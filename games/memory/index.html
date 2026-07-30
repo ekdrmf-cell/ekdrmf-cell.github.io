@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>카드 짝맞추기 — 수익화허브</title>
+<link rel="stylesheet" href="../../css/style.css" />
+<style>
+  .game-wrap {
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .score-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-weight: 700;
+    min-width: 72px;
+  }
+  .score-box .label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .card {
+    aspect-ratio: 1 / 1;
+    perspective: 700px;
+    cursor: pointer;
+  }
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.4s;
+    transform-style: preserve-3d;
+  }
+  .card.flipped .card-inner,
+  .card.matched .card-inner {
+    transform: rotateY(180deg);
+  }
+  .card-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 1.7rem;
+    backface-visibility: hidden;
+  }
+  .card-front {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 1.2rem;
+  }
+  .card-back {
+    background: linear-gradient(145deg, rgba(139, 107, 255, 0.25), rgba(34, 211, 170, 0.16));
+    border: 1px solid var(--border);
+    transform: rotateY(180deg);
+  }
+  .card.matched .card-back {
+    background: linear-gradient(145deg, rgba(34, 211, 170, 0.35), rgba(34, 211, 170, 0.18));
+    box-shadow: inset 0 0 0 2px var(--accent-2);
+  }
+  .controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .hint {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body data-active="games" data-root="../../">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="game-wrap">
+    <h1 style="margin-bottom:4px;">카드 짝맞추기</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-top:0;">카드를 두 장씩 뒤집어 같은 그림을 찾아 모든 짝을 맞춰보세요.</p>
+
+    <div class="score-row">
+      <div class="score-box"><span class="label">이동</span><span id="moves">0</span></div>
+      <div class="score-box"><span class="label">시간</span><span id="time">00:00</span></div>
+      <div class="score-box"><span class="label">점수</span><span id="score">1000</span></div>
+      <div class="score-box"><span class="label">최고 점수</span><span id="best">0</span></div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn" id="hint-btn">광고 보고 힌트 보기</button>
+      <button class="btn" id="remove-ads-btn">광고 제거</button>
+    </div>
+
+    <div id="board"></div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="restart-btn">다시하기</button>
+      <a class="btn" href="../index.html">게임 목록</a>
+    </div>
+    <div class="hint">두 장이 같지 않으면 잠시 후 다시 뒤집힙니다. 힌트는 광고 시청 후 게임당 1회만 사용할 수 있습니다.</div>
+  </div>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/ad-stub.js"></script>
+<script>
+  const EMOJIS = ["🐶", "🐱", "🐰", "🦊", "🐼", "🐸", "🦁", "🐯"];
+
+  const boardEl = document.getElementById("board");
+  const movesEl = document.getElementById("moves");
+  const timeEl = document.getElementById("time");
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+  const hintBtn = document.getElementById("hint-btn");
+
+  let best = Number(localStorage.getItem("memory-best") || 0);
+  bestEl.textContent = best;
+
+  let cards = [];
+  let matchedSet = new Set();
+  let flippedIndices = [];
+  let lockBoard = false;
+  let moves = 0;
+  let elapsedSeconds = 0;
+  let timerInterval = null;
+  let timerStarted = false;
+  let hintUsed = false;
+  let gameWon = false;
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function buildDeck() {
+    return shuffle(EMOJIS.concat(EMOJIS));
+  }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, "0");
+    const s = (sec % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function currentScore() {
+    return Math.max(0, 1000 - moves * 20);
+  }
+
+  function updateMoves() {
+    movesEl.textContent = moves;
+    scoreEl.textContent = currentScore();
+  }
+
+  function updateTime() {
+    timeEl.textContent = formatTime(elapsedSeconds);
+  }
+
+  function startTimer() {
+    if (timerInterval) return;
+    timerInterval = setInterval(() => {
+      elapsedSeconds++;
+      updateTime();
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function cardEl(idx) {
+    return boardEl.querySelector(`.card[data-index="${idx}"]`);
+  }
+
+  function flipUp(idx) {
+    const el = cardEl(idx);
+    if (el) el.classList.add("flipped");
+  }
+
+  function flipDown(idx) {
+    const el = cardEl(idx);
+    if (el) el.classList.remove("flipped");
+  }
+
+  function markMatched(idx) {
+    const el = cardEl(idx);
+    if (el) el.classList.add("matched");
+  }
+
+  function render() {
+    boardEl.innerHTML = "";
+    cards.forEach((value, idx) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.dataset.index = idx;
+      card.innerHTML = `
+        <div class="card-inner">
+          <div class="card-face card-front">❓</div>
+          <div class="card-face card-back">${value}</div>
+        </div>`;
+      card.addEventListener("click", onCardClick);
+      boardEl.appendChild(card);
+    });
+  }
+
+  function onCardClick(e) {
+    if (lockBoard || gameWon) return;
+    const idx = Number(e.currentTarget.dataset.index);
+    if (matchedSet.has(idx)) return;
+    if (flippedIndices.includes(idx)) return;
+    if (flippedIndices.length >= 2) return;
+
+    if (!timerStarted) {
+      timerStarted = true;
+      startTimer();
+    }
+
+    flipUp(idx);
+    flippedIndices.push(idx);
+
+    if (flippedIndices.length === 2) {
+      moves++;
+      updateMoves();
+      lockBoard = true;
+      const [a, b] = flippedIndices;
+      if (cards[a] === cards[b]) {
+        matchedSet.add(a);
+        matchedSet.add(b);
+        markMatched(a);
+        markMatched(b);
+        flippedIndices = [];
+        lockBoard = false;
+        if (matchedSet.size === cards.length) {
+          winGame();
+        }
+      } else {
+        setTimeout(() => {
+          flipDown(a);
+          flipDown(b);
+          flippedIndices = [];
+          lockBoard = false;
+        }, 700);
+      }
+    }
+  }
+
+  function winGame() {
+    gameWon = true;
+    stopTimer();
+    const finalScore = currentScore();
+    scoreEl.textContent = finalScore;
+    if (finalScore > best) {
+      best = finalScore;
+      localStorage.setItem("memory-best", best);
+      bestEl.textContent = best;
+    }
+    const moveCount = moves;
+    const timeText = formatTime(elapsedSeconds);
+    setTimeout(() => {
+      AdStub.showInterstitialAd(() => {
+        alert(`축하합니다! 모든 카드를 맞췄습니다.\n이동 횟수: ${moveCount}\n걸린 시간: ${timeText}\n점수: ${finalScore}`);
+      });
+    }, 300);
+  }
+
+  function useHint() {
+    if (hintUsed || lockBoard || gameWon) return;
+    AdStub.showRewardAd(() => {
+      if (hintUsed) return;
+      hintUsed = true;
+      hintBtn.disabled = true;
+      hintBtn.textContent = "힌트 사용 완료";
+      lockBoard = true;
+
+      const els = Array.from(boardEl.querySelectorAll(".card"));
+      els.forEach((el) => {
+        const idx = Number(el.dataset.index);
+        if (!matchedSet.has(idx)) el.classList.add("flipped");
+      });
+
+      setTimeout(() => {
+        els.forEach((el) => {
+          const idx = Number(el.dataset.index);
+          if (!matchedSet.has(idx) && !flippedIndices.includes(idx)) {
+            el.classList.remove("flipped");
+          }
+        });
+        lockBoard = false;
+      }, 1000);
+    });
+  }
+
+  function restart() {
+    stopTimer();
+    cards = buildDeck();
+    matchedSet = new Set();
+    flippedIndices = [];
+    lockBoard = false;
+    moves = 0;
+    elapsedSeconds = 0;
+    timerStarted = false;
+    gameWon = false;
+    hintUsed = false;
+    hintBtn.disabled = false;
+    hintBtn.textContent = "광고 보고 힌트 보기";
+    updateMoves();
+    updateTime();
+    render();
+  }
+
+  document.getElementById("restart-btn").addEventListener("click", restart);
+  document.getElementById("remove-ads-btn").addEventListener("click", () => AdStub.showRemoveAdsPurchase());
+  hintBtn.addEventListener("click", useHint);
+
+  restart();
+</script>
+</body>
+</html>

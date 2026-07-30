@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>상식퀴즈 챌린지 — 수익화허브</title>
+<link rel="stylesheet" href="../../css/style.css" />
+<style>
+  .game-wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .score-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 700;
+  }
+  .score-box .label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  .lives-box #lives {
+    letter-spacing: 2px;
+    color: var(--accent-3);
+  }
+  .quiz-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 18px;
+    text-align: left;
+  }
+  .q-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .streak-badge {
+    font-size: 0.78rem;
+    color: var(--accent-2);
+    background: rgba(34, 211, 170, 0.1);
+    border: 1px solid rgba(34, 211, 170, 0.25);
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .category-badge {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+  .question-text {
+    font-size: 1.08rem;
+    line-height: 1.5;
+    margin: 4px 0 18px;
+    min-height: 2.6em;
+  }
+  .choices-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .choice-btn {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 10px;
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    text-align: center;
+  }
+  .choice-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+  .choice-btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .choice-btn:disabled {
+    cursor: default;
+  }
+  .choice-btn.correct {
+    background: rgba(34, 211, 170, 0.22);
+    border-color: var(--accent-2);
+    color: #fff;
+  }
+  .choice-btn.wrong {
+    background: rgba(255, 122, 92, 0.22);
+    border-color: var(--accent-3);
+    color: #fff;
+    animation: shake 0.3s;
+  }
+  .choice-btn.reveal-correct {
+    background: rgba(34, 211, 170, 0.14);
+    border-color: var(--accent-2);
+  }
+  @keyframes shake {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(4px); }
+    30%, 50%, 70% { transform: translateX(-7px); }
+    40%, 60% { transform: translateX(7px); }
+  }
+  .controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .hint {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body data-active="games" data-root="../../">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="game-wrap">
+    <h1 style="margin-bottom:4px;">상식퀴즈 챌린지</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-top:0;">4지선다 상식 문제를 풀고 목숨이 다하기 전까지 점수를 쌓아보세요.</p>
+
+    <div class="score-row">
+      <div class="score-box"><span class="label">점수</span><span id="score">0</span></div>
+      <div class="score-box lives-box"><span class="label">목숨</span><span id="lives">❤❤❤</span></div>
+      <button class="btn" id="remove-ads-btn">광고 제거</button>
+      <div class="score-box"><span class="label">최고 점수</span><span id="best">0</span></div>
+    </div>
+
+    <div class="quiz-card">
+      <div class="q-meta">
+        <span class="category-badge" id="progress-badge">문제</span>
+        <span class="streak-badge" id="streak-badge">연속 0회</span>
+      </div>
+      <div class="question-text" id="question-text">문제를 불러오는 중...</div>
+      <div class="choices-grid" id="choices">
+        <button class="choice-btn" type="button" data-i="0"></button>
+        <button class="choice-btn" type="button" data-i="1"></button>
+        <button class="choice-btn" type="button" data-i="2"></button>
+        <button class="choice-btn" type="button" data-i="3"></button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="restart-btn">다시하기</button>
+      <a class="btn" href="../index.html">게임 목록</a>
+    </div>
+    <div class="hint">오답을 고르면 목숨이 하나 줄고 정답이 표시됩니다. 목숨이 모두 사라지면 "광고 보고 이어하기"로 한 번 더 도전할 수 있습니다.</div>
+  </div>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/ad-stub.js"></script>
+<script>
+  // 상식 퀴즈 문제 은행 (최소 30문항, 시대에 따라 바뀌지 않는 사실 위주로 구성)
+  const questionBank = [
+    { q: "나일강 유역에서 발달한, 세계 4대 문명 중 하나로 꼽히는 문명은 무엇인가?", choices: ["이집트 문명", "마야 문명", "잉카 문명", "아즈텍 문명"], answer: 0 },
+    { q: "제2차 세계대전이 끝난 해는 언제인가?", choices: ["1943년", "1945년", "1947년", "1950년"], answer: 1 },
+    { q: "프랑스 혁명이 시작된 해는 언제인가?", choices: ["1776년", "1789년", "1804년", "1812년"], answer: 1 },
+    { q: "종이를 처음 발명한 것으로 널리 알려진 나라는 어디인가?", choices: ["중국", "이집트", "인도", "그리스"], answer: 0 },
+    { q: "만리장성이 위치한 나라는 어디인가?", choices: ["중국", "몽골", "일본", "베트남"], answer: 0 },
+    { q: "콜럼버스가 아메리카 대륙에 처음 도달한 해는 언제인가?", choices: ["1492년", "1500년", "1607년", "1620년"], answer: 0 },
+    { q: "인류 최초로 달에 착륙한 유인 우주선 임무의 이름은?", choices: ["아폴로 11호", "보스토크 1호", "제미니 4호", "스푸트니크 1호"], answer: 0 },
+    { q: "노벨상을 제정한 인물은 누구인가?", choices: ["알프레드 노벨", "토머스 에디슨", "아이작 뉴턴", "알베르트 아인슈타인"], answer: 0 },
+    { q: "물의 화학식은 무엇인가?", choices: ["H2O", "CO2", "NaCl", "O2"], answer: 0 },
+    { q: "태양계에서 가장 큰 행성은 무엇인가?", choices: ["목성", "토성", "지구", "화성"], answer: 0 },
+    { q: "사람의 몸에서 혈액을 온몸으로 순환시키는 역할을 하는 기관은?", choices: ["심장", "간", "폐", "신장"], answer: 0 },
+    { q: "진공 상태에서 빛의 속도는 초당 약 얼마인가?", choices: ["약 30만 km", "약 3만 km", "약 300만 km", "약 3천 km"], answer: 0 },
+    { q: "식물이 빛 에너지를 이용해 스스로 양분을 만드는 과정을 무엇이라 하는가?", choices: ["광합성", "호흡", "증산작용", "발효"], answer: 0 },
+    { q: "원소기호 'O'가 나타내는 원소는 무엇인가?", choices: ["산소", "금", "철", "수소"], answer: 0 },
+    { q: "태양계에서 태양에 가장 가까운 행성은 무엇인가?", choices: ["수성", "금성", "지구", "화성"], answer: 0 },
+    { q: "사람의 정상 체온은 대략 몇 도인가?", choices: ["약 36.5도", "약 30도", "약 40도", "약 25도"], answer: 0 },
+    { q: "DNA의 이중나선 구조를 밝혀낸 것으로 유명한 두 과학자는?", choices: ["왓슨과 크릭", "다윈과 멘델", "아인슈타인과 보어", "뉴턴과 갈릴레이"], answer: 0 },
+    { q: "물이 어는 온도는 섭씨 몇 도인가?", choices: ["0도", "10도", "-10도", "5도"], answer: 0 },
+    { q: "해수면 기준으로 물이 끓는 온도는 섭씨 몇 도인가?", choices: ["100도", "80도", "90도", "120도"], answer: 0 },
+    { q: "성인의 몸을 이루는 뼈의 개수는 일반적으로 몇 개인가?", choices: ["206개", "186개", "226개", "246개"], answer: 0 },
+    { q: "사람의 몸에서 가장 넓은 면적을 차지하는 기관은 무엇인가?", choices: ["피부", "간", "폐", "대장"], answer: 0 },
+    { q: "세계에서 육지 면적이 가장 넓은 대륙은 어디인가?", choices: ["아시아", "아프리카", "유럽", "북아메리카"], answer: 0 },
+    { q: "세계에서 영토 면적이 가장 넓은 나라는 어디인가?", choices: ["러시아", "캐나다", "중국", "미국"], answer: 0 },
+    { q: "에펠탑이 있는 도시는 어디인가?", choices: ["파리", "런던", "로마", "베를린"], answer: 0 },
+    { q: "세계에서 해발 고도가 가장 높은 산은 무엇인가?", choices: ["에베레스트산", "킬리만자로산", "몽블랑", "매킨리산"], answer: 0 },
+    { q: "피라미드로 유명한 기자(Giza) 지역이 위치한 나라는 어디인가?", choices: ["이집트", "사우디아라비아", "이란", "모로코"], answer: 0 },
+    { q: "지구의 대양 중 면적이 가장 넓은 바다는 어디인가?", choices: ["태평양", "대서양", "인도양", "북극해"], answer: 0 },
+    { q: "호주(오스트레일리아)의 수도는 어디인가?", choices: ["캔버라", "시드니", "멜버른", "브리즈번"], answer: 0 },
+    { q: "1년(평년 기준)은 며칠인가?", choices: ["365일", "360일", "366일", "364일"], answer: 0 },
+    { q: "하루는 몇 시간인가?", choices: ["24시간", "12시간", "48시간", "20시간"], answer: 0 },
+    { q: "일반적으로 무지개는 몇 가지 색으로 이루어져 있다고 알려져 있는가?", choices: ["7가지", "5가지", "6가지", "9가지"], answer: 0 },
+    { q: "꿀벌이 만드는 벌집의 구멍은 대체로 어떤 모양인가?", choices: ["육각형", "사각형", "삼각형", "원형"], answer: 0 },
+    { q: "일본의 전통 의상으로 잘 알려진 옷은 무엇인가?", choices: ["기모노", "한복", "치파오", "사리"], answer: 0 },
+    { q: "음력 8월 15일에 해당하는 한국의 전통 명절은 무엇인가?", choices: ["추석", "설날", "단오", "동지"], answer: 0 },
+    { q: "얇게 편 반죽 위에 토마토소스와 치즈를 올려 구운, 이탈리아에서 유래한 대표적인 요리는?", choices: ["피자", "파스타", "리조또", "라자냐"], answer: 0 },
+    { q: "매년 프랑스에서 열리는 세계적으로 유명한 도로 사이클 대회는?", choices: ["투르 드 프랑스", "지로 디탈리아", "부엘타 에스파냐", "파리-루베"], answer: 0 },
+    { q: "사자성어 '어부지리(漁夫之利)'의 뜻으로 가장 알맞은 것은?", choices: ["둘이 다투는 사이에 제3자가 이익을 챙긴다", "매우 위험한 상황에 처하다", "시작은 있지만 끝이 없다", "아무 노력 없이 큰 성공을 거둔다"], answer: 0 },
+    { q: "사자성어 '새옹지마(塞翁之馬)'의 뜻으로 가장 알맞은 것은?", choices: ["인생의 좋고 나쁨은 예측하기 어렵다", "말을 매우 아낀다", "늙은 말이 길을 안다", "준비가 있으면 걱정이 없다"], answer: 0 },
+    { q: "속담 '가는 말이 고와야 오는 말이 곱다'의 뜻으로 가장 알맞은 것은?", choices: ["자신이 남에게 잘해야 남도 자신에게 잘한다", "말은 빠르게 퍼진다", "말을 아끼는 것이 미덕이다", "먼저 말을 거는 사람이 손해를 본다"], answer: 0 },
+    { q: "속담 '호랑이도 제 말 하면 온다'의 뜻으로 가장 알맞은 것은?", choices: ["누군가에 대해 이야기하면 공교롭게 그 사람이 나타난다", "호랑이는 몹시 사납고 위험하다", "소문은 사실보다 부풀려진다", "위험은 예고 없이 찾아온다"], answer: 0 },
+    { q: "속담 '백지장도 맞들면 낫다'의 뜻으로 가장 알맞은 것은?", choices: ["쉬운 일도 여럿이 힘을 합치면 더 쉬워진다", "종이는 얇을수록 좋다", "혼자 하는 일이 더 정확하다", "일은 시작이 반이다"], answer: 0 },
+    { q: "속담 '가는 날이 장날'의 뜻으로 가장 알맞은 것은?", choices: ["어떤 일을 하려는데 뜻하지 않은 일이 공교롭게 겹친다", "시장은 정해진 날에만 연다", "부지런한 사람이 성공한다", "장사는 타이밍이 중요하다"], answer: 0 },
+  ];
+
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+  const livesEl = document.getElementById("lives");
+  const streakBadgeEl = document.getElementById("streak-badge");
+  const progressBadgeEl = document.getElementById("progress-badge");
+  const questionTextEl = document.getElementById("question-text");
+  const choicesEl = document.getElementById("choices");
+
+  let best = Number(localStorage.getItem("quiz-best") || 0);
+  bestEl.textContent = best;
+
+  let score, lives, streak, over, locked, continuesUsed;
+  let queue = [];
+  let currentIndex = -1;
+  let currentCorrectIndex = -1;
+  let roundCount = 0;
+
+  function refillQueue() {
+    queue = questionBank.map((_, i) => i);
+    for (let i = queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [queue[i], queue[j]] = [queue[j], queue[i]];
+    }
+  }
+
+  function nextQuestionIndex() {
+    if (queue.length === 0) refillQueue();
+    return queue.pop();
+  }
+
+  function updateHeader() {
+    scoreEl.textContent = score;
+    const filled = "❤".repeat(Math.max(0, lives));
+    const empty = "♡".repeat(Math.max(0, 3 - lives));
+    livesEl.textContent = filled + empty;
+    streakBadgeEl.textContent = `연속 ${streak}회`;
+  }
+
+  function updateBest() {
+    if (score > best) {
+      best = score;
+      localStorage.setItem("quiz-best", best);
+      bestEl.textContent = best;
+    }
+  }
+
+  function loadQuestion() {
+    currentIndex = nextQuestionIndex();
+    roundCount++;
+    const q = questionBank[currentIndex];
+    questionTextEl.textContent = q.q;
+    progressBadgeEl.textContent = `문제 ${roundCount}`;
+
+    const items = q.choices.map((text, idx) => ({ text, correct: idx === q.answer }));
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+    currentCorrectIndex = items.findIndex((it) => it.correct);
+
+    const btns = choicesEl.querySelectorAll(".choice-btn");
+    btns.forEach((btn, i) => {
+      btn.textContent = items[i].text;
+      btn.className = "choice-btn";
+      btn.disabled = false;
+    });
+  }
+
+  function selectChoice(i) {
+    if (locked || over) return;
+    locked = true;
+    const btns = choicesEl.querySelectorAll(".choice-btn");
+    btns.forEach((b) => (b.disabled = true));
+
+    if (i === currentCorrectIndex) {
+      btns[i].classList.add("correct");
+      streak++;
+      const bonusStreak = Math.min(streak, 10);
+      score += 100 + (bonusStreak - 1) * 20;
+      updateBest();
+      updateHeader();
+      setTimeout(() => {
+        locked = false;
+        loadQuestion();
+      }, 650);
+    } else {
+      btns[i].classList.add("wrong");
+      if (currentCorrectIndex >= 0 && currentCorrectIndex !== i) {
+        btns[currentCorrectIndex].classList.add("reveal-correct");
+      }
+      streak = 0;
+      lives = Math.max(0, lives - 1);
+      updateHeader();
+      setTimeout(() => {
+        if (lives <= 0) {
+          endGame();
+        } else {
+          locked = false;
+          loadQuestion();
+        }
+      }, 1100);
+    }
+  }
+
+  function endGame() {
+    over = true;
+    setTimeout(() => {
+      if (continuesUsed < 1) {
+        AdStub.showRewardAd(() => {
+          continuesUsed++;
+          over = false;
+          lives = 1;
+          updateHeader();
+          locked = false;
+          loadQuestion();
+        });
+      } else {
+        alert(`게임 오버! 최종 점수: ${score}`);
+      }
+    }, 200);
+  }
+
+  function restart() {
+    score = 0;
+    lives = 3;
+    streak = 0;
+    over = false;
+    locked = false;
+    continuesUsed = 0;
+    roundCount = 0;
+    refillQueue();
+    updateHeader();
+    loadQuestion();
+  }
+
+  choicesEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".choice-btn");
+    if (!btn) return;
+    selectChoice(Number(btn.dataset.i));
+  });
+
+  document.getElementById("restart-btn").addEventListener("click", restart);
+  document.getElementById("remove-ads-btn").addEventListener("click", () => AdStub.showRemoveAdsPurchase());
+
+  restart();
+</script>
+</body>
+</html>

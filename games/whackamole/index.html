@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>두더지 잡기 — 수익화허브</title>
+<link rel="stylesheet" href="../../css/style.css" />
+<style>
+  .game-wrap {
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .score-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 700;
+  }
+  .score-box .label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  .score-box.time-box #time {
+    color: var(--accent-2);
+  }
+  .score-box.time-box.low #time {
+    color: var(--accent-3);
+  }
+  #holes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .hole {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 42%, #23283c 0%, #0b0d13 72%);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.06s, background 0.15s, border-color 0.15s;
+  }
+  .hole:active {
+    transform: scale(0.96);
+  }
+  .hole .mole {
+    font-size: 2.1rem;
+    opacity: 0;
+    transform: translateY(65%) scale(0.7);
+    transition: opacity 0.1s ease-out, transform 0.1s ease-out;
+    pointer-events: none;
+  }
+  .hole.up .mole {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .hole.hit {
+    background: radial-gradient(circle at 50% 42%, rgba(34, 211, 170, 0.35), #0b0d13 72%);
+    border-color: var(--accent-2);
+  }
+  .hole.miss {
+    border-color: var(--accent-3);
+  }
+  .controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .hint {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body data-active="games" data-root="../../">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="game-wrap">
+    <h1 style="margin-bottom:4px;">두더지 잡기</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-top:0;">구멍에서 튀어나오는 두더지를 클릭/터치해서 잡으세요! 시간이 지날수록 빨라집니다.</p>
+
+    <div class="score-row">
+      <div class="score-box"><span class="label">점수</span><span id="score">0</span></div>
+      <div class="score-box time-box"><span class="label">남은 시간</span><span id="time">60</span></div>
+      <button class="btn" id="remove-ads-btn">광고 제거</button>
+      <div class="score-box"><span class="label">최고 점수</span><span id="best">0</span></div>
+    </div>
+
+    <div id="holes-grid"></div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="restart-btn">다시하기</button>
+      <a class="btn" href="../index.html">게임 목록</a>
+    </div>
+    <div class="hint">게임오버 후 "광고 보고 이어하기"를 선택하면 시간이 15초 추가되어 한 번 더 도전할 수 있습니다.</div>
+  </div>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/ad-stub.js"></script>
+<script>
+  const TOTAL_TIME = 60;
+  const HOLE_COUNT = 9;
+
+  const gridEl = document.getElementById("holes-grid");
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+  const timeEl = document.getElementById("time");
+  const timeBoxEl = document.querySelector(".time-box");
+
+  let best = Number(localStorage.getItem("whackamole-best") || 0);
+  bestEl.textContent = best;
+
+  let score, timeLeft, over, continuesUsed;
+  let countdownId = null;
+  let moleSpawnId = null;
+  let moleHideIds = [];
+  let moleState = [];
+  let holes = [];
+
+  function buildGrid() {
+    gridEl.innerHTML = "";
+    holes = [];
+    for (let i = 0; i < HOLE_COUNT; i++) {
+      const hole = document.createElement("div");
+      hole.className = "hole";
+      hole.dataset.idx = String(i);
+      const mole = document.createElement("span");
+      mole.className = "mole";
+      mole.textContent = "🐹";
+      hole.appendChild(mole);
+      hole.addEventListener("click", () => handleHoleClick(i));
+      gridEl.appendChild(hole);
+      holes.push(hole);
+    }
+  }
+
+  function clearAllTimers() {
+    if (countdownId !== null) {
+      clearInterval(countdownId);
+      countdownId = null;
+    }
+    if (moleSpawnId !== null) {
+      clearTimeout(moleSpawnId);
+      moleSpawnId = null;
+    }
+    moleHideIds.forEach((id) => {
+      if (id !== null) clearTimeout(id);
+    });
+    moleHideIds = new Array(HOLE_COUNT).fill(null);
+  }
+
+  function hideAllMoles() {
+    for (let i = 0; i < HOLE_COUNT; i++) {
+      moleState[i] = false;
+      if (holes[i]) holes[i].classList.remove("up");
+    }
+  }
+
+  function currentProgress() {
+    // 0 (게임 시작) ~ 1 (종료 직전) 사이 값. 시간이 지날수록 난이도 상승에 사용.
+    return Math.min(1, Math.max(0, (TOTAL_TIME - timeLeft) / TOTAL_TIME));
+  }
+
+  function scheduleNextMole() {
+    if (over) return;
+    const progress = currentProgress();
+    const delayMin = 700 - progress * 400; // 700ms -> 300ms
+    const delayMax = 1200 - progress * 500; // 1200ms -> 700ms
+    const delay = delayMin + Math.random() * (delayMax - delayMin);
+    moleSpawnId = setTimeout(spawnMole, delay);
+  }
+
+  function spawnMole() {
+    if (over) return;
+    const idleIndices = [];
+    for (let i = 0; i < HOLE_COUNT; i++) if (!moleState[i]) idleIndices.push(i);
+    const pool = idleIndices.length ? idleIndices : holes.map((_, i) => i);
+    const idx = pool[Math.floor(Math.random() * pool.length)];
+    activateMole(idx);
+    scheduleNextMole();
+  }
+
+  function activateMole(idx) {
+    if (over) return;
+    const hole = holes[idx];
+    if (moleHideIds[idx] !== null) {
+      clearTimeout(moleHideIds[idx]);
+      moleHideIds[idx] = null;
+    }
+    moleState[idx] = true;
+    hole.classList.remove("hit", "miss");
+    hole.classList.add("up");
+
+    const progress = currentProgress();
+    const durMin = Math.max(280, 500 - progress * 150); // 500ms -> 350ms
+    const durMax = Math.max(durMin + 150, 900 - progress * 300); // 900ms -> 600ms
+    const dur = durMin + Math.random() * (durMax - durMin);
+
+    moleHideIds[idx] = setTimeout(() => {
+      moleState[idx] = false;
+      hole.classList.remove("up");
+      moleHideIds[idx] = null;
+    }, dur);
+  }
+
+  function handleHoleClick(idx) {
+    if (over) return;
+    const hole = holes[idx];
+    if (moleState[idx]) {
+      score++;
+      scoreEl.textContent = score;
+      if (score > best) {
+        best = score;
+        localStorage.setItem("whackamole-best", best);
+        bestEl.textContent = best;
+      }
+      moleState[idx] = false;
+      if (moleHideIds[idx] !== null) {
+        clearTimeout(moleHideIds[idx]);
+        moleHideIds[idx] = null;
+      }
+      hole.classList.remove("up", "miss");
+      hole.classList.add("hit");
+      setTimeout(() => hole.classList.remove("hit"), 150);
+    } else {
+      hole.classList.add("miss");
+      setTimeout(() => hole.classList.remove("miss"), 150);
+    }
+  }
+
+  function updateTimeDisplay() {
+    timeEl.textContent = Math.max(0, timeLeft);
+    if (timeLeft <= 10) timeBoxEl.classList.add("low");
+    else timeBoxEl.classList.remove("low");
+  }
+
+  function startCountdown() {
+    if (countdownId !== null) clearInterval(countdownId);
+    countdownId = setInterval(() => {
+      timeLeft--;
+      updateTimeDisplay();
+      if (timeLeft <= 0) {
+        endGame();
+      }
+    }, 1000);
+  }
+
+  function endGame() {
+    if (over) return;
+    over = true;
+    if (countdownId !== null) {
+      clearInterval(countdownId);
+      countdownId = null;
+    }
+    if (moleSpawnId !== null) {
+      clearTimeout(moleSpawnId);
+      moleSpawnId = null;
+    }
+    moleHideIds.forEach((id) => {
+      if (id !== null) clearTimeout(id);
+    });
+    moleHideIds = new Array(HOLE_COUNT).fill(null);
+    hideAllMoles();
+
+    setTimeout(() => {
+      if (!continuesUsed) {
+        AdStub.showRewardAd(() => {
+          continuesUsed = true;
+          over = false;
+          timeLeft += 15;
+          updateTimeDisplay();
+          startCountdown();
+          scheduleNextMole();
+        });
+      } else {
+        alert(`게임 종료! 최종 점수: ${score}`);
+      }
+    }, 200);
+  }
+
+  function restart() {
+    clearAllTimers();
+    hideAllMoles();
+    score = 0;
+    timeLeft = TOTAL_TIME;
+    over = false;
+    continuesUsed = false;
+    scoreEl.textContent = "0";
+    updateTimeDisplay();
+    startCountdown();
+    scheduleNextMole();
+  }
+
+  document.getElementById("restart-btn").addEventListener("click", restart);
+  document.getElementById("remove-ads-btn").addEventListener("click", () => AdStub.showRemoveAdsPurchase());
+
+  buildGrid();
+  moleHideIds = new Array(HOLE_COUNT).fill(null);
+  moleState = new Array(HOLE_COUNT).fill(false);
+  restart();
+</script>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>매치3 캔디 — 수익화허브</title>
+<link rel="stylesheet" href="../../css/style.css" />
+<style>
+  .game-wrap {
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .score-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 700;
+    min-width: 76px;
+  }
+  .score-box .label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .tile {
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.15);
+    transition: transform 0.15s ease, opacity 0.2s ease, box-shadow 0.15s ease;
+  }
+  .tile.selected {
+    transform: scale(0.88);
+    box-shadow: inset 0 0 0 3px #fff, 0 0 0 2px var(--accent);
+  }
+  .tile.matched {
+    transform: scale(0.35);
+    opacity: 0.15;
+  }
+  .controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .hint {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body data-active="games" data-root="../../">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="game-wrap">
+    <h1 style="margin-bottom:4px;">매치3 캔디</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-top:0;">타일을 클릭한 뒤 인접한 타일을 클릭해 3개 이상을 맞추세요.</p>
+
+    <div class="score-row">
+      <div class="score-box"><span class="label">점수</span><span id="score">0</span></div>
+      <div class="score-box"><span class="label">남은 횟수</span><span id="moves">25</span></div>
+      <button class="btn" id="remove-ads-btn">광고 제거</button>
+      <div class="score-box"><span class="label">최고 점수</span><span id="best">0</span></div>
+    </div>
+
+    <div id="board"></div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="restart-btn">다시하기</button>
+      <a class="btn" href="../index.html">게임 목록</a>
+    </div>
+    <div class="hint">게임오버 후 "광고 보고 이어하기"를 선택하면 이동 횟수 10회를 더 받을 수 있습니다.</div>
+  </div>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/ad-stub.js"></script>
+<script>
+  const SIZE = 6;
+  const START_MOVES = 25;
+  const CONTINUE_MOVES = 10;
+
+  const COLORS = [
+    { bg: "#ff6f6f", emoji: "🍓" },
+    { bg: "#ffb347", emoji: "🍊" },
+    { bg: "#ffd166", emoji: "🍋" },
+    { bg: "#22d3aa", emoji: "🍏" },
+    { bg: "#5a9fff", emoji: "🫐" },
+    { bg: "#b47cff", emoji: "🍇" },
+  ];
+
+  const boardEl = document.getElementById("board");
+  const scoreEl = document.getElementById("score");
+  const movesEl = document.getElementById("moves");
+  const bestEl = document.getElementById("best");
+
+  let grid, score, moves, over, continuesUsed, selectedIdx, locked;
+
+  let best = Number(localStorage.getItem("match3-best") || 0);
+  bestEl.textContent = best;
+
+  function idx(r, c) {
+    return r * SIZE + c;
+  }
+
+  function randomColorAvoiding(r, c, arr) {
+    const bad = new Set();
+    if (c >= 2 && arr[idx(r, c - 1)] === arr[idx(r, c - 2)]) bad.add(arr[idx(r, c - 1)]);
+    if (r >= 2 && arr[idx(r - 1, c)] === arr[idx(r - 2, c)]) bad.add(arr[idx(r - 1, c)]);
+    const options = [];
+    for (let k = 0; k < COLORS.length; k++) if (!bad.has(k)) options.push(k);
+    return options[Math.floor(Math.random() * options.length)];
+  }
+
+  function generateBoard() {
+    const arr = new Array(SIZE * SIZE).fill(0);
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        arr[idx(r, c)] = randomColorAvoiding(r, c, arr);
+      }
+    }
+    return arr;
+  }
+
+  function isAdjacent(a, b) {
+    const r1 = Math.floor(a / SIZE), c1 = a % SIZE;
+    const r2 = Math.floor(b / SIZE), c2 = b % SIZE;
+    return (r1 === r2 && Math.abs(c1 - c2) === 1) || (c1 === c2 && Math.abs(r1 - r2) === 1);
+  }
+
+  function swapCells(a, b) {
+    const t = grid[a];
+    grid[a] = grid[b];
+    grid[b] = t;
+  }
+
+  function findMatches() {
+    const matched = new Set();
+    // 가로
+    for (let r = 0; r < SIZE; r++) {
+      let c = 0;
+      while (c < SIZE) {
+        const color = grid[idx(r, c)];
+        let runEnd = c + 1;
+        while (runEnd < SIZE && grid[idx(r, runEnd)] === color) runEnd++;
+        if (runEnd - c >= 3) {
+          for (let k = c; k < runEnd; k++) matched.add(idx(r, k));
+        }
+        c = runEnd;
+      }
+    }
+    // 세로
+    for (let c = 0; c < SIZE; c++) {
+      let r = 0;
+      while (r < SIZE) {
+        const color = grid[idx(r, c)];
+        let runEnd = r + 1;
+        while (runEnd < SIZE && grid[idx(runEnd, c)] === color) runEnd++;
+        if (runEnd - r >= 3) {
+          for (let k = r; k < runEnd; k++) matched.add(idx(k, c));
+        }
+        r = runEnd;
+      }
+    }
+    return matched;
+  }
+
+  function clearMatches(matched) {
+    matched.forEach((i) => {
+      grid[i] = null;
+    });
+  }
+
+  function collapseAndRefill() {
+    for (let c = 0; c < SIZE; c++) {
+      const colVals = [];
+      for (let r = 0; r < SIZE; r++) {
+        const v = grid[idx(r, c)];
+        if (v !== null) colVals.push(v);
+      }
+      const missing = SIZE - colVals.length;
+      const newVals = [];
+      for (let i = 0; i < missing; i++) newVals.push(Math.floor(Math.random() * COLORS.length));
+      const full = newVals.concat(colVals);
+      for (let r = 0; r < SIZE; r++) grid[idx(r, c)] = full[r];
+    }
+  }
+
+  function render(matchedSet) {
+    boardEl.innerHTML = "";
+    for (let i = 0; i < grid.length; i++) {
+      const color = grid[i];
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.dataset.idx = i;
+      if (color !== null && color !== undefined) {
+        const info = COLORS[color];
+        tile.style.background = info.bg;
+        tile.textContent = info.emoji;
+      }
+      if (i === selectedIdx) tile.classList.add("selected");
+      if (matchedSet && matchedSet.has(i)) tile.classList.add("matched");
+      boardEl.appendChild(tile);
+    }
+    updateHeader();
+  }
+
+  function updateHeader() {
+    scoreEl.textContent = score;
+    movesEl.textContent = moves;
+    if (score > best) {
+      best = score;
+      localStorage.setItem("match3-best", best);
+      bestEl.textContent = best;
+    }
+  }
+
+  function resolveCascade(done) {
+    const matched = findMatches();
+    if (matched.size === 0) {
+      done();
+      return;
+    }
+    score += matched.size * 10;
+    render(matched);
+    setTimeout(() => {
+      clearMatches(matched);
+      collapseAndRefill();
+      render();
+      setTimeout(() => resolveCascade(done), 180);
+    }, 220);
+  }
+
+  function attemptSwap(a, b) {
+    if (locked || over) return;
+    locked = true;
+    swapCells(a, b);
+    render();
+    setTimeout(() => {
+      const matches = findMatches();
+      if (matches.size > 0) {
+        moves = Math.max(0, moves - 1);
+        updateHeader();
+        resolveCascade(() => {
+          locked = false;
+          checkGameOver();
+        });
+      } else {
+        swapCells(a, b);
+        render();
+        locked = false;
+      }
+    }, 150);
+  }
+
+  function onTileClick(i) {
+    if (locked || over) return;
+    if (selectedIdx === null) {
+      selectedIdx = i;
+      render();
+      return;
+    }
+    if (selectedIdx === i) {
+      selectedIdx = null;
+      render();
+      return;
+    }
+    if (isAdjacent(selectedIdx, i)) {
+      const a = selectedIdx;
+      const b = i;
+      selectedIdx = null;
+      attemptSwap(a, b);
+    } else {
+      selectedIdx = i;
+      render();
+    }
+  }
+
+  boardEl.addEventListener("click", (e) => {
+    const tile = e.target.closest(".tile");
+    if (!tile) return;
+    onTileClick(Number(tile.dataset.idx));
+  });
+
+  function checkGameOver() {
+    if (moves <= 0) {
+      over = true;
+      setTimeout(() => {
+        if (continuesUsed < 1) {
+          AdStub.showRewardAd(() => {
+            continuesUsed++;
+            moves += CONTINUE_MOVES;
+            over = false;
+            updateHeader();
+          });
+        } else {
+          alert(`게임오버! 최종 점수: ${score}`);
+        }
+      }, 200);
+    }
+  }
+
+  function restart() {
+    grid = generateBoard();
+    score = 0;
+    moves = START_MOVES;
+    over = false;
+    continuesUsed = 0;
+    selectedIdx = null;
+    locked = false;
+    render();
+  }
+
+  document.getElementById("restart-btn").addEventListener("click", restart);
+  document.getElementById("remove-ads-btn").addEventListener("click", () => AdStub.showRemoveAdsPurchase());
+
+  restart();
+</script>
+</body>
+</html>
