@@ -12,13 +12,50 @@
 
 <main>
   <section class="hero">
-    <div class="wrap">
-      <h1>시장이 <span class="accent">비워둔 자리</span>를<br />찾아서 채웁니다</h1>
-      <p>"이것도 만들면 좋겠다"가 아니라 판매 데이터·후기·트렌드를 실측해서, 진짜 수요가 있는데 아무도 제대로 안 채운 자리만 골라 만듭니다.</p>
-      <div class="proof-row">
-        <span class="proof-chip">📊 <b>크몽 실측</b> 리뷰·가격 데이터로 서비스 선정</span>
-        <span class="proof-chip">🎮 <b>2026 게임 트렌드</b> 분석으로 장르 선정</span>
-        <span class="proof-chip">✍️ <b>AI 집필 가능성 검증</b>을 통과한 전자책만 공개</span>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="kicker">● 데이터 기반으로 만듭니다</span>
+        <h1>시장이 <span class="accent">비워둔 자리</span>를<br />찾아서 채웁니다</h1>
+        <p>"이것도 만들면 좋겠다"가 아니라 판매 데이터·후기·트렌드를 실측해서, 진짜 수요가 있는데 아무도 제대로 안 채운 자리만 골라 만듭니다.</p>
+        <div class="proof-row">
+          <span class="proof-chip">📊 <b>크몽 실측</b> 리뷰·가격 데이터로 서비스 선정</span>
+          <span class="proof-chip">🎮 <b>2026 게임 트렌드</b> 분석으로 장르 선정</span>
+          <span class="proof-chip">✍️ <b>AI 집필 가능성 검증</b>을 통과한 전자책만 공개</span>
+        </div>
+      </div>
+      <div class="hero-art">
+        <span class="orb orb-1"></span>
+        <span class="orb orb-2"></span>
+        <svg viewBox="0 0 400 340" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" />
+              <stop offset="100%" stop-color="var(--accent-2)" />
+            </linearGradient>
+            <radialGradient id="coreGrad" cx="35%" cy="30%" r="75%">
+              <stop offset="0%" stop-color="var(--accent-soft)" />
+              <stop offset="100%" stop-color="var(--accent)" />
+            </radialGradient>
+          </defs>
+
+          <circle cx="200" cy="180" r="150" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 7" opacity="0.7" />
+
+          <path d="M200,180 Q145,120 90,80" fill="none" stroke="url(#lineGrad)" stroke-width="2" opacity="0.55" />
+          <path d="M200,180 Q255,120 310,80" fill="none" stroke="url(#lineGrad)" stroke-width="2" opacity="0.55" />
+          <path d="M200,180 Q200,240 200,300" fill="none" stroke="url(#lineGrad)" stroke-width="2" opacity="0.55" />
+
+          <circle cx="90" cy="80" r="33" fill="var(--bg-card)" stroke="var(--border)" />
+          <text x="90" y="90" font-size="26" text-anchor="middle">🎮</text>
+
+          <circle cx="310" cy="80" r="33" fill="var(--bg-card)" stroke="var(--border)" />
+          <text x="310" y="90" font-size="26" text-anchor="middle">🛠️</text>
+
+          <circle cx="200" cy="300" r="33" fill="var(--bg-card)" stroke="var(--border)" />
+          <text x="200" y="310" font-size="26" text-anchor="middle">📚</text>
+
+          <circle cx="200" cy="180" r="46" fill="url(#coreGrad)" />
+          <text x="200" y="190" font-size="30" text-anchor="middle">⚡</text>
+        </svg>
       </div>
     </div>
   </section>
@@ -26,7 +63,13 @@
   <section class="section">
     <div class="wrap">
       <div class="section-head">
-        <h2>🎮 게임 하러 가기</h2>
+        <div class="heading">
+          <span class="section-icon">🎮</span>
+          <div>
+            <span class="eyebrow">2026 게임 트렌드 분석 기반</span>
+            <h2>게임 하러 가기</h2>
+          </div>
+        </div>
         <a class="more" href="games/index.html">전체 게임 보기 →</a>
       </div>
       <div class="grid" id="featured-games"></div>
@@ -36,16 +79,24 @@
   <section class="section">
     <div class="wrap">
       <div class="section-head">
-        <h2>🛠️ 서비스</h2>
+        <div class="heading">
+          <span class="section-icon">🛠️</span>
+          <div>
+            <span class="eyebrow">크몽 판매 데이터 실측 기반</span>
+            <h2>서비스</h2>
+          </div>
+        </div>
         <a class="more" href="services.html">전체 서비스 보기 →</a>
       </div>
       <div class="grid">
         <div class="item-card">
+          <span class="icon-badge">⚙️</span>
           <span class="badge badge-soon">준비중</span>
           <h3>자동화 템플릿 판매</h3>
           <p>업무 자동화 워크플로우를 완제품으로 만들어 바로 쓸 수 있게 판매합니다.</p>
         </div>
         <div class="item-card">
+          <span class="icon-badge">🖼️</span>
           <span class="badge badge-soon">준비중</span>
           <h3>AI 상세페이지 제작</h3>
           <p>온라인 판매자를 위한 상세페이지 · 카피 · 썸네일을 AI로 빠르게 제작합니다.</p>
@@ -57,11 +108,18 @@
   <section class="section">
     <div class="wrap">
       <div class="section-head">
-        <h2>📚 전자책</h2>
+        <div class="heading">
+          <span class="section-icon">📚</span>
+          <div>
+            <span class="eyebrow">AI 집필 가능성 검증 기반</span>
+            <h2>전자책</h2>
+          </div>
+        </div>
         <a class="more" href="ebooks.html">전체 전자책 보기 →</a>
       </div>
       <div class="grid">
         <div class="item-card">
+          <span class="icon-badge">📖</span>
           <span class="badge badge-soon">기획중</span>
           <h3>전자책 코너 오픈 준비중</h3>
           <p>품질 검증을 마친 전자책부터 순차적으로 공개할 예정입니다.</p>
