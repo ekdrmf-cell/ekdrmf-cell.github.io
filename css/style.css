@@ -433,6 +433,19 @@ img, svg {
   margin: 0;
 }
 
+.insight {
+  border-left: 2px solid var(--accent-2);
+  padding: 8px 12px;
+  background: rgba(34, 211, 170, 0.06);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.82rem !important;
+  color: var(--text) !important;
+}
+
+.insight b {
+  color: var(--accent-2);
+}
+
 .badge {
   display: inline-block;
   font-size: 0.72rem;
