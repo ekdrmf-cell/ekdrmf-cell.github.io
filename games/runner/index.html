@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>장애물 러너 — 수익화허브</title>
+<link rel="stylesheet" href="../../css/style.css" />
+<style>
+  .game-wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .score-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 700;
+  }
+  .score-box .label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  #canvas {
+    width: 100%;
+    background: linear-gradient(180deg, #131722, #0b0e14);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    touch-action: none;
+  }
+  .controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .hint {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body data-active="games" data-root="../../">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="game-wrap">
+    <h1 style="margin-bottom:4px;">장애물 러너</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-top:0;">스페이스바 또는 화면 탭으로 점프해 장애물을 피하세요.</p>
+
+    <div class="score-row">
+      <div class="score-box"><span class="label">점수</span><span id="score">0</span></div>
+      <button class="btn" id="remove-ads-btn">광고 제거</button>
+      <div class="score-box"><span class="label">최고 점수</span><span id="best">0</span></div>
+    </div>
+
+    <canvas id="canvas" width="480" height="260"></canvas>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="restart-btn">다시하기</button>
+      <a class="btn" href="../index.html">게임 목록</a>
+    </div>
+    <div class="hint">게임오버 후 "광고 보고 이어하기"를 선택하면 그 자리에서 한 번 더 도전할 수 있습니다.</div>
+  </div>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/ad-stub.js"></script>
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const groundY = H - 40;
+
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+  let best = Number(localStorage.getItem("runner-best") || 0);
+  bestEl.textContent = best;
+
+  let player, obstacles, speed, score, over, frame, continuesUsed, playCount, raf;
+
+  function reset() {
+    player = { x: 60, y: groundY - 30, w: 28, h: 30, vy: 0, jumping: false };
+    obstacles = [];
+    speed = 4.2;
+    score = 0;
+    over = false;
+    frame = 0;
+    continuesUsed = 0;
+    scoreEl.textContent = 0;
+  }
+
+  function spawnObstacle() {
+    const h = 24 + Math.random() * 26;
+    obstacles.push({ x: W + 10, y: groundY - h, w: 20, h });
+  }
+
+  function jump() {
+    if (over) return;
+    if (!player.jumping) {
+      player.vy = -10.5;
+      player.jumping = true;
+    }
+  }
+
+  function update() {
+    frame++;
+    if (frame % Math.max(40, 90 - Math.floor(speed * 4)) === 0) spawnObstacle();
+
+    player.vy += 0.55;
+    player.y += player.vy;
+    if (player.y >= groundY - player.h) {
+      player.y = groundY - player.h;
+      player.vy = 0;
+      player.jumping = false;
+    }
+
+    obstacles.forEach((o) => (o.x -= speed));
+    obstacles = obstacles.filter((o) => o.x + o.w > 0);
+
+    for (const o of obstacles) {
+      if (
+        player.x < o.x + o.w &&
+        player.x + player.w > o.x &&
+        player.y < o.y + o.h &&
+        player.y + player.h > o.y
+      ) {
+        endGame();
+        return;
+      }
+    }
+
+    speed += 0.0025;
+    score = Math.floor(frame / 6);
+    scoreEl.textContent = score;
+    if (score > best) {
+      best = score;
+      localStorage.setItem("runner-best", best);
+      bestEl.textContent = best;
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = "#262c40";
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(W, groundY);
+    ctx.stroke();
+
+    ctx.fillStyle = "#7c5cff";
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+
+    ctx.fillStyle = "#22d3aa";
+    obstacles.forEach((o) => ctx.fillRect(o.x, o.y, o.w, o.h));
+
+    if (over) {
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#e8eaf2";
+      ctx.font = "bold 20px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("게임 오버", W / 2, H / 2);
+    }
+  }
+
+  function loop() {
+    if (!over) update();
+    draw();
+    raf = requestAnimationFrame(loop);
+  }
+
+  function endGame() {
+    over = true;
+    playCount = (playCount || 0) + 1;
+    setTimeout(() => {
+      if (continuesUsed < 1) {
+        AdStub.showRewardAd(() => {
+          continuesUsed++;
+          over = false;
+          obstacles = [];
+        });
+      } else if (playCount % 3 === 0) {
+        AdStub.showInterstitialAd();
+      }
+    }, 150);
+  }
+
+  document.getElementById("restart-btn").addEventListener("click", () => {
+    reset();
+  });
+  document.getElementById("remove-ads-btn").addEventListener("click", () => AdStub.showRemoveAdsPurchase());
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      jump();
+    }
+  });
+  canvas.addEventListener("pointerdown", jump);
+
+  reset();
+  loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>2048 퍼즐 — 수익화허브</title>
+<link rel="stylesheet" href="../../css/style.css" />
+<style>
+  .game-wrap {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .score-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 700;
+  }
+  .score-box .label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    touch-action: none;
+    user-select: none;
+  }
+  .cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 800;
+    transition: background 0.1s;
+  }
+  .cell[data-v="2"] { background: #262c40; color: #e8eaf2; }
+  .cell[data-v="4"] { background: #2f3654; color: #e8eaf2; }
+  .cell[data-v="8"] { background: #4331a8; color: #fff; }
+  .cell[data-v="16"] { background: #5a3fd6; color: #fff; }
+  .cell[data-v="32"] { background: #7c5cff; color: #fff; }
+  .cell[data-v="64"] { background: #9b6cff; color: #fff; }
+  .cell[data-v="128"] { background: #22b894; color: #fff; font-size: 1.2rem; }
+  .cell[data-v="256"] { background: #22d3aa; color: #06110d; font-size: 1.2rem; }
+  .cell[data-v="512"] { background: #ffd166; color: #1a1400; font-size: 1.2rem; }
+  .cell[data-v="1024"] { background: #ffb347; color: #1a1400; font-size: 1.05rem; }
+  .cell[data-v="2048"] { background: #ff6f6f; color: #1a0000; font-size: 1.05rem; }
+  .controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .hint {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body data-active="games" data-root="../../">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="game-wrap">
+    <h1 style="margin-bottom:4px;">2048 퍼즐</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-top:0;">방향키 또는 스와이프로 타일을 합쳐 2048을 만드세요.</p>
+
+    <div class="score-row">
+      <div class="score-box"><span class="label">점수</span><span id="score">0</span></div>
+      <button class="btn" id="remove-ads-btn">광고 제거</button>
+      <div class="score-box"><span class="label">최고 점수</span><span id="best">0</span></div>
+    </div>
+
+    <div id="board"></div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="restart-btn">다시하기</button>
+      <a class="btn" href="../index.html">게임 목록</a>
+    </div>
+    <div class="hint">게임오버 후 "광고 보고 이어하기"를 선택하면 한 번 더 도전할 수 있습니다.</div>
+  </div>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/ad-stub.js"></script>
+<script>
+  const SIZE = 4;
+  let grid, score, best, over, continuesUsed;
+
+  const boardEl = document.getElementById("board");
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+
+  best = Number(localStorage.getItem("game2048-best") || 0);
+  bestEl.textContent = best;
+
+  function emptyGrid() {
+    return Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+  }
+
+  function addRandomTile() {
+    const empties = [];
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++) if (grid[r][c] === 0) empties.push([r, c]);
+    if (empties.length === 0) return;
+    const [r, c] = empties[Math.floor(Math.random() * empties.length)];
+    grid[r][c] = Math.random() < 0.9 ? 2 : 4;
+  }
+
+  function render() {
+    boardEl.innerHTML = "";
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const v = grid[r][c];
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        if (v) {
+          cell.dataset.v = v;
+          cell.textContent = v;
+        }
+        boardEl.appendChild(cell);
+      }
+    }
+    scoreEl.textContent = score;
+  }
+
+  function slideRowLeft(row) {
+    let vals = row.filter((v) => v !== 0);
+    let gained = 0;
+    for (let i = 0; i < vals.length - 1; i++) {
+      if (vals[i] === vals[i + 1]) {
+        vals[i] *= 2;
+        gained += vals[i];
+        vals.splice(i + 1, 1);
+      }
+    }
+    while (vals.length < SIZE) vals.push(0);
+    return { vals, gained };
+  }
+
+  function rotateGrid(g) {
+    const n = emptyGrid();
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++) n[c][SIZE - 1 - r] = g[r][c];
+    return n;
+  }
+
+  function move(dir) {
+    if (over) return;
+    let g = grid;
+    let rotations = { left: 0, up: 1, right: 2, down: 3 }[dir];
+    for (let i = 0; i < rotations; i++) g = rotateGrid(g);
+
+    let moved = false;
+    let gainedTotal = 0;
+    const newG = [];
+    for (let r = 0; r < SIZE; r++) {
+      const { vals, gained } = slideRowLeft(g[r]);
+      if (vals.join(",") !== g[r].join(",")) moved = true;
+      gainedTotal += gained;
+      newG.push(vals);
+    }
+    g = newG;
+    for (let i = 0; i < (4 - rotations) % 4; i++) g = rotateGrid(g);
+
+    if (moved) {
+      grid = g;
+      score += gainedTotal;
+      if (score > best) {
+        best = score;
+        localStorage.setItem("game2048-best", best);
+        bestEl.textContent = best;
+      }
+      addRandomTile();
+      render();
+      checkGameOver();
+    }
+  }
+
+  function canMove() {
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (grid[r][c] === 0) return true;
+        if (c < SIZE - 1 && grid[r][c] === grid[r][c + 1]) return true;
+        if (r < SIZE - 1 && grid[r][c] === grid[r + 1][c]) return true;
+      }
+    }
+    return false;
+  }
+
+  function checkGameOver() {
+    if (!canMove()) {
+      over = true;
+      setTimeout(() => {
+        if (continuesUsed < 1) {
+          AdStub.showRewardAd(() => {
+            continuesUsed++;
+            over = false;
+            // 이어하기: 가장 작은 타일 하나를 비워 재도전 기회 제공
+            for (let r = 0; r < SIZE; r++)
+              for (let c = 0; c < SIZE; c++)
+                if (grid[r][c] && (r + c) % 5 === 0) grid[r][c] = 0;
+            addRandomTile();
+            render();
+          });
+        } else {
+          alert(`게임오버! 최종 점수: ${score}`);
+        }
+      }, 200);
+    }
+  }
+
+  function restart() {
+    grid = emptyGrid();
+    score = 0;
+    over = false;
+    continuesUsed = 0;
+    addRandomTile();
+    addRandomTile();
+    render();
+  }
+
+  document.getElementById("restart-btn").addEventListener("click", restart);
+  document.getElementById("remove-ads-btn").addEventListener("click", () => AdStub.showRemoveAdsPurchase());
+
+  window.addEventListener("keydown", (e) => {
+    const map = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
+    if (map[e.key]) {
+      e.preventDefault();
+      move(map[e.key]);
+    }
+  });
+
+  let touchStartX = 0, touchStartY = 0;
+  boardEl.addEventListener("touchstart", (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  });
+  boardEl.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? "right" : "left");
+    else move(dy > 0 ? "down" : "up");
+  });
+
+  restart();
+</script>
+</body>
+</html>

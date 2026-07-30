@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>게임 전체보기 — 수익화허브</title>
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body data-active="games" data-root="../">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>게임 전체보기</h1>
+    <p>가볍게 즐기는 캐주얼 게임을 계속 추가하고 있습니다. 장르는 상관없이 재밌고 짧게 즐길 수 있는 게임 위주로 늘려갑니다.</p>
+  </div>
+  <div class="section">
+    <div class="wrap">
+      <div class="grid" id="all-games"></div>
+    </div>
+  </div>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="../js/games-data.js"></script>
+<script src="../js/common.js"></script>
+<script>
+  const el = document.getElementById("all-games");
+  el.innerHTML = GAMES.map(
+    (g) => `
+    <a class="card game-card" href="../${g.path}">
+      <div class="game-thumb">${g.emoji}</div>
+      <div class="game-genre">${g.genre}</div>
+      <div class="game-title">${g.title}</div>
+      <div class="game-desc">${g.desc}</div>
+    </a>
+  `
+  ).join("");
+</script>
+</body>
+</html>

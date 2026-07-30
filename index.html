@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>수익화허브 — 게임 · 서비스 · 전자책</title>
+<meta name="description" content="게임, 자동화 서비스, 전자책을 한 곳에서 즐기고 이용할 수 있는 허브 사이트" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-active="home" data-root="./">
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <h1>게임도, <span class="accent">서비스</span>도,<br />전자책도 여기 한 곳에</h1>
+      <p>가볍게 즐기는 웹게임부터 AI로 만든 실용 서비스, 바로 읽는 전자책까지 — 한 사이트에서 모두 만나보세요.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>🎮 게임 하러 가기</h2>
+        <a class="more" href="games/index.html">전체 게임 보기 →</a>
+      </div>
+      <div class="grid" id="featured-games"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>🛠️ 서비스</h2>
+        <a class="more" href="services.html">전체 서비스 보기 →</a>
+      </div>
+      <div class="grid">
+        <div class="item-card">
+          <span class="badge badge-soon">준비중</span>
+          <h3>자동화 템플릿 판매</h3>
+          <p>업무 자동화 워크플로우를 완제품으로 만들어 바로 쓸 수 있게 판매합니다.</p>
+        </div>
+        <div class="item-card">
+          <span class="badge badge-soon">준비중</span>
+          <h3>AI 상세페이지 제작</h3>
+          <p>온라인 판매자를 위한 상세페이지 · 카피 · 썸네일을 AI로 빠르게 제작합니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>📚 전자책</h2>
+        <a class="more" href="ebooks.html">전체 전자책 보기 →</a>
+      </div>
+      <div class="grid">
+        <div class="item-card">
+          <span class="badge badge-soon">기획중</span>
+          <h3>전자책 코너 오픈 준비중</h3>
+          <p>품질 검증을 마친 전자책부터 순차적으로 공개할 예정입니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script src="js/games-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+  const featuredEl = document.getElementById("featured-games");
+  featuredEl.innerHTML = GAMES.map(
+    (g) => `
+    <a class="card game-card" href="${g.path}">
+      <div class="game-thumb">${g.emoji}</div>
+      <div class="game-genre">${g.genre}</div>
+      <div class="game-title">${g.title}</div>
+      <div class="game-desc">${g.desc}</div>
+    </a>
+  `
+  ).join("");
+</script>
+</body>
+</html>
