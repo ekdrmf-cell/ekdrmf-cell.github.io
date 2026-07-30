@@ -122,6 +122,28 @@ img {
   color: transparent;
 }
 
+.proof-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.proof-chip {
+  font-size: 0.78rem;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.proof-chip b {
+  color: var(--text);
+  font-weight: 700;
+}
+
 /* Section */
 .section {
   padding: 40px 0;
