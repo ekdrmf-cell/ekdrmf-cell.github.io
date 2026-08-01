@@ -899,7 +899,7 @@ faq("이 가이드에 나온 사이트들 말고 또 확인할 곳이 있나요?
 faq("노란우산공제와 정부지원사업은 같은 건가요?", "다릅니다. 노란우산공제는 소상공인 스스로 매달 납입해 폐업ㆍ퇴직 시 목돈을 받는 공적 공제제도(중소기업중앙회 운영)이고, 이 가이드에서 다룬 지원사업과는 별개입니다. 다만 일부 지원사업 심사에서 가입 여부가 가점 요소가 되는 경우가 있습니다.")
 faq("지원사업 관련 사기를 조심해야 한다고 들었는데, 어떻게 구별하나요?", "공식 기관 사이트(정부 도메인은 .go.kr, 공공기관은 .or.kr이 많음)를 벗어난 곳에서 신청비ㆍ수수료를 요구하면 의심해야 합니다. 정부지원사업은 신청 자체에 비용이 들지 않는 것이 원칙입니다. 애매하면 부록3의 콜센터로 먼저 확인하세요.")
 faq("이 가이드의 내용을 다른 사람에게 공유해도 되나요?", "개인적으로 참고하시는 건 자유입니다. 다만 이 전자책 파일 자체를 무단으로 재배포ㆍ재판매하는 것은 삼가주세요.")
-faq("지원사업을 여러 개 동시에 준비하려면 어떻게 시간을 관리하나요?", "12부 워크시트2(신청 일정 관리표)와 워크시트9(연간 목표 설정표)를 함께 쓰면 마감일이 겹치는지 한눈에 파악할 수 있습니다. 서류가 겹치는 사업끼리는 동시에 준비하면 효율적입니다.")
+faq("지원사업을 여러 개 동시에 준비하려면 어떻게 시간을 관리하나요?", "9부의 연간 캘린더를 기준으로 마감일이 겹치지 않는 사업 위주로 우선순위를 정하고, 12부 워크시트4-2(90일 실행 캘린더)에 주차별로 배분해두면 한눈에 파악할 수 있습니다. 서류가 겹치는 사업끼리는 동시에 준비하면 효율적입니다.")
 faq("이 가이드에 나온 워크시트를 전부 다 써야 하나요?", "아닙니다. 본인 상황에 필요한 것만 골라 쓰면 됩니다. 처음이라면 워크시트1(상황 정리)과 워크시트5(자가진단)부터 시작하는 걸 추천합니다.")
 
 # ============================================================
@@ -1230,22 +1230,6 @@ body("<b>내가 조합한 검색 키워드:</b>")
 worksheet_table(blank_line_rows(2), [166 * mm])
 story.append(Spacer(1, 10))
 
-h1("워크시트 2. 신청 일정 관리표")
-body("관심 있는 지원사업이 여러 개라면 아래 표에 정리해두세요. 마감일이 겹치지 않는지 한눈에 볼 수 있습니다.")
-sched_header = [Paragraph("사업명", styles["table_head"]), Paragraph("사이트", styles["table_head"]),
-                Paragraph("마감일", styles["table_head"]), Paragraph("필요서류", styles["table_head"]),
-                Paragraph("완료", styles["table_head"])]
-sched_rows = [sched_header] + [["", "", "", "", ""] for _ in range(8)]
-sched_tbl = Table(sched_rows, colWidths=[48 * mm, 30 * mm, 24 * mm, 44 * mm, 20 * mm], rowHeights=[9 * mm] * len(sched_rows))
-sched_tbl.setStyle(TableStyle([
-    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-    ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, 0), 7),
-    ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
-]))
-story.append(sched_tbl)
-story.append(Spacer(1, 12))
-
 h1("워크시트 3. 사업계획서 초안 작성표")
 body("5-3부의 5대 항목을 짧게라도 직접 써보세요. 완성된 문장이 아니어도 됩니다 — 초안이 있는 것과 없는 것의 차이가 큽니다.")
 for label in ["① 일반현황(대표자ㆍ업종ㆍ사업 개요)", "② 창업동기 및 문제인식(구체적 근거 포함)", "③ 실현가능성(현재까지 준비된 것)", "④ 성장전략(지원금 사용 계획과 목표)", "⑤ 팀 구성 및 역량(부족한 부분과 보완 계획)"]:
@@ -1332,70 +1316,81 @@ diag_tbl.setStyle(TableStyle([
 ]))
 story.append(diag_tbl)
 
-h1("워크시트 6. 최근 매출 기록표")
-body("증빙서류(부록1)를 준비할 때, 최근 몇 개월간 매출을 먼저 손으로 정리해두면 서류 작성이 훨씬 빨라집니다.")
-sales_header = [Paragraph("월", styles["table_head"]), Paragraph("매출액", styles["table_head"]),
-                Paragraph("주요 지출", styles["table_head"]), Paragraph("메모", styles["table_head"])]
-sales_rows = [sales_header] + [["", "", "", ""] for _ in range(6)]
-sales_tbl = Table(sales_rows, colWidths=[22 * mm, 36 * mm, 54 * mm, 54 * mm], rowHeights=[10 * mm] * len(sales_rows))
-sales_tbl.setStyle(TableStyle([
+h1("정책자금(융자) 실제 금리ㆍ한도 총정리")
+body("2부에서 소진공 정책자금을 &ldquo;융자&rdquo;라고만 짧게 다뤘는데, 실제로 어떤 자금이 있고 금리ㆍ한도가 얼마인지 궁금한 분들을 위해 2026년 기준 실측 수치로 정리했습니다.")
+callout_box("2026년 1월 기준 정책자금 금리", [
+    "전체 평균 금리는 연 2.96% 수준 — 자금 유형에 따라 2%대~4%대까지 차등 적용됩니다.",
+    "비수도권 사업자는 0.2%포인트 우대금리를 추가로 받습니다.",
+    "스마트소상공인자금은 연 1~2%대로 가장 낮은 금리 구간에 속합니다.",
+])
+fund_header = [Paragraph("자금 종류", styles["table_head"]), Paragraph("대출 한도", styles["table_head"]),
+               Paragraph("특징", styles["table_head"])]
+fund_rows = [fund_header] + [
+    [Paragraph("일반ㆍ특별 경영안정자금", styles["table_cell"]), Paragraph("최대 7천만원", styles["table_cell"]), Paragraph("가장 기본적인 운영자금 대출", styles["table_cell"])],
+    [Paragraph("재도전 특별자금", styles["table_cell"]), Paragraph("최대 2억원(유형별 상이)", styles["table_cell"]), Paragraph("폐업 후 재창업자 대상", styles["table_cell"])],
+    [Paragraph("성장기반자금", styles["table_cell"]), Paragraph("최대 5억원", styles["table_cell"]), Paragraph("일정 매출ㆍ고용 규모 이상 성장 단계 기업", styles["table_cell"])],
+    [Paragraph("스마트소상공인자금", styles["table_cell"]), Paragraph("자금별 상이", styles["table_cell"]), Paragraph("금리 연 1~2%대로 가장 낮음", styles["table_cell"])],
+]
+fund_tbl = Table(fund_rows, colWidths=[50 * mm, 42 * mm, 74 * mm])
+fund_tbl.setStyle(TableStyle([
     ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
     ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, 0), 7),
-    ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
-]))
-story.append(sales_tbl)
-story.append(Spacer(1, 12))
-body("이 표는 실제 세무 신고 자료를 대체하지 않습니다. 어디까지나 서류 준비 전 스스로 상황을 파악하기 위한 참고용입니다.")
-
-h1("워크시트 7. 담당 부서 문의 기록표")
-body("11부의 통화ㆍ이메일 스크립트를 실제로 사용했다면, 언제 누구와 무슨 이야기를 했는지 기록해두세요. 나중에 다시 확인할 때 큰 도움이 됩니다.")
-contact_log_header = [Paragraph("날짜", styles["table_head"]), Paragraph("문의 기관", styles["table_head"]),
-                       Paragraph("질문 내용", styles["table_head"]), Paragraph("답변 요약", styles["table_head"])]
-contact_log_rows = [contact_log_header] + [["", "", "", ""] for _ in range(5)]
-contact_log_tbl = Table(contact_log_rows, colWidths=[22 * mm, 34 * mm, 55 * mm, 55 * mm], rowHeights=[10 * mm] * len(contact_log_rows))
-contact_log_tbl.setStyle(TableStyle([
-    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-    ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, 0), 7),
-    ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
-]))
-story.append(contact_log_tbl)
-
-h1("워크시트 8. 후보 지원사업 비교표")
-body("관심 있는 지원사업이 2~3개로 좁혀졌다면, 나란히 놓고 비교해보세요. 표로 정리하면 어느 쪽이 나에게 더 유리한지 한눈에 보입니다.")
-compare_header = [Paragraph("항목", styles["table_head"]), Paragraph("후보 A", styles["table_head"]),
-                   Paragraph("후보 B", styles["table_head"]), Paragraph("후보 C", styles["table_head"])]
-compare_items = ["사업명", "지원 형태(융자/보조금)", "지원 금액ㆍ한도", "신청 자격 충족 여부", "마감일", "필요 서류", "우선순위"]
-compare_rows = [compare_header] + [[Paragraph(item, styles["table_cell"]), "", "", ""] for item in compare_items]
-compare_ws_tbl = Table(compare_rows, colWidths=[38 * mm, 43 * mm, 43 * mm, 42 * mm], rowHeights=[9 * mm] * len(compare_rows))
-compare_ws_tbl.setStyle(TableStyle([
-    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-    ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
+    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#faf9ff")]),
     ("TOPPADDING", (0, 0), (-1, -1), 6),
     ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ("LEFTPADDING", (0, 0), (-1, -1), 8),
     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
 ]))
-story.append(compare_ws_tbl)
+story.append(fund_tbl)
 story.append(Spacer(1, 10))
-body("우선순위를 정할 때는 지원 금액의 크기보다 &ldquo;내가 자격을 확실히 충족하는지&rdquo;와 &ldquo;마감일이 언제인지&rdquo;를 먼저 보는 게 실패 확률을 줄이는 방법입니다.")
+callout_box("신청 경로 주의", [
+    "정책자금은 &ldquo;소상공인정책자금 공식 사이트(ols.semas.or.kr)&rdquo; 또는 전국 78곳 소진공 지역센터에서만 신청할 수 있습니다.",
+    "사설 대출중개업체가 &ldquo;정책자금 대행&rdquo;을 내세우며 수수료를 요구하면 사기일 가능성이 높으니 주의하세요.",
+])
 
-h1("워크시트 9. 연간 목표 설정표")
-body("올해 안에 몇 건의 지원사업에 도전할지 목표를 세워보세요. 목표가 있으면 9부 캘린더를 훨씬 계획적으로 활용할 수 있습니다.")
-goal_header = [Paragraph("분기", styles["table_head"]), Paragraph("목표 신청 건수", styles["table_head"]),
-               Paragraph("실제 신청 건수", styles["table_head"]), Paragraph("결과", styles["table_head"])]
-goal_rows = [goal_header] + [[q, "", "", ""] for q in ["1분기(1~3월)", "2분기(4~6월)", "3분기(7~9월)", "4분기(10~12월)"]]
-goal_tbl = Table(goal_rows, colWidths=[36 * mm, 40 * mm, 40 * mm, 50 * mm], rowHeights=[10 * mm] * len(goal_rows))
-goal_tbl.setStyle(TableStyle([
+h1("청년 창업 3대 대표 프로그램 비교")
+body("&ldquo;예비창업패키지ㆍ초기창업패키지ㆍ청년창업사관학교&rdquo;는 이름이 비슷해 헷갈리기 쉬운 대표적인 청년 창업 지원 프로그램입니다. 셋 다 상환 의무가 없는 사업화 자금이며, K-Startup 창업지원포털에서 온라인으로 신청합니다.")
+youth_header = [Paragraph("프로그램", styles["table_head"]), Paragraph("대상", styles["table_head"]),
+                Paragraph("지원 규모", styles["table_head"])]
+youth_rows = [youth_header] + [
+    [Paragraph("예비창업패키지", styles["table_cell"]), Paragraph("사업자등록 전 예비창업자", styles["table_cell"]), Paragraph("최대 1억원", styles["table_cell"])],
+    [Paragraph("초기창업패키지", styles["table_cell"]), Paragraph("업력 3년 이내 기업 대표", styles["table_cell"]), Paragraph("최대 1억원", styles["table_cell"])],
+    [Paragraph("청년창업사관학교", styles["table_cell"]), Paragraph("만 39세 이하, 창업 3년 이내", styles["table_cell"]), Paragraph("최대 1억원(총사업비의 70% 이내) + 창업공간ㆍ코칭", styles["table_cell"])],
+]
+youth_tbl = Table(youth_rows, colWidths=[46 * mm, 60 * mm, 60 * mm])
+youth_tbl.setStyle(TableStyle([
     ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
     ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, -1), 7),
-    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#faf9ff")]),
+    ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ("LEFTPADDING", (0, 0), (-1, -1), 8),
     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
 ]))
-story.append(goal_tbl)
+story.append(youth_tbl)
 story.append(Spacer(1, 10))
-body("1부에서 다뤘듯 1~2월에 가장 많은 공고가 몰립니다. 1분기 목표를 가장 여유 있게 잡고, 나머지 분기는 놓친 기회를 보충하는 방식으로 계획하는 것을 추천합니다.")
+body("청년창업사관학교는 매년 <b>글로벌형ㆍ지역특화형ㆍ투자형</b> 세 갈래로 나눠 총 850명 안팎을 선발하며, <b>공고(1월) → 신청ㆍ접수(1~2월) → 평가ㆍ발표(2~3월) → 프로그램 진행(3월~)</b> 순서로 진행됩니다. 예비창업패키지ㆍ초기창업패키지보다 창업 공간ㆍ코칭ㆍ기술지원까지 포함된 밀착형 프로그램이라는 점이 가장 큰 차이입니다.")
+callout_box("정책자금ㆍ청년 프로그램 핵심 요약", [
+    "정책자금은 자금 유형별로 금리 2~4%대, 한도 7천만원~5억원까지 천차만별 — 본인 상황에 맞는 유형부터 확인",
+    "예비ㆍ초기창업패키지는 사업화 자금 중심, 청년창업사관학교는 공간ㆍ코칭까지 포함된 밀착형",
+])
+
+h1("폐업을 고민 중이라면 — 희망리턴패키지 실측 정리")
+body("이 가이드의 독자 중에는 새로 시작하려는 분뿐 아니라 <b>폐업을 고민 중이거나 이미 폐업한 뒤 재도전을 준비하는 분</b>도 있습니다. &ldquo;희망리턴패키지&rdquo;는 이런 분들을 위한 대표적인 정부지원사업입니다.")
+callout_box("지원 내용과 금액", [
+    "점포 철거비 — 전용면적 3.3㎡당 13만원 이내, 업체당 최대 600만원",
+    "사업정리 컨설팅ㆍ법률자문ㆍ채무조정도 함께 신청 가능한 4가지 항목",
+    "자가 건물이 아니라 임대차 계약으로 운영 중인 사업장이 대상(자가 건물은 철거비 제외)",
+])
+body("신청은 공식 홈페이지(<b>www.sbiz.or.kr</b>)에서 상시 접수하며, 2026년부터 공공 마이데이터 서비스가 연동되어 제출 서류가 예전보다 대폭 간소화됐습니다.")
+h2("정리가 끝난 뒤에는 &lsquo;재도전성공패키지&rsquo;")
+body("폐업 정리를 마치고 다시 도전할 준비가 됐다면, 중소벤처기업부의 <b>재도전성공패키지</b>가 정확히 이 시점을 위한 사업입니다. 폐업 이력이 있는 예비재창업자 또는 <b>7년 이내 재창업기업</b>을 대상으로, 사업화 자금(최대 1억원, 평균 6,700만원)에 더해 심리치유ㆍ실패원인분석ㆍ맞춤형 멘토링ㆍ투자연계까지 패키지로 지원합니다.")
+callout_box("재도전성공패키지 핵심 정보", [
+    "대상 — 폐업 이력 보유 예비재창업자, 또는 7년 이내 재창업기업",
+    "지원 규모 — 사업화자금 최대 1억원(평균 6,700만원) + 심리치유ㆍ실패원인분석ㆍ멘토링",
+    "신청 경로 — K-Startup 창업지원포털(k-startup.go.kr), 일반 모집은 보통 2~3월 접수",
+])
+body("즉 <b>희망리턴패키지(정리) → 재도전성공패키지(재창업)</b>로 이어지는 흐름이 폐업 이후 재도전을 준비하는 가장 현실적인 순서입니다.")
 
 # ============================================================
 # 마무리 + 부록
@@ -1738,66 +1733,32 @@ callout_box("체크해보세요", [
 ])
 body("절반 이상 체크했다면 이미 &ldquo;찾아만 보고 마는&rdquo; 단계를 지나 실제 행동으로 옮기고 있는 것입니다. 나머지 항목도 12부 워크시트를 활용해 하나씩 채워보세요.")
 
-h1("워크시트 10. 나의 강점ㆍ약점 정리표")
-body("5-3부의 &ldquo;팀 구성 및 역량&rdquo; 항목을 쓰기 전에, 미리 강점과 약점을 정리해두면 훨씬 수월합니다.")
-sw_header = [Paragraph("강점(이미 가진 것)", styles["table_head"]), Paragraph("약점(보완이 필요한 것)", styles["table_head"])]
-sw_rows = [sw_header] + [["", ""] for _ in range(5)]
-sw_tbl = Table(sw_rows, colWidths=[83 * mm, 83 * mm], rowHeights=[10 * mm] * len(sw_rows))
-sw_tbl.setStyle(TableStyle([
-    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-    ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, -1), 6),
-    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-]))
-story.append(sw_tbl)
-story.append(Spacer(1, 10))
-body("약점은 숨기기보다 &ldquo;어떻게 보완할 것인지&rdquo;를 함께 적어두세요. 5-3부에서 다뤘듯, 부족한 부분을 솔직하게 인정하고 보완 계획을 제시하는 쪽이 심사에서 더 좋은 인상을 줍니다.")
-
-h1("워크시트 11. 예상 질문 대비표")
-body("발표평가(5-3부)나 담당 부서 문의(11부)에 대비해, 예상 질문과 내 답변을 미리 적어두세요.")
-qa_header = [Paragraph("예상 질문", styles["table_head"]), Paragraph("나의 답변(요약)", styles["table_head"])]
-qa_rows = [qa_header] + [["", ""] for _ in range(5)]
-qa_tbl = Table(qa_rows, colWidths=[66 * mm, 100 * mm], rowHeights=[11 * mm] * len(qa_rows))
-qa_tbl.setStyle(TableStyle([
-    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-    ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, -1), 6),
-    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-]))
-story.append(qa_tbl)
-story.append(Spacer(1, 8))
-body("가장 흔한 질문은 &ldquo;그래서 어떻게 돈을 벌 것인가&rdquo;(5-3부)와 &ldquo;신청 자격이 정확히 되는가&rdquo;(11부)입니다. 이 두 가지부터 채워보세요.")
-
-h1("워크시트 12. 나의 지원사업 이력 카드")
-body("여러 해에 걸쳐 지원사업에 도전하다 보면 이력을 잊어버리기 쉽습니다. 신청ㆍ선정ㆍ정산 이력을 한 장에 모아 관리하세요.")
-history_header = [Paragraph("연도", styles["table_head"]), Paragraph("사업명", styles["table_head"]),
-                   Paragraph("결과", styles["table_head"]), Paragraph("받은 금액/내용", styles["table_head"]),
-                   Paragraph("정산 완료", styles["table_head"])]
-history_rows = [history_header] + [["", "", "", "", ""] for _ in range(6)]
-history_tbl = Table(history_rows, colWidths=[18 * mm, 52 * mm, 20 * mm, 46 * mm, 20 * mm], rowHeights=[9 * mm] * len(history_rows))
-history_tbl.setStyle(TableStyle([
-    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-    ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, -1), 6),
-    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-]))
-story.append(history_tbl)
-story.append(Spacer(1, 8))
-body("이 카드는 8부 FAQ에서 다룬 &ldquo;중복 지원 제한&rdquo; 확인이나, 새 지원사업 신청 시 &ldquo;과거 수혜 이력&rdquo;을 물어볼 때 바로 답할 수 있게 해줍니다.")
-
-h1("워크시트 13. 우리 동네 담당 기관 연락처 정리표")
-body("자주 연락하게 될 기관의 연락처를 미리 정리해두면 다음번엔 훨씬 빠르게 확인할 수 있습니다. 부록3ㆍ부록7을 참고해 채워보세요.")
-local_contact_header = [Paragraph("기관명", styles["table_head"]), Paragraph("담당 부서", styles["table_head"]),
-                         Paragraph("전화번호", styles["table_head"]), Paragraph("비고", styles["table_head"])]
-local_contact_rows = [local_contact_header] + [["", "", "", ""] for _ in range(5)]
-local_contact_tbl = Table(local_contact_rows, colWidths=[44 * mm, 44 * mm, 34 * mm, 44 * mm], rowHeights=[9 * mm] * len(local_contact_rows))
-local_contact_tbl.setStyle(TableStyle([
-    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-    ("GRID", (0, 0), (-1, -1), 0.6, BORDER),
-    ("TOPPADDING", (0, 0), (-1, -1), 6),
-    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-]))
-story.append(local_contact_tbl)
+h1("실제 탈락 이유 TOP 5 — 심사위원 입장에서 본 함정")
+body("10부에서 &ldquo;자주 하는 오해&rdquo;를 다뤘다면, 여기서는 실제로 서류ㆍ발표 평가에서 가장 자주 나오는 <b>탈락 원인 5가지</b>를 심사위원 시점에서 정리했습니다.")
+callout_box("1위. 공고와 &ldquo;단계&rdquo;가 안 맞는다", [
+    "탈락의 원인은 대부분 실력 부족이 아니라 &ldquo;이 기업은 아직 이 사업을 받을 단계가 아니다&rdquo;, &ldquo;사업 취지와 방향이 안 맞는다&rdquo;는 단계ㆍ목적 불일치입니다.",
+    "지원 전 4부 체크리스트로 내 창업 단계(예비/1년/3년 등)를 먼저 명확히 하고, 그 단계에 맞는 사업만 추려서 지원하세요.",
+])
+callout_box("2위. 설명 없는 표ㆍ차트만 붙여넣는다", [
+    "평가위원은 하루에 수십 개 계획서를 보기 때문에, 숫자나 그래프만 있고 &ldquo;왜 이 숫자인지&rdquo; 설명이 없으면 감점 대상입니다.",
+    "표를 넣었다면 반드시 그 아래에 &ldquo;이 표가 의미하는 것&rdquo;을 한두 문장으로 설명하세요.",
+])
+callout_box("3위. &ldquo;할 수 있다&rdquo;만 있고 &ldquo;해봤다&rdquo;가 없다", [
+    "심사위원은 아이디어 자체보다 시장조사ㆍ프로토타입ㆍ고객 반응처럼 <b>이미 해본 흔적</b>을 봅니다.",
+    "작은 규모라도 실제로 시도해본 것(설문조사 결과, 시제품 사진, SNS 반응 등)이 있다면 반드시 넣으세요.",
+])
+callout_box("4위. 근거 없는 재무 숫자", [
+    "&ldquo;3년 안에 매출 10억&rdquo;처럼 과장되거나 근거 없는 숫자는 즉시 감점 요인입니다.",
+    "숫자를 쓸 때는 반드시 &ldquo;어떤 계산으로 나온 숫자인지&rdquo; 함께 적어야 신뢰를 얻습니다.",
+])
+callout_box("5위. 첨부서류ㆍ서명 누락", [
+    "빠진 첨부파일, 서명 누락, 증빙자료 불충분처럼 사소해 보이는 서류 미비도 실제 탈락 사유의 큰 비중을 차지합니다.",
+    "제출 직전 7부 체크리스트로 한 번 더 확인하는 습관이 가장 확실한 예방책입니다.",
+])
+callout_box("탈락 이유 TOP5 핵심 요약", [
+    "가장 흔한 탈락 원인은 실력 부족이 아니라 &ldquo;단계ㆍ취지 불일치&rdquo;",
+    "표는 설명과 함께, 재무 숫자는 근거와 함께, 서류는 제출 직전 한 번 더 확인",
+])
 
 # ============================================================
 # 부록 11 — 요약 카드
@@ -1824,7 +1785,7 @@ summary_data = [
     [Paragraph("6~8부", styles["table_cell"]), Paragraph("검색 키워드 모음, 신청 전 체크리스트, FAQ", styles["table_cell"])],
     [Paragraph("9부ㆍ9-2ㆍ9-3", styles["table_cell"]), Paragraph("연간 캘린더, 선정 이후 절차, 공고문 읽는 법", styles["table_cell"])],
     [Paragraph("10~11부", styles["table_cell"]), Paragraph("오해와 진실, 통화ㆍ이메일 스크립트", styles["table_cell"])],
-    [Paragraph("12부", styles["table_cell"]), Paragraph("인쇄용 워크시트 10종", styles["table_cell"])],
+    [Paragraph("12부", styles["table_cell"]), Paragraph("인쇄용 워크시트 5종 + 정책자금ㆍ탈락원인 실측 정리", styles["table_cell"])],
     [Paragraph("부록", styles["table_cell"]), Paragraph("서류가이드ㆍ체크리스트ㆍ표현사전ㆍ기관소개ㆍ색인 등 12종", styles["table_cell"])],
 ]
 summary_tbl = Table(summary_data, colWidths=[30 * mm, 136 * mm])
