@@ -1830,7 +1830,29 @@ story.append(HRFlowable(width="100%", thickness=0.7, color=BORDER, spaceAfter=10
 story.append(Paragraph("데이터로 검증된 빈틈만 골라 만듭니다", styles["small"]))
 
 
+WATERMARK_TEXT = "수익화허브 · 무단 전재·재배포 금지"
+
+
+def draw_watermark(canvas, dark_bg=False):
+    """구매 후 재배포를 막기 위한 저작권 표시용 옅은 대각선 반복 워터마크."""
+    canvas.saveState()
+    canvas.setFont(FONT, 12.5)
+    canvas.setFillColor(colors.white if dark_bg else colors.HexColor("#000000"))
+    try:
+        canvas.setFillAlpha(0.05 if dark_bg else 0.045)
+    except AttributeError:
+        pass
+    canvas.translate(A4[0] / 2, A4[1] / 2)
+    canvas.rotate(33)
+    step_x, step_y = 78 * mm, 40 * mm
+    for ix in range(-3, 4):
+        for iy in range(-5, 6):
+            canvas.drawCentredString(ix * step_x, iy * step_y, WATERMARK_TEXT)
+    canvas.restoreState()
+
+
 def add_page_number(canvas, doc_):
+    draw_watermark(canvas, dark_bg=False)
     canvas.saveState()
     canvas.setFont(FONT, 9)
     canvas.setFillColor(TEXT_DIM)
@@ -1838,5 +1860,5 @@ def add_page_number(canvas, doc_):
     canvas.restoreState()
 
 
-doc.build(story, onFirstPage=lambda c, d: None, onLaterPages=add_page_number)
+doc.build(story, onFirstPage=lambda c, d: draw_watermark(c, dark_bg=True), onLaterPages=add_page_number)
 print("done:", OUT)

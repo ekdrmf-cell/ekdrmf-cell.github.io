@@ -381,18 +381,43 @@ class PDFKit:
         self.story.append(Paragraph(text, self.styles[style]))
 
     # ---------- 빌드 ----------
-    def build(self, footer_tagline=None):
+    def build(self, footer_tagline=None, watermark_text="수익화허브 · 무단 전재·재배포 금지"):
         if footer_tagline:
             self.story.append(Spacer(1, 20))
             self.story.append(HRFlowable(width="100%", thickness=0.7, color=BORDER, spaceAfter=10))
             self.story.append(Paragraph(footer_tagline, self.styles["small"]))
 
+        def draw_watermark(canvas, dark_bg=False):
+            """구매 후 재배포를 막기 위한 저작권 표시용 옅은 대각선 반복 워터마크.
+            눈에 거슬리지 않을 정도로만 보이되, 스크린샷ㆍ캡처로 재유포될 때는
+            남아있도록 본문 위에 얹는다(밝은 배경=짙은 회색/어두운 배경=흰색, 알파 매우 낮음)."""
+            canvas.saveState()
+            canvas.setFont(BOLD, 12.5)
+            canvas.setFillColor(colors.white if dark_bg else colors.HexColor("#000000"))
+            try:
+                canvas.setFillAlpha(0.05 if dark_bg else 0.045)
+            except AttributeError:
+                pass
+            canvas.translate(A4[0] / 2, A4[1] / 2)
+            canvas.rotate(33)
+            step_x, step_y = 78 * mm, 40 * mm
+            for ix in range(-3, 4):
+                for iy in range(-5, 6):
+                    canvas.drawCentredString(ix * step_x, iy * step_y, watermark_text)
+            canvas.restoreState()
+
+        def on_cover(canvas, doc_):
+            if watermark_text:
+                draw_watermark(canvas, dark_bg=True)
+
         def add_page_number(canvas, doc_):
+            if watermark_text:
+                draw_watermark(canvas, dark_bg=False)
             canvas.saveState()
             canvas.setFont(REG, 9)
             canvas.setFillColor(TEXT_DIM)
             canvas.drawCentredString(A4[0] / 2, 13 * mm, str(doc_.page))
             canvas.restoreState()
 
-        self.doc.build(self.story, onFirstPage=lambda c, d: None, onLaterPages=add_page_number)
+        self.doc.build(self.story, onFirstPage=on_cover, onLaterPages=add_page_number)
         print("done:", self.out_path)
