@@ -489,6 +489,16 @@ img, svg {
   font-size: 0.8rem;
 }
 
+.site-footer .footer-link {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.site-footer .footer-link:hover {
+  text-decoration: underline;
+}
+
 /* Modal (ad / payment stub) */
 .modal-backdrop {
   position: fixed;

@@ -48,6 +48,7 @@
           수익화허브
         </a>
         <div class="tagline">데이터로 검증된 빈틈만 골라 만듭니다 · 무자본으로 시작한 실험 프로젝트</div>
+        <a class="footer-link" href="${root}privacy.html">개인정보처리방침</a>
       </div>
     `;
   }
