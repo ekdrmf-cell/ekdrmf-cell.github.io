@@ -94,7 +94,7 @@ const AdStub = (function () {
   }
 
   function showRemoveAdsPurchase() {
-    const hasPayment = window.SITE_CONFIG && window.SITE_CONFIG.paymentLink;
+    const hasPayment = window.SITE_CONFIG && (window.SITE_CONFIG.paymentLink || window.SITE_CONFIG.paymentGuideText);
     open(`
       <h3>광고 제거</h3>
       <p>${hasPayment ? "결제 후 광고 제거 코드는 별도로 안내드립니다(자동 처리 전까지 수동 확인)." : "결제 연동은 아직 준비 중입니다. 서비스 오픈 시 1회 결제로 모든 광고를 영구히 제거할 수 있습니다."}</p>
