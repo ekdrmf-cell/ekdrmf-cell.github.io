@@ -20,6 +20,7 @@ const SITE_CONFIG = {
   rewardAdSlot: "",
   interstitialAdSlot: "",
 };
+window.SITE_CONFIG = SITE_CONFIG;
 
 function contactMail(subject, body) {
   const s = encodeURIComponent(subject);
