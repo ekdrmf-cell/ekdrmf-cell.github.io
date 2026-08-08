@@ -15,12 +15,12 @@
 - **전자책 페이지** (`ebooks.html`) — 전자책 10종 판매중.
   - `products/gov-subsidy-guide/` — 소상공인·1인사업자 정부지원금 찾기 가이드(80p, 9,900원)
   - `products/ebook-writing-guide/` — 전자책 만들어 팔기 실전 가이드(79p, 12,900원)
-  - `products/adsense-blog-guide/` — 구글 애드센스 수익형 블로그 시작 가이드(80p, 13,900원)
+  - `products/adsense-blog-guide/` — 구글 애드센스 수익형 블로그 시작 가이드(86p, 13,900원)
   - `products/instagram-marketing-guide/` — 인스타그램 마케팅 핵심노하우(80p, 12,900원)
-  - `products/architecture-exam-strategy-guide/` — 건축기사 실기 합격 전략 가이드(43p, 9,900원. 계산 풀이가 아닌 출제경향·답안작성규칙·합격률데이터 중심이라 다른 책보다 짧음)
+  - `products/architecture-exam-strategy-guide/` — 건축기사 실기 합격 전략 가이드(46p, 9,900원. 계산 풀이가 아닌 출제경향·답안작성규칙·합격률데이터 중심이라 다른 책보다 짧음)
   - `products/youtube-monetization-guide/` — 유튜브 채널 수익화 전략 가이드(80p, 13,900원)
   - `products/affiliate-marketing-guide/` — 제휴마케팅 실전 가이드(80p, 12,900원)
-  - `products/coupang-seller-guide/` — 쿠팡 셀러 창업 가이드(73p, 21,900원. 가격 공식 상한 폐지 후 첫 적용)
+  - `products/coupang-seller-guide/` — 쿠팡 셀러 창업 가이드(77p, 21,900원. 가격 공식 상한 폐지 후 첫 적용)
   - `products/meta-ads-guide/` — 메타 광고 최적화 가이드(58p, 9,900원)
   - `products/chatgpt-usage-guide/` — 챗GPT 실무 활용 가이드(60p, 11,900원, 스크린샷 없음 — openai.com Cloudflare 차단)
   - `products/_shared/pdf_kit.py` — 3번째 전자책부터 쓰는 공용 PDF 디자인 키트(Pretendard 폰트, 색상별 박스 등). 새 전자책은 이 모듈을 재사용합니다.
