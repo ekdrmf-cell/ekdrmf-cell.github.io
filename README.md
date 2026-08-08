@@ -12,7 +12,7 @@
 - **서비스 페이지** (`services.html`)
   - **견적서 자동생성 템플릿(15,000원) — 실제로 판매 가능한 첫 상품.** `products/quote-generator/`에 실제 작동하는 구글시트+Apps Script 코드와 설치 가이드가 완성되어 있습니다.
   - 나머지 3개(자동화 템플릿 추가분, AI 상세페이지 제작, 소상공인 챗봇)는 아직 상품 자체는 없고, 관심 등록/문의만 받는 상태입니다.
-- **전자책 페이지** (`ebooks.html`) — 전자책 9종 판매중.
+- **전자책 페이지** (`ebooks.html`) — 전자책 10종 판매중.
   - `products/gov-subsidy-guide/` — 소상공인·1인사업자 정부지원금 찾기 가이드(80p, 9,900원)
   - `products/ebook-writing-guide/` — 전자책 만들어 팔기 실전 가이드(79p, 12,900원)
   - `products/adsense-blog-guide/` — 구글 애드센스 수익형 블로그 시작 가이드(80p, 13,900원)
@@ -22,6 +22,7 @@
   - `products/affiliate-marketing-guide/` — 제휴마케팅 실전 가이드(80p, 12,900원)
   - `products/coupang-seller-guide/` — 쿠팡 셀러 창업 가이드(73p, 21,900원. 가격 공식 상한 폐지 후 첫 적용)
   - `products/meta-ads-guide/` — 메타 광고 최적화 가이드(52p, 9,900원)
+  - `products/chatgpt-usage-guide/` — 챗GPT 실무 활용 가이드(33p, 11,900원, 스크린샷 없음 — openai.com Cloudflare 차단)
   - `products/_shared/pdf_kit.py` — 3번째 전자책부터 쓰는 공용 PDF 디자인 키트(Pretendard 폰트, 색상별 박스 등). 새 전자책은 이 모듈을 재사용합니다.
   - 완성된 전자책 PDF는 바탕화면의 `전자책 자동화/` 폴더에도 번호순으로 보관합니다.
 - **연락처 중앙 관리** (`js/config.js`) — 모든 문의/구매 버튼이 이 파일의 이메일 하나를 씁니다. 전용 채널로 바꿀 때 이 파일만 고치면 사이트 전체에 반영됩니다.
