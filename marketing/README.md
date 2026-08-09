@@ -4,7 +4,8 @@
 
 - `drafts/threads/` — 스레드용 짧은 글
 - `drafts/instagram/` — 인스타그램 카드뉴스 슬라이드 문구 + 캡션
-- `drafts/blog/` — 네이버 블로그/티스토리용 긴 글
+- `drafts/blog/naver/` — 네이버 블로그(`blog.naver.com/ekdrmf33`)용 글
+- `drafts/blog/tistory/` — 티스토리(`intelbrain.tistory.com`)용 글 (네이버용과 일부러 다르게 씀 — 중복 콘텐츠 방지)
 - `drafts/newsletter/` — 스티비 이메일용 글
 
 **쓰는 법**: 마음에 드는 초안을 골라서 그대로 복사해 직접 올리거나, Claude에게
