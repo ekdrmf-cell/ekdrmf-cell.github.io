@@ -13,7 +13,7 @@
   - **견적서 자동생성 템플릿(15,000원) — 실제로 판매 가능한 첫 상품.** `products/quote-generator/`에 실제 작동하는 구글시트+Apps Script 코드와 설치 가이드가 완성되어 있습니다.
   - 나머지 3개(자동화 템플릿 추가분, AI 상세페이지 제작, 소상공인 챗봇)는 아직 상품 자체는 없고, 관심 등록/문의만 받는 상태입니다.
 - **전자책 페이지** (`ebooks.html`) — 전자책 10종 판매중.
-  - `products/gov-subsidy-guide/` — 소상공인·1인사업자 정부지원금 찾기 가이드(80p, 9,900원)
+  - `products/gov-subsidy-guide/` — 소상공인·1인사업자 정부지원금 찾기 가이드(81p, 9,900원)
   - `products/ebook-writing-guide/` — 전자책 만들어 팔기 실전 가이드(79p, 12,900원)
   - `products/adsense-blog-guide/` — 구글 애드센스 수익형 블로그 시작 가이드(86p, 13,900원)
   - `products/instagram-marketing-guide/` — 인스타그램 마케팅 핵심노하우(80p, 12,900원)
