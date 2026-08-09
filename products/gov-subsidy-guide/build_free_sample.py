@@ -81,7 +81,7 @@ story.append(Paragraph("소상공인ㆍ1인사업자를 위한", styles["subtitl
 story.append(Paragraph("정부지원금 찾기 가이드", styles["title"]))
 story.append(Spacer(1, 6))
 story.append(HRFlowable(width="26%", thickness=1.4, color=ACCENT, hAlign="CENTER", spaceBefore=8, spaceAfter=16))
-story.append(Paragraph("전체 81페이지 중 1부(5분 컷 핵심 요약)만 무료로 담았습니다.<br/>전체 가이드는 마지막 페이지에서 안내합니다.", styles["cover_meta"]))
+story.append(Paragraph("1부(5분 컷 핵심 요약)만 무료로 담았습니다.<br/>전체 가이드는 마지막 페이지에서 안내합니다.", styles["cover_meta"]))
 story.append(Spacer(1, 60 * mm))
 story.append(Paragraph("수익화허브", styles["cover_meta"]))
 story.append(PageBreak())
@@ -248,7 +248,7 @@ story.append(Spacer(1, 20))
 cta_rows = [
     [Paragraph("여기까지가 무료 샘플입니다", styles["cta_title"])],
     [Paragraph(
-        "전체 가이드(81페이지, 19,900원)에는 소상공인24ㆍ중소벤처24ㆍ소진공ㆍ정부24ㆍ지자체 "
+        "전체 가이드에는 소상공인24ㆍ중소벤처24ㆍ소진공ㆍ정부24ㆍ지자체 "
         "사이트별 상세 사용법, 헷갈리는 용어 사전, 실전 사례 6개(A~F씨), 사업계획서 작성 "
         "실전가이드, 연간 지원사업 캘린더, 담당자 통화 스크립트까지 담겨 있습니다.",
         styles["cta_body"])],
