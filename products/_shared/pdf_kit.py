@@ -17,6 +17,17 @@
 - 챕터 끝에는 반드시 summary_box + next_chapter_box를 넣어 "그냥 끊기지 않게" 할 것.
 - 이모지는 BMP 범위(★☆⚠▶✓■ 등)만 안전하게 렌더링됨 — 💡🎯 같은 서플리멘터리 플레인
   이모지는 Pretendard에 글리프가 없어 틀린 기호로 깨진다. 절대 쓰지 말 것.
+- ✕(U+2715)ㆍ✗(U+2717) 같은 곱셈기호형 X도 Pretendard에 글리프가 없어 깨진다
+  (2026-08-09 발견, comparison_card에서 확인) — "X"자 그대로 쓸 것.
+
+2026-08-09 디자인 리뉴얼(문서적ㆍ단조롭다는 피드백 반영):
+- 보조 강조색 ACCENT2(테라코타) 추가 — 보라 하나로만 통일됐던 단조로움을 깨는 용도.
+- 표지ㆍ파트 배너ㆍ챕터 헤더에 "고스트 넘버"(큰 반투명/연한 색 숫자) 장식 추가.
+- 표지는 평면 단색 박스 대신 캔버스에 풀블리드로 겹친 원 그라디언트풍 배경을 그림.
+- 박스류(tip/warn/next/summary/callout/site_box)에 모서리 둥글림(ROUNDEDCORNERS) 적용.
+- 신규 컴포넌트: stat_hero(큰 숫자 하나 강조), stat_row(작은 숫자 여러 개 가로 나열),
+  pull_quote(큰 인용부호 강조 인용구), comparison_card(Before/After 빨강ㆍ초록 대비 카드).
+  **Before/After 실전예시를 쓸 때는 이제 simple_table 대신 comparison_card를 우선 사용할 것.**
 """
 
 from pathlib import Path
@@ -60,15 +71,28 @@ def register_fonts():
 # ---------- 색 ----------
 ACCENT = colors.HexColor("#5a3fd6")
 ACCENT_DEEP = colors.HexColor("#3d2a99")
-ACCENT_SOFT = colors.HexColor("#efeafc")
+ACCENT_SOFT = colors.HexColor("#d9cdf7")
 TEXT_DARK = colors.HexColor("#1f2333")
 TEXT_DIM = colors.HexColor("#4d5268")
 BORDER = colors.HexColor("#d9d5f0")
 
-TIP_BG, TIP_BAR = colors.HexColor("#eaf2ff"), colors.HexColor("#2a63c9")
-WARN_BG, WARN_BAR = colors.HexColor("#fff6df"), colors.HexColor("#c2790a")
-NEXT_BG, NEXT_BAR = colors.HexColor("#fdeef3"), colors.HexColor("#c23572")
+# 2026-08-09 디자인 리뉴얼: 보라 하나로만 통일돼 있던 게 "문서적ㆍ단조롭다"는
+# 피드백을 받아, 대비를 주는 보조 강조색(테라코타)과 고스트 넘버ㆍBefore/After
+# 카드ㆍ스탯 히어로용 팔레트를 추가함. tip/warn/next/summary는 기존 의미 유지.
+# (같은 날 2차 피드백: 배경 틴트가 너무 파스텔해서 밋밋해 보임 → 전체적으로
+# 명도를 낮추고 채도를 높여 더 짙고 선명하게 재조정함.)
+ACCENT2 = colors.HexColor("#d9501f")
+ACCENT2_DEEP = colors.HexColor("#a53c17")
+ACCENT2_SOFT = colors.HexColor("#f8cdb3")
+GHOST_ON_ACCENT = colors.HexColor("#8574e2")   # 보라 배경 위 고스트 넘버(파트 배너)
+GHOST_ON_WHITE = colors.HexColor("#d7c9f5")    # 흰 배경 위 고스트 넘버(챕터 헤더)
+
+TIP_BG, TIP_BAR = colors.HexColor("#c3daf9"), colors.HexColor("#1f4fa8")
+WARN_BG, WARN_BAR = colors.HexColor("#fbdf9c"), colors.HexColor("#a35f05")
+NEXT_BG, NEXT_BAR = colors.HexColor("#f6c7d8"), colors.HexColor("#a12760")
 SUMMARY_BG = colors.HexColor("#1f2338")
+CMP_BAD_BG, CMP_BAD_BAR = colors.HexColor("#f6c9c2"), colors.HexColor("#a8321f")
+CMP_GOOD_BG, CMP_GOOD_BAR = colors.HexColor("#bce6d1"), colors.HexColor("#1c6e3f")
 
 STEP_SHADES = [ACCENT, colors.HexColor("#7457e0"), colors.HexColor("#8d6fea"),
                colors.HexColor("#a687f2"), colors.HexColor("#bfa0f7"), colors.HexColor("#d3bffa")]
@@ -137,20 +161,47 @@ class PDFKit:
                                             textColor=colors.white),
             "summary_body": ParagraphStyle("summary_body", fontName=REG, fontSize=10.3, leading=16,
                                             textColor=colors.HexColor("#dcdcf5")),
+            # ---- 2026-08-09 디자인 리뉴얼 추가분 ----
+            "chnum_badge": ParagraphStyle("chnum_badge", fontName=BLACK, fontSize=14.5, leading=17,
+                                           textColor=colors.white, alignment=TA_CENTER),
+            "chnum_ghost": ParagraphStyle("chnum_ghost", fontName=BLACK, fontSize=46, leading=46,
+                                           textColor=GHOST_ON_WHITE, alignment=TA_CENTER),
+            "part_ghost": ParagraphStyle("part_ghost", fontName=BLACK, fontSize=40, leading=40,
+                                          textColor=GHOST_ON_ACCENT, alignment=TA_CENTER),
+            "stat_num": ParagraphStyle("stat_num", fontName=BLACK, fontSize=38, leading=42,
+                                        textColor=ACCENT2, alignment=TA_CENTER),
+            "stat_label": ParagraphStyle("stat_label", fontName=BOLD, fontSize=11.5, leading=15,
+                                          textColor=TEXT_DARK, alignment=TA_CENTER, spaceBefore=2),
+            "stat_sub": ParagraphStyle("stat_sub", fontName=REG, fontSize=9, leading=13,
+                                        textColor=TEXT_DIM, alignment=TA_CENTER),
+            "pull_mark": ParagraphStyle("pull_mark", fontName=BLACK, fontSize=32, leading=26,
+                                         textColor=ACCENT2, spaceAfter=2),
+            "pull_text": ParagraphStyle("pull_text", fontName=MED, fontSize=12.8, leading=19.5,
+                                         textColor=ACCENT_DEEP, alignment=TA_LEFT),
+            "pull_attr": ParagraphStyle("pull_attr", fontName=BOLD, fontSize=9.3, leading=13,
+                                         textColor=TEXT_DIM, spaceBefore=6),
+            "cmp_head_bad": ParagraphStyle("cmp_head_bad", fontName=BOLD, fontSize=10, leading=14,
+                                            textColor=CMP_BAD_BAR),
+            "cmp_head_good": ParagraphStyle("cmp_head_good", fontName=BOLD, fontSize=10, leading=14,
+                                             textColor=CMP_GOOD_BAR),
         }
 
     # ---------- 표지 ----------
     def cover(self, kicker, title_html, subtitle, tagline=None):
-        cell = [Paragraph(kicker, self.styles["cover_kicker"]), Spacer(1, 12),
+        """표지 배경(그라디언트풍 도형)은 build()의 onFirstPage에서 캔버스에 풀블리드로
+        그리므로, 여기 테이블은 배경색 없이 텍스트만 얹는다(2026-08-09 리뉴얼)."""
+        accent_line = Table([[""]], colWidths=[26 * mm], rowHeights=[2.6 * mm],
+                             style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), ACCENT2)]))
+        cell = [accent_line, Spacer(1, 10),
+                Paragraph(kicker, self.styles["cover_kicker"]), Spacer(1, 12),
                 Paragraph(title_html, self.styles["cover_title"]), Spacer(1, 10),
                 Paragraph(subtitle, self.styles["cover_sub"])]
         if tagline:
-            cell += [Spacer(1, 190), Paragraph(tagline, self.styles["cover_sub"])]
+            cell += [Spacer(1, 178), Paragraph(tagline, self.styles["cover_sub"])]
         else:
-            cell += [Spacer(1, 210)]
+            cell += [Spacer(1, 198)]
         box = Table([[cell]], colWidths=[166 * mm], rowHeights=[233 * mm])
         box.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#15132a")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 20),
             ("RIGHTPADDING", (0, 0), (-1, -1), 16),
@@ -178,27 +229,43 @@ class PDFKit:
 
     # ---------- 파트/챕터 헤더 ----------
     def part_page(self, label, title, desc=""):
+        """2026-08-09 리뉴얼: 파트 번호를 오른쪽에 큰 고스트 넘버로 얹고 모서리를 둥글려
+        평범한 색 배너에서 벗어나게 함."""
+        num_str = "".join(ch for ch in label if ch.isdigit())
         cell = [Paragraph(label, self.styles["part_label"]), Paragraph(title, self.styles["part_title"])]
         if desc:
             cell.append(Paragraph(desc, self.styles["part_desc"]))
-        banner = Table([[cell]], colWidths=[166 * mm])
+        ghost = Paragraph(num_str, self.styles["part_ghost"]) if num_str else Paragraph("", self.styles["part_ghost"])
+        banner = Table([[cell, ghost]], colWidths=[136 * mm, 30 * mm])
         banner.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), ACCENT),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (1, 0), (1, 0), "RIGHT"),
             ("TOPPADDING", (0, 0), (-1, -1), 14), ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
-            ("LEFTPADDING", (0, 0), (-1, -1), 16), ("RIGHTPADDING", (0, 0), (-1, -1), 16),
+            ("LEFTPADDING", (0, 0), (-1, -1), 16), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ("ROUNDEDCORNERS", [10, 10, 10, 10]),
         ]))
         self.story.append(banner)
         self.story.append(Spacer(1, 14))
 
     def chapter_header(self, num, title, eyebrow="CHAPTER"):
-        bar = Table([[""]], colWidths=[3 * mm], rowHeights=[18 * mm],
-                    style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), ACCENT)]))
-        head = [Paragraph(f"{eyebrow} {num:02d}", self.styles["eyebrow"]),
-                Paragraph(title, self.styles["chapter_title"])]
-        t = Table([[bar, head]], colWidths=[6 * mm, 160 * mm])
-        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (1, 0), (1, 0), 10)]))
+        """2026-08-09 리뉴얼: 얇은 색바 대신 컬러 배지 + 큰 고스트 넘버 + 짧은 강조선으로
+        구성해 매뉴얼 느낌의 반복 패턴에서 벗어나게 함."""
+        badge = Table([[Paragraph(f"{num:02d}", self.styles["chnum_badge"])]],
+                      colWidths=[15 * mm], rowHeights=[15 * mm])
+        badge.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), ACCENT),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+        ]))
+        head = [Paragraph(eyebrow, self.styles["eyebrow"]), Paragraph(title, self.styles["chapter_title"])]
+        ghost = Paragraph(f"{num:02d}", self.styles["chnum_ghost"])
+        t = Table([[badge, head, ghost]], colWidths=[19 * mm, 120 * mm, 27 * mm])
+        t.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+            ("LEFTPADDING", (1, 0), (1, 0), 10),
+        ]))
         self.story.append(t)
-        self.story.append(Spacer(1, 12))
+        self.story.append(HRFlowable(width="22%", thickness=2.2, color=ACCENT2, spaceBefore=8, spaceAfter=12, hAlign="LEFT"))
 
     # ---------- 색상별 박스 ----------
     def _colored_box(self, header, items, bg, bar, icon):
@@ -212,6 +279,7 @@ class PDFKit:
             ("LINEBEFORE", (0, 0), (0, -1), 3, bar),
             ("LEFTPADDING", (0, 0), (-1, -1), 14), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
             ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("ROUNDEDCORNERS", [7, 7, 7, 7]),
         ]))
         self.story.append(t)
         self.story.append(Spacer(1, 11))
@@ -237,6 +305,7 @@ class PDFKit:
             ("LEFTPADDING", (0, 0), (-1, -1), 13), ("RIGHTPADDING", (0, 0), (-1, -1), 13),
             ("TOPPADDING", (0, 1), (-1, -1), 6), ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
             ("BOX", (0, 0), (-1, -1), 0.8, BORDER), ("LINEBELOW", (0, 0), (-1, 0), 0.8, BORDER),
+            ("ROUNDEDCORNERS", [8, 8, 8, 8]),
         ]))
         self.story.append(t)
         self.story.append(Spacer(1, 12))
@@ -252,6 +321,7 @@ class PDFKit:
             ("LINEBEFORE", (0, 0), (0, -1), 3, NEXT_BAR),
             ("LEFTPADDING", (0, 0), (-1, -1), 14),
             ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("ROUNDEDCORNERS", [7, 7, 7, 7]),
         ]))
         self.story.append(t)
         self.story.append(Spacer(1, 12))
@@ -265,6 +335,7 @@ class PDFKit:
             ("BACKGROUND", (0, 0), (-1, -1), SUMMARY_BG),
             ("LEFTPADDING", (0, 0), (-1, -1), 16), ("RIGHTPADDING", (0, 0), (-1, -1), 16),
             ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("ROUNDEDCORNERS", [9, 9, 9, 9]),
         ]))
         self.story.append(t)
         self.story.append(Spacer(1, 13))
@@ -279,9 +350,86 @@ class PDFKit:
             ("BOX", (0, 0), (-1, -1), 0.8, BORDER),
             ("LEFTPADDING", (0, 0), (-1, -1), 13), ("RIGHTPADDING", (0, 0), (-1, -1), 13),
             ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("ROUNDEDCORNERS", [7, 7, 7, 7]),
         ]))
         self.story.append(t)
         self.story.append(Spacer(1, 9))
+
+    # ---------- 2026-08-09 리뉴얼 추가 컴포넌트 ----------
+    def stat_hero(self, number, label, sublabel=None):
+        """큰 숫자 하나로 데이터를 강조하는 인포그래픽형 카드. 법정기한ㆍ리뷰수ㆍ
+        피해구제 건수처럼 "이 숫자 하나가 핵심"인 실측 데이터에 쓸 것."""
+        cell = [Paragraph(number, self.styles["stat_num"]), Paragraph(label, self.styles["stat_label"])]
+        if sublabel:
+            cell.append(Paragraph(sublabel, self.styles["stat_sub"]))
+        t = Table([[cell]], colWidths=[164 * mm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), ACCENT2_SOFT),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 16), ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+            ("ROUNDEDCORNERS", [12, 12, 12, 12]),
+        ]))
+        self.story.append(t)
+        self.story.append(Spacer(1, 12))
+
+    def stat_row(self, stats):
+        """stats: [(number, label), ...] 2~4개. 작은 숫자 여러 개를 가로로 나열할 때."""
+        n = len(stats)
+        w = 164 / n
+        cells = []
+        for number, label in stats:
+            cells.append([Paragraph(number, ParagraphStyle(
+                "sr_num", fontName=BLACK, fontSize=24, leading=27, textColor=ACCENT2, alignment=TA_CENTER)),
+                Paragraph(label, self.styles["stat_sub"])])
+        row = Table([cells], colWidths=[w * mm] * n)
+        row.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#ece3f9")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ("LINEAFTER", (0, 0), (-2, -1), 0.6, BORDER),
+            ("ROUNDEDCORNERS", [10, 10, 10, 10]),
+        ]))
+        self.story.append(row)
+        self.story.append(Spacer(1, 12))
+
+    def pull_quote(self, text, attribution=None):
+        """굵은 인용부호를 곁들인 강조 인용구. 법 조문 원문ㆍ실제 응대 대사ㆍ핵심 한 문장을
+        본문 사이에서 잡지 기사처럼 도드라지게 보여줄 때 쓸 것(기존 quote()보다 강한 강조)."""
+        cell = [Paragraph("“", self.styles["pull_mark"]), Paragraph(text, self.styles["pull_text"])]
+        if attribution:
+            cell.append(Paragraph(attribution, self.styles["pull_attr"]))
+        t = Table([[cell]], colWidths=[164 * mm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), ACCENT_SOFT),
+            ("LEFTPADDING", (0, 0), (-1, -1), 20), ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+            ("ROUNDEDCORNERS", [12, 12, 12, 12]),
+        ]))
+        self.story.append(t)
+        self.story.append(Spacer(1, 12))
+
+    def comparison_card(self, bad_label, bad_text, good_label, good_text):
+        """Before/After(나쁜 예ㆍ좋은 예) 실전 대비 카드. 지금까지 simple_table이나 평문으로
+        처리하던 Before/After 실전예시를 빨강/초록 카드로 시각화해 한눈에 대비되게 함."""
+        def _panel(label, text, bg, bar, mark):
+            rows = [[Paragraph(f"{mark}  {label}", ParagraphStyle(
+                "cmph", fontName=BOLD, fontSize=10, leading=14, textColor=bar))],
+                [Paragraph(text, self.styles["box_body"])]]
+            t = Table(rows, colWidths=[79 * mm])
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), bg),
+                ("LINEBEFORE", (0, 0), (0, -1), 3, bar),
+                ("LEFTPADDING", (0, 0), (-1, -1), 11), ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+                ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("ROUNDEDCORNERS", [7, 7, 7, 7]),
+            ]))
+            return t
+        bad = _panel(bad_label, bad_text, CMP_BAD_BG, CMP_BAD_BAR, "X")
+        good = _panel(good_label, good_text, CMP_GOOD_BG, CMP_GOOD_BAR, "✓")
+        outer = Table([[bad, good]], colWidths=[81 * mm, 83 * mm])
+        outer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (1, 0), (1, 0), 4)]))
+        self.story.append(outer)
+        self.story.append(Spacer(1, 12))
 
     # ---------- 도식 ----------
     def icon_steps(self, steps):
@@ -406,7 +554,36 @@ class PDFKit:
                     canvas.drawCentredString(ix * step_x, iy * step_y, watermark_text)
             canvas.restoreState()
 
+        def draw_cover_art(canvas):
+            """표지 전체를 풀블리드로 채우는 배경(2026-08-09 리뉴얼). 평면 단색 박스 대신
+            겹쳐진 반투명 원으로 깊이감을 주고, 하단에 보조색 강조선을 둔다."""
+            w, h = A4
+            canvas.saveState()
+            canvas.setFillColor(colors.HexColor("#15132a"))
+            canvas.rect(0, 0, w, h, stroke=0, fill=1)
+            layers = [
+                (w * 0.95, h * 0.97, 128, ACCENT_DEEP, 0.78),
+                (w * 0.86, h * 0.86, 92, ACCENT, 0.58),
+                (w * 0.06, h * 0.05, 96, ACCENT2, 0.68),
+                (w * 0.18, h * 0.14, 46, ACCENT2, 0.4),
+            ]
+            for cx, cy, r, col, alpha in layers:
+                canvas.setFillColor(col)
+                try:
+                    canvas.setFillAlpha(alpha)
+                except AttributeError:
+                    pass
+                canvas.circle(cx, cy, r, stroke=0, fill=1)
+            try:
+                canvas.setFillAlpha(1)
+            except AttributeError:
+                pass
+            canvas.setFillColor(ACCENT2)
+            canvas.rect(0, 26, w, 3.2, stroke=0, fill=1)
+            canvas.restoreState()
+
         def on_cover(canvas, doc_):
+            draw_cover_art(canvas)
             if watermark_text:
                 draw_watermark(canvas, dark_bg=True)
 
