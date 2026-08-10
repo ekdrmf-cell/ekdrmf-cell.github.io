@@ -6,6 +6,9 @@
 
 강조하고 싶은 단어는 문장 안에서 [[이렇게]] 겹대괄호로 감싸면 빨간 펜 색+밑줄로
 포인트가 들어간다.
+
+캔버스 크기는 size=(width, height)로 지정한다 — 캐러셀/스레드용은 기본값
+(1080, 1350, 4:5), 릴스용은 (1080, 1920, 9:16)을 쓴다(build_*_reels.py 참고).
 """
 import random
 import re
@@ -17,7 +20,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 HERE = Path(__file__).resolve().parent
 FONT_PATH = HERE / "fonts" / "NanumPenScript-Regular.ttf"
 
-W, H = 1080, 1350
+DEFAULT_SIZE = (1080, 1350)
 PAPER_COLOR = (252, 249, 241)
 INK_COLOR = (26, 34, 64)
 ACCENT_COLOR = (162, 48, 38)
@@ -40,12 +43,13 @@ def _parse_runs(text: str) -> list:
     return runs or [("", False)]
 
 
-def add_stains(paper: Image.Image, seed: int) -> None:
+def add_stains(paper: Image.Image, seed: int, size: tuple) -> None:
+    w, h = size
     rng = random.Random(seed)
     draw = ImageDraw.Draw(paper, "RGBA")
 
     if rng.random() < 0.8:
-        corners = [(130, 130), (W - 160, 140), (150, H - 170), (W - 170, H - 150)]
+        corners = [(130, 130), (w - 160, 140), (150, h - 170), (w - 170, h - 150)]
         cx, cy = rng.choice(corners)
         r = rng.randint(65, 95)
         ring_color = (101, 67, 33)
@@ -59,22 +63,23 @@ def add_stains(paper: Image.Image, seed: int) -> None:
             outline=(*ring_color, 12), width=4,
         )
 
-    crumb_band = rng.choice([(H - 230, H - 100), (110, 220)])
+    crumb_band = rng.choice([(h - 230, h - 100), (110, 220)])
     for _ in range(rng.randint(6, 11)):
-        px = rng.randint(90, W - 90)
+        px = rng.randint(90, w - 90)
         py = rng.randint(*crumb_band)
-        size = rng.randint(3, 9)
+        csize = rng.randint(3, 9)
         shade = rng.choice([(150, 110, 60), (120, 85, 45), (170, 130, 80)])
         alpha = rng.randint(90, 160)
-        h = size * rng.uniform(0.6, 1.0)
-        draw.ellipse([px, py, px + size, py + h], fill=(*shade, alpha))
+        ch = csize * rng.uniform(0.6, 1.0)
+        draw.ellipse([px, py, px + csize, py + ch], fill=(*shade, alpha))
 
 
-def make_paper(seed: int) -> Image.Image:
+def make_paper(seed: int, size: tuple = DEFAULT_SIZE) -> Image.Image:
+    w, h = size
     rng = np.random.default_rng(seed)
-    base = Image.new("RGB", (W, H), PAPER_COLOR)
+    base = Image.new("RGB", (w, h), PAPER_COLOR)
 
-    noise = rng.integers(-14, 14, (H, W, 1), dtype=np.int16)
+    noise = rng.integers(-14, 14, (h, w, 1), dtype=np.int16)
     noise = np.repeat(noise, 3, axis=2)
     arr = np.array(base, dtype=np.int16) + noise
     arr = np.clip(arr, 0, 255).astype(np.uint8)
@@ -82,27 +87,27 @@ def make_paper(seed: int) -> Image.Image:
 
     draw = ImageDraw.Draw(paper, "RGBA")
     y = 210
-    while y < H - 60:
-        draw.line([(70, y), (W - 70, y)], fill=(*LINE_COLOR, 130), width=2)
+    while y < h - 60:
+        draw.line([(70, y), (w - 70, y)], fill=(*LINE_COLOR, 130), width=2)
         y += 78
 
-    add_stains(paper, seed)
+    add_stains(paper, seed, size)
 
-    vignette = Image.new("L", (W, H), 90)
+    vignette = Image.new("L", (w, h), 90)
     vdraw = ImageDraw.Draw(vignette)
-    vdraw.ellipse([-260, -260, W + 260, H + 260], fill=255)
+    vdraw.ellipse([-260, -260, w + 260, h + 260], fill=255)
     vignette = vignette.filter(ImageFilter.GaussianBlur(160))
-    shade = Image.new("RGB", (W, H), VIGNETTE_COLOR)
+    shade = Image.new("RGB", (w, h), VIGNETTE_COLOR)
     paper = Image.composite(paper, shade, vignette)
 
     return paper
 
 
 def draw_handwritten_line(canvas: Image.Image, text: str, font: ImageFont.FreeTypeFont,
-                           x: int, y: int, align_center_x: int = None) -> int:
+                           x: int, y: int, align_center_x: int = None, canvas_width: int = DEFAULT_SIZE[0]) -> int:
     runs = _parse_runs(text)
 
-    tmp = Image.new("RGBA", (W, 260), (0, 0, 0, 0))
+    tmp = Image.new("RGBA", (canvas_width, 260), (0, 0, 0, 0))
     tdraw = ImageDraw.Draw(tmp)
     cursor_x = 10
     top = 10
@@ -149,30 +154,32 @@ def _fit_font_size(lines: list, start_size: int, max_width: int) -> int:
     return size
 
 
-def render_slide(idx: int, total: int, lines: list, out_dir: Path, underline: bool = False) -> Path:
-    paper = make_paper(seed=100 + idx)
+def render_slide(idx: int, total: int, lines: list, out_dir: Path, underline: bool = False,
+                  size: tuple = DEFAULT_SIZE) -> Path:
+    w, h = size
+    paper = make_paper(seed=100 + idx, size=size)
 
     line_count = len(lines)
     base_size = 132 if line_count <= 3 else 112
-    font_size = _fit_font_size(lines, base_size, max_width=W - 160)
+    font_size = _fit_font_size(lines, base_size, max_width=w - 160)
     font = ImageFont.truetype(str(FONT_PATH), font_size)
     small_font = ImageFont.truetype(str(FONT_PATH), 50)
 
     line_height = int(font_size * 1.55)
     block_height = line_height * line_count
-    cursor_y = (H - block_height) // 2 - 40
+    cursor_y = (h - block_height) // 2 - 40
 
     for line in lines:
-        cursor_y = draw_handwritten_line(paper, line, font, x=0, y=cursor_y, align_center_x=W // 2)
+        cursor_y = draw_handwritten_line(paper, line, font, x=0, y=cursor_y, align_center_x=w // 2, canvas_width=w)
 
     if underline:
         underline_y = cursor_y + 6
-        rng_pts = [(W // 2 - 210 + i * 12, underline_y + random.randint(-4, 4)) for i in range(36)]
+        rng_pts = [(w // 2 - 210 + i * 12, underline_y + random.randint(-4, 4)) for i in range(36)]
         draw = ImageDraw.Draw(paper, "RGBA")
         draw.line(rng_pts, fill=(*INK_COLOR, 200), width=5, joint="curve")
 
     tag = f"{idx + 1}/{total}"
-    draw_handwritten_line(paper, tag, small_font, x=W - 130, y=H - 110)
+    draw_handwritten_line(paper, tag, small_font, x=w - 130, y=h - 110, canvas_width=w)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"card_{idx + 1}.png"
@@ -180,10 +187,10 @@ def render_slide(idx: int, total: int, lines: list, out_dir: Path, underline: bo
     return out_path
 
 
-def render_deck(slides: list, out_dir: Path, seed: int = 7) -> list:
+def render_deck(slides: list, out_dir: Path, seed: int = 7, size: tuple = DEFAULT_SIZE) -> list:
     random.seed(seed)
     total = len(slides)
     return [
-        render_slide(i, total, lines, out_dir, underline=(i == total - 1))
+        render_slide(i, total, lines, out_dir, underline=(i == total - 1), size=size)
         for i, lines in enumerate(slides)
     ]
