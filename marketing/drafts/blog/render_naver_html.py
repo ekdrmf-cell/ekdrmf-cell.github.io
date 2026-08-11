@@ -1,18 +1,20 @@
-"""티스토리용 .md 초안을 실제 서식(H2/번호목록/링크)이 적용된 HTML로 변환.
+"""네이버용 .md 초안을 실제 링크(<a href>)가 적용된 HTML로 변환.
 
-메모장으로 보면 구조가 안 보인다는 문제(2026-08-11) 해결용 — 이 HTML을
-브라우저로 열어서 통째로 복사(Ctrl+A, Ctrl+C)한 뒤 티스토리 에디터에
-붙여넣으면(Ctrl+V), 리치 페이스트로 제목ㆍ목록ㆍ링크 서식이 그대로
-들어간다(에디터에서 수동으로 스타일 버튼을 누를 필요가 없어짐).
+티스토리와 달리 네이버는 소제목에 별도 스타일(제목2)을 적용하는 절차 자체가
+없어서(■ 기호만으로 충분), 이 스크립트가 필요한 이유는 딱 하나 — "글 제목"과
+"URL"이 서로 다른 텍스트/링크 쌍으로 들어가는 부분(예: 이전 글 소개)을 에디터의
+링크 버튼을 누르지 않고도 붙여넣기만으로 실제 하이퍼링크가 걸리게 하기 위함이다.
 
-사용법: python render_tistory_html.py 초안파일.md
+사용법: python render_naver_html.py 초안파일.md
+출력: 같은 이름의 .html — 브라우저로 열어 Ctrl+A, Ctrl+C 한 뒤
+blog.naver.com 에디터 본문에 Ctrl+V 하면 링크가 실제 하이퍼링크로 붙는다.
 """
 import re
 import sys
 from pathlib import Path
 
-HEADING_RE = re.compile(r"^▶\s*(.+?)\s*\(제목2\)\s*$")
 IMAGE_RE = re.compile(r'^\(※ 여기에 사진 삽입: 이미지 폴더의 "(.+?)"\)$')
+KICKER_RE = re.compile(r"^■\s*(.+)$")
 NUMBERED_RE = re.compile(r"^(\d+)\.\s+(.+)$")
 LINK_LINE_RE = re.compile(r"^https?://\S+$")
 
@@ -26,9 +28,9 @@ def parse_body(lines: list) -> list:
             i += 1
             continue
 
-        m = HEADING_RE.match(line)
+        m = KICKER_RE.match(line)
         if m:
-            html_parts.append(f"<h2>{m.group(1)}</h2>")
+            html_parts.append(f"<p class='kicker'><b>■ {m.group(1)}</b></p>")
             i += 1
             continue
 
@@ -55,9 +57,11 @@ def parse_body(lines: list) -> list:
             s = lines[idx].strip()
             if not s:
                 return True
-            if HEADING_RE.match(s) or IMAGE_RE.match(s) or NUMBERED_RE.match(s):
+            if KICKER_RE.match(s) or IMAGE_RE.match(s) or NUMBERED_RE.match(s):
                 return True
             if s.startswith("- ") and idx + 1 < len(lines) and LINK_LINE_RE.match(lines[idx + 1].strip()):
+                return True
+            if s.startswith("[") and s.endswith("]"):
                 return True
             return False
 
@@ -66,6 +70,11 @@ def parse_body(lines: list) -> list:
             url = lines[i + 1].strip()
             html_parts.append(f'<p><a href="{url}">{label}</a></p>')
             i += 2
+            continue
+
+        if line.startswith("[") and line.endswith("]"):
+            html_parts.append(f"<p class='todo'>⚠ {line} (이 안내문은 붙여넣기 전에 지우거나, 위 '- 제목/URL' 형식으로 바꿔서 실제 링크로 만들어주세요)</p>")
+            i += 1
             continue
 
         para_lines = []
@@ -80,7 +89,7 @@ def parse_body(lines: list) -> list:
 def render(md_path: Path) -> Path:
     text = md_path.read_text(encoding="utf-8")
     sections = {}
-    for key in ["제목", "메타 설명", "본문", "링크", "태그", "쓰는 법"]:
+    for key in ["제목", "본문", "링크", "태그", "쓰는 법"]:
         m = re.search(rf"\[{key}[^\]]*\]\n(.*?)(?=\n\[|\Z)", text, re.S)
         if m:
             sections[key] = m.group(1).strip()
@@ -100,8 +109,9 @@ def render(md_path: Path) -> Path:
 body {{ font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 720px;
   margin: 40px auto; line-height: 1.8; color: #222; padding: 0 16px; }}
 h1 {{ font-size: 26px; }}
-h2 {{ font-size: 20px; margin-top: 36px; border-left: 4px solid #444; padding-left: 10px; }}
 p {{ font-size: 16px; }}
+p.kicker {{ font-size: 17px; margin-top: 30px; }}
+p.todo {{ color: #c0392b; background: #fdecea; padding: 10px; border-radius: 6px; }}
 ol {{ font-size: 16px; }}
 .img-slot {{ background: #f0f0f0; border: 2px dashed #999; padding: 24px;
   text-align: center; color: #777; margin: 16px 0; font-size: 14px; }}
