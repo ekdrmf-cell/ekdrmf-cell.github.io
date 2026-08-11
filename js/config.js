@@ -4,7 +4,7 @@
 const SITE_CONFIG = {
   contactEmail: "ekdrmf@gmail.com",
 
-  // TODO(사용자): 애드센스에서 수익화허브 도메인을 추가하면 발급되는
+  // TODO(사용자): 애드센스에서 서비스허브 도메인을 추가하면 발급되는
   // "ca-pub-여러자리숫자" 형태의 퍼블리셔 ID를 여기 넣으세요.
   // 비워두면(빈 문자열) 광고 스크립트가 아예 로드되지 않습니다.
   adsensePublisherId: "ca-pub-9038430968074722",
