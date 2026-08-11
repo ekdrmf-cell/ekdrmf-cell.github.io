@@ -574,6 +574,14 @@ img, svg {
 }
 
 /* Value props (why-us) */
+.section-intro {
+  color: var(--text-dim);
+  font-size: 0.96rem;
+  line-height: 1.8;
+  max-width: 720px;
+  margin: -6px 0 22px;
+}
+
 .value-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
