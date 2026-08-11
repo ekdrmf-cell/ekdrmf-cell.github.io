@@ -7,6 +7,7 @@
     { href: `${root}games/index.html`, key: "games", label: "게임" },
     { href: `${root}services.html`, key: "services", label: "서비스" },
     { href: `${root}ebooks.html`, key: "ebooks", label: "전자책" },
+    { href: `${root}resources.html`, key: "resources", label: "자료" },
   ];
 
   const logoSvg = `
@@ -48,7 +49,11 @@
           서비스허브
         </a>
         <div class="tagline">데이터로 검증된 빈틈만 골라 만듭니다 · 무자본으로 시작한 실험 프로젝트</div>
-        <a class="footer-link" href="${root}privacy.html">개인정보처리방침</a>
+        <div style="display:flex; gap:16px;">
+          <a class="footer-link" href="${root}about.html">소개</a>
+          <a class="footer-link" href="${root}resources.html">무료 자료</a>
+          <a class="footer-link" href="${root}privacy.html">개인정보처리방침</a>
+        </div>
       </div>
     `;
   }
