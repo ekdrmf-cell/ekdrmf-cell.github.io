@@ -43,16 +43,6 @@ def parse_body(lines: list) -> list:
             i += 1
             continue
 
-        m = NUMBERED_RE.match(line)
-        if m:
-            items = []
-            while i < len(lines) and NUMBERED_RE.match(lines[i].strip()):
-                items.append(NUMBERED_RE.match(lines[i].strip()).group(2))
-                i += 1
-            li = "".join(f"<li>{item}</li>" for item in items)
-            html_parts.append(f"<ol>{li}</ol>")
-            continue
-
         def is_special(idx):
             s = lines[idx].strip()
             if not s:
@@ -64,6 +54,22 @@ def parse_body(lines: list) -> list:
             if s.startswith("[") and s.endswith("]"):
                 return True
             return False
+
+        m = NUMBERED_RE.match(line)
+        if m:
+            items = []
+            while i < len(lines) and NUMBERED_RE.match(lines[i].strip()):
+                item_text = NUMBERED_RE.match(lines[i].strip()).group(2)
+                i += 1
+                # 번호 목록 항목이 줄바꿈으로 이어지는 경우(다음 줄이 번호로
+                # 시작하지 않고 특수 줄도 아니면) 같은 항목에 계속 이어붙인다.
+                while i < len(lines) and lines[i].strip() and not is_special(i):
+                    item_text += " " + lines[i].strip()
+                    i += 1
+                items.append(item_text)
+            li = "".join(f"<li>{item}</li>" for item in items)
+            html_parts.append(f"<ol>{li}</ol>")
+            continue
 
         if line.startswith("- ") and i + 1 < len(lines) and LINK_LINE_RE.match(lines[i + 1].strip()):
             label = line[2:].strip()
