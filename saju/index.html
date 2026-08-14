@@ -127,12 +127,8 @@
   }
 </style>
 </head>
-<body>
-<header class="site-header">
-  <div class="wrap">
-    <a class="brand" href="../index.html">서비스허브</a>
-  </div>
-</header>
+<body data-active="saju" data-root="../">
+<header id="site-header" class="site-header"></header>
 
 <div class="saju-wrap">
   <h1 class="saju-title">무료 사주 계산기</h1>
@@ -177,6 +173,8 @@
     </div>
   </div>
 </div>
+
+<footer id="site-footer" class="site-footer"></footer>
 
 <script src="lib/lunar.js"></script>
 <script src="js/saju-calc.js"></script>
@@ -270,5 +268,6 @@
     contactPurchase("사주 상세 해석 신청", "무료 계산기에서 나온 제 사주로 상세 해석을 받고 싶습니다. 생년월일시: ");
   });
 </script>
+<script src="../js/common.js"></script>
 </body>
 </html>
