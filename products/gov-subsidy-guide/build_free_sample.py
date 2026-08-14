@@ -20,7 +20,7 @@ from PIL import Image as PILImage
 FONT = "HYGothic-Medium"
 pdfmetrics.registerFont(UnicodeCIDFont(FONT))
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\gov-subsidy-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\gov-subsidy-guide")
 SHOT_DIR = BASE_DIR / "screenshots"
 
 ACCENT = colors.HexColor("#5a3fd6")
@@ -36,7 +36,7 @@ doc = SimpleDocTemplate(
     topMargin=24 * mm, bottomMargin=24 * mm,
     leftMargin=22 * mm, rightMargin=22 * mm,
     title="정부지원금 찾기 가이드 - 무료 샘플",
-    author="수익화허브",
+    author="서비스허브",
 )
 
 styles = {
@@ -83,7 +83,7 @@ story.append(Spacer(1, 6))
 story.append(HRFlowable(width="26%", thickness=1.4, color=ACCENT, hAlign="CENTER", spaceBefore=8, spaceAfter=16))
 story.append(Paragraph("1부(5분 컷 핵심 요약)만 무료로 담았습니다.<br/>전체 가이드는 마지막 페이지에서 안내합니다.", styles["cover_meta"]))
 story.append(Spacer(1, 60 * mm))
-story.append(Paragraph("수익화허브", styles["cover_meta"]))
+story.append(Paragraph("서비스허브", styles["cover_meta"]))
 story.append(PageBreak())
 
 
@@ -265,7 +265,7 @@ story.append(cta)
 # ============================================================
 # 워터마크 + 빌드
 # ============================================================
-WATERMARK_TEXT = "수익화허브 무료 샘플 · ekdrmf-cell.github.io"
+WATERMARK_TEXT = "서비스허브 무료 샘플 · ekdrmf-cell.github.io"
 
 
 def draw_watermark(canvas, dark_bg=False):

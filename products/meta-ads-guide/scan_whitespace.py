@@ -4,7 +4,7 @@ import fitz
 from PIL import Image
 import io
 
-PDF = r"C:\Users\nalla\Desktop\수익화허브\products\meta-ads-guide\메타_광고_최적화_가이드.pdf"
+PDF = r"C:\Users\nalla\Desktop\서비스허브\products\meta-ads-guide\메타_광고_최적화_가이드.pdf"
 doc = fitz.open(PDF)
 print("total pages:", doc.page_count)
 

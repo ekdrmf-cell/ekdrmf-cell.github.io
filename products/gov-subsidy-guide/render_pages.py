@@ -2,8 +2,8 @@
 import fitz
 from pathlib import Path
 
-PDF = r"C:\Users\nalla\Desktop\수익화허브\products\gov-subsidy-guide\정부지원금_찾기_가이드.pdf"
-OUT = Path(r"C:\Users\nalla\Desktop\수익화허브\products\gov-subsidy-guide\preview")
+PDF = r"C:\Users\nalla\Desktop\서비스허브\products\gov-subsidy-guide\정부지원금_찾기_가이드.pdf"
+OUT = Path(r"C:\Users\nalla\Desktop\서비스허브\products\gov-subsidy-guide\preview")
 OUT.mkdir(exist_ok=True)
 
 # 표지, 목차, 1부 시작, 스크린샷 포함 페이지, 용어사전, 사업계획서 가이드, 부록, 마지막 페이지

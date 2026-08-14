@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-OUT = Path(r"C:\Users\nalla\Desktop\수익화허브\products\gov-subsidy-guide\screenshots")
+OUT = Path(r"C:\Users\nalla\Desktop\서비스허브\products\gov-subsidy-guide\screenshots")
 VIEWPORT = {"width": 1280, "height": 900}
 
 with sync_playwright() as p:

@@ -99,7 +99,7 @@ STEP_SHADES = [ACCENT, colors.HexColor("#7457e0"), colors.HexColor("#8d6fea"),
 
 
 class PDFKit:
-    def __init__(self, out_path, title, author="수익화허브", shot_dir=None):
+    def __init__(self, out_path, title, author="서비스허브", shot_dir=None):
         register_fonts()
         self.out_path = str(out_path)
         self.shot_dir = Path(shot_dir) if shot_dir else None
@@ -529,7 +529,7 @@ class PDFKit:
         self.story.append(Paragraph(text, self.styles[style]))
 
     # ---------- 빌드 ----------
-    def build(self, footer_tagline=None, watermark_text="수익화허브 · 무단 전재·재배포 금지"):
+    def build(self, footer_tagline=None, watermark_text="서비스허브 · 무단 전재·재배포 금지"):
         if footer_tagline:
             self.story.append(Spacer(1, 20))
             self.story.append(HRFlowable(width="100%", thickness=0.7, color=BORDER, spaceAfter=10))

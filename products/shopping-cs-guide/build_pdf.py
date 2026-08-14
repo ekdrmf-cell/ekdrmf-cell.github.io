@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from pdf_kit import PDFKit  # noqa: E402
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\shopping-cs-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\shopping-cs-guide")
 OUT = BASE_DIR / "쇼핑몰_CS_고객응대_가이드.pdf"
 
 k = PDFKit(OUT, title="쇼핑몰 CS 고객응대 가이드", shot_dir=BASE_DIR / "screenshots")

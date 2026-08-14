@@ -6,7 +6,7 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-FONT_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\_shared\fonts")
+FONT_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\_shared\fonts")
 OUT_DIR = Path(r"C:\Users\nalla\Desktop\홍보\인스타그램")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

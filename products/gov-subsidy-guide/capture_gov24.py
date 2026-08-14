@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from playwright.sync_api import sync_playwright
 
-OUT = r"C:\Users\nalla\Desktop\수익화허브\products\gov-subsidy-guide\screenshots\08_gov24_search.png"
+OUT = r"C:\Users\nalla\Desktop\서비스허브\products\gov-subsidy-guide\screenshots\08_gov24_search.png"
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
@@ -13,7 +13,7 @@ with sync_playwright() as p:
     try:
         page.goto("https://plus.gov.kr", wait_until="load", timeout=25000)
         page.wait_for_timeout(1500)
-        page.screenshot(path=r"C:\Users\nalla\Desktop\수익화허브\products\gov-subsidy-guide\screenshots\_debug_gov24.png")
+        page.screenshot(path=r"C:\Users\nalla\Desktop\서비스허브\products\gov-subsidy-guide\screenshots\_debug_gov24.png")
         print("title:", page.title())
         box = page.get_by_placeholder("안녕하세요. 무엇을 알고 싶으세요?")
         box.click()

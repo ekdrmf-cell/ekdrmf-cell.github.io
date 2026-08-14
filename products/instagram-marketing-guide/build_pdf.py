@@ -10,7 +10,7 @@ from reportlab.lib.units import mm
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from pdf_kit import PDFKit  # noqa: E402
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\instagram-marketing-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\instagram-marketing-guide")
 OUT = BASE_DIR / "인스타그램_마케팅_핵심노하우.pdf"
 
 k = PDFKit(OUT, title="인스타그램 마케팅 핵심노하우", shot_dir=BASE_DIR / "screenshots")

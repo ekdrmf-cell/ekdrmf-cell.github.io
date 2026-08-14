@@ -18,7 +18,7 @@ from PIL import Image as PILImage
 FONT = "HYGothic-Medium"
 pdfmetrics.registerFont(UnicodeCIDFont(FONT))
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\gov-subsidy-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\gov-subsidy-guide")
 SHOT_DIR = BASE_DIR / "screenshots"
 
 # ---------- 색(전부 흰 배경 위 텍스트 대비 6:1 이상 확인된 값만 사용) ----------
@@ -36,7 +36,7 @@ doc = SimpleDocTemplate(
     topMargin=24 * mm, bottomMargin=24 * mm,
     leftMargin=22 * mm, rightMargin=22 * mm,
     title="소상공인ㆍ1인사업자를 위한 정부지원금 찾기 가이드",
-    author="수익화허브",
+    author="서비스허브",
 )
 
 # ---------- 스타일: 기존보다 전반적으로 크게(가독성 확보) ----------
@@ -1854,7 +1854,7 @@ story.append(HRFlowable(width="100%", thickness=0.7, color=BORDER, spaceAfter=10
 story.append(Paragraph("데이터로 검증된 빈틈만 골라 만듭니다", styles["small"]))
 
 
-WATERMARK_TEXT = "수익화허브 · 무단 전재·재배포 금지"
+WATERMARK_TEXT = "서비스허브 · 무단 전재·재배포 금지"
 
 
 def draw_watermark(canvas, dark_bg=False):

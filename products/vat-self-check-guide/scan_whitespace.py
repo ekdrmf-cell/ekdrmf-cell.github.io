@@ -4,7 +4,7 @@ import fitz
 from PIL import Image
 import io
 
-PDF = r"C:\Users\nalla\Desktop\수익화허브\products\vat-self-check-guide\1인사업자_부가세_셀프_체크리스트.pdf"
+PDF = r"C:\Users\nalla\Desktop\서비스허브\products\vat-self-check-guide\1인사업자_부가세_셀프_체크리스트.pdf"
 doc = fitz.open(PDF)
 print("total pages:", doc.page_count)
 

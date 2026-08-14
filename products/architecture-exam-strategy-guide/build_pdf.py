@@ -18,7 +18,7 @@ from reportlab.lib.units import mm
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from pdf_kit import PDFKit  # noqa: E402
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\architecture-exam-strategy-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\architecture-exam-strategy-guide")
 OUT = BASE_DIR / "건축기사_실기_합격전략_가이드.pdf"
 
 k = PDFKit(OUT, title="건축기사 실기 합격 전략 가이드", shot_dir=BASE_DIR / "screenshots")

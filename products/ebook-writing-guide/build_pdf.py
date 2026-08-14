@@ -24,7 +24,7 @@ from PIL import Image as PILImage
 FONT = "HYGothic-Medium"
 pdfmetrics.registerFont(UnicodeCIDFont(FONT))
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\ebook-writing-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\ebook-writing-guide")
 SHOT_DIR = BASE_DIR / "screenshots"
 
 ACCENT = colors.HexColor("#5a3fd6")
@@ -40,7 +40,7 @@ doc = SimpleDocTemplate(
     topMargin=24 * mm, bottomMargin=24 * mm,
     leftMargin=22 * mm, rightMargin=22 * mm,
     title="전자책 만들어 팔기 실전 가이드",
-    author="수익화허브",
+    author="서비스허브",
 )
 
 styles = {

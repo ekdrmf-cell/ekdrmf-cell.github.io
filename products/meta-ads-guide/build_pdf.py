@@ -11,7 +11,7 @@ from reportlab.lib.units import mm
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from pdf_kit import PDFKit  # noqa: E402
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\meta-ads-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\meta-ads-guide")
 OUT = BASE_DIR / "메타_광고_최적화_가이드.pdf"
 
 k = PDFKit(OUT, title="메타 광고 최적화 가이드", shot_dir=BASE_DIR / "screenshots")

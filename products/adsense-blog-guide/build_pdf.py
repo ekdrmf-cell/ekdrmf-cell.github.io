@@ -13,7 +13,7 @@ from reportlab.lib.units import mm
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from pdf_kit import PDFKit  # noqa: E402
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\adsense-blog-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\adsense-blog-guide")
 OUT = BASE_DIR / "애드센스_블로그_시작_가이드.pdf"
 
 k = PDFKit(OUT, title="구글 애드센스 수익형 블로그 시작 가이드", shot_dir=BASE_DIR / "screenshots")

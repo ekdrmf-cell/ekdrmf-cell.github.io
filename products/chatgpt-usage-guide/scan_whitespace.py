@@ -4,7 +4,7 @@ import fitz
 from PIL import Image
 import io
 
-PDF = r"C:\Users\nalla\Desktop\수익화허브\products\chatgpt-usage-guide\챗GPT_실무_활용_가이드.pdf"
+PDF = r"C:\Users\nalla\Desktop\서비스허브\products\chatgpt-usage-guide\챗GPT_실무_활용_가이드.pdf"
 doc = fitz.open(PDF)
 print("total pages:", doc.page_count)
 

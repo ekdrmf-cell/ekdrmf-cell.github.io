@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from pdf_kit import PDFKit  # noqa: E402
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\vat-self-check-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\vat-self-check-guide")
 OUT = BASE_DIR / "1인사업자_부가세_셀프_체크리스트.pdf"
 
 k = PDFKit(OUT, title="1인사업자 부가세 셀프 체크리스트", shot_dir=BASE_DIR / "screenshots")
@@ -1171,4 +1171,4 @@ k.callout_box("공식 출처", [
 ], numbered=False)
 k.body("이 책에 등장하는 세액ㆍ매출 예시는 계산 구조를 보여주기 위한 가정 수치이며 실제 인물의 신고 결과가 아닙니다. 개별 사업자의 정확한 세액은 홈택스 신고 화면 또는 세무사 상담을 통해 확인하시기 바랍니다.")
 
-k.build(footer_tagline="수익화허브 ㆍ 이 책은 정보 제공용 가이드이며 세무 자문이 아닙니다. 구체적인 세액 확정ㆍ신고는 홈택스 확인 또는 세무사 상담을 이용하세요.")
+k.build(footer_tagline="서비스허브 ㆍ 이 책은 정보 제공용 가이드이며 세무 자문이 아닙니다. 구체적인 세액 확정ㆍ신고는 홈택스 확인 또는 세무사 상담을 이용하세요.")

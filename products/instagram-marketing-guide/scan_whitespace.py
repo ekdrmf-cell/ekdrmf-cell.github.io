@@ -4,7 +4,7 @@ import fitz
 from PIL import Image
 import io
 
-PDF = r"C:\Users\nalla\Desktop\수익화허브\products\instagram-marketing-guide\인스타그램_마케팅_핵심노하우.pdf"
+PDF = r"C:\Users\nalla\Desktop\서비스허브\products\instagram-marketing-guide\인스타그램_마케팅_핵심노하우.pdf"
 doc = fitz.open(PDF)
 print("total pages:", doc.page_count)
 

@@ -11,7 +11,7 @@ from reportlab.lib.units import mm
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from pdf_kit import PDFKit  # noqa: E402
 
-BASE_DIR = Path(r"C:\Users\nalla\Desktop\수익화허브\products\youtube-monetization-guide")
+BASE_DIR = Path(r"C:\Users\nalla\Desktop\서비스허브\products\youtube-monetization-guide")
 OUT = BASE_DIR / "유튜브_채널_수익화_전략_가이드.pdf"
 
 k = PDFKit(OUT, title="유튜브 채널 수익화 전략 가이드", shot_dir=BASE_DIR / "screenshots")
