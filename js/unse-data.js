@@ -38,4 +38,11 @@ const UNSE_TOOLS = [
     desc: "A·B·O·AB형 성격 특징과 잘 맞는 상대 확인",
     path: "bloodtype/index.html",
   },
+  {
+    id: "name",
+    title: "이름 발음오행 분석",
+    emoji: "🈶",
+    desc: "이름 소리의 오행 흐름을 무료로 확인",
+    path: "name/index.html",
+  },
 ];
