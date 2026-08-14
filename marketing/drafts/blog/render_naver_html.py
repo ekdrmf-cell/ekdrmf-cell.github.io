@@ -8,6 +8,15 @@
 사용법: python render_naver_html.py 초안파일.md
 출력: 같은 이름의 .html — 브라우저로 열어 Ctrl+A, Ctrl+C 한 뒤
 blog.naver.com 에디터 본문에 Ctrl+V 하면 링크가 실제 하이퍼링크로 붙는다.
+
+주의(2026-08-14): 제목 태그는 일부러 <h1>로 둔다 — 네이버는 h1/h2 같은
+HTML 제목 태그를 SEO에 안 쓰고 텍스트를 NLP로 분석하므로(MARKETING_HANDOFF.md
+6-5절 참고), 여기서 <h1>이든 <h2>든 네이버 검색순위엔 영향이 없다. 반면
+render_tistory_html.py는 <h2>를 쓴다 — 티스토리는 구글에 노출되고, 구글은
+h1/h2 구조를 실제로 SEO에 사용하며 블로그 플랫폼 자체 제목칸이 이미 h1이라
+본문에 h1이 하나 더 있으면 중복 h1 문제가 생기기 때문. 두 스크립트를
+"통일감 있게" 똑같이 맞추고 싶어질 수 있는데, 그러면 안 된다 — 이 차이는
+의도된 것이다.
 """
 import re
 import sys
@@ -122,7 +131,7 @@ def render(md_path: Path) -> Path:
 <style>
 body {{ font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 720px;
   margin: 40px auto; line-height: 1.8; color: #222; padding: 0 16px; }}
-h2.post-title {{ font-size: 26px; }}
+h1 {{ font-size: 26px; }}
 p {{ font-size: 16px; }}
 p.kicker {{ font-size: 17px; margin-top: 30px; }}
 p.todo {{ color: #c0392b; background: #fdecea; padding: 10px; border-radius: 6px; }}
@@ -136,7 +145,7 @@ ol {{ font-size: 16px; }}
 a {{ color: #1a5fd0; }}
 </style></head>
 <body>
-<h2 class="post-title">{title}</h2>
+<h1>{title}</h1>
 {body_html}
 {cta_html}
 {tags_html}
