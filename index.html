@@ -32,6 +32,10 @@
         <span class="kicker">● 필요한 사람에게, 필요한 만큼</span>
         <h1>시장이 <span class="accent">비워둔 자리</span>를<br />찾아서 채웁니다</h1>
         <p>게임으로 잠깐의 즐거움을, 서비스와 전자책으로 지금 필요한 실질적인 도움을 드립니다.</p>
+        <div class="site-search" id="site-search">
+          <input type="text" id="search-input" placeholder="무엇을 찾으시나요? (예: 부가세, 사주, 유튜브)" autocomplete="off" />
+          <div class="site-search-results" id="search-results"></div>
+        </div>
         <div class="proof-row">
           <span class="proof-chip">🎮 <b>다양한 장르</b>의 무료 캐주얼 게임</span>
           <span class="proof-chip">🧾 <b>바로 쓸 수 있는</b> 실용 서비스</span>
@@ -133,9 +137,25 @@
     <div class="wrap">
       <div class="section-head">
         <div class="heading">
+          <span class="section-icon">🔮</span>
+          <div>
+            <span class="eyebrow">신년·이직·연애 고민될 때 많이 찾아요</span>
+            <h2>운세</h2>
+          </div>
+        </div>
+        <a class="more" href="unse/index.html">전체 운세 도구 보기 →</a>
+      </div>
+      <div class="grid" id="featured-unse"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="heading">
           <span class="section-icon">🛠️</span>
           <div>
-            <span class="eyebrow">바로 쓸 수 있는 실용 서비스</span>
+            <span class="eyebrow">사장님·소상공인이 많이 찾아요</span>
             <h2>서비스</h2>
           </div>
         </div>
@@ -171,7 +191,7 @@
         <div class="heading">
           <span class="section-icon">📚</span>
           <div>
-            <span class="eyebrow">실전 활용 가이드</span>
+            <span class="eyebrow">부업·수익화 준비할 때 많이 찾아요</span>
             <h2>전자책</h2>
           </div>
         </div>
@@ -243,6 +263,8 @@
 <script src="js/config.js"></script>
 <script src="js/adsense.js"></script>
 <script src="js/games-data.js"></script>
+<script src="js/unse-data.js"></script>
+<script src="js/search-data.js"></script>
 <script src="js/common.js"></script>
 <script>
   const featuredEl = document.getElementById("featured-games");
@@ -256,6 +278,38 @@
     </a>
   `
   ).join("");
+
+  const featuredUnseEl = document.getElementById("featured-unse");
+  featuredUnseEl.innerHTML = UNSE_TOOLS.slice(0, 3).map(
+    (t) => `
+    <a class="card game-card" href="${t.path}">
+      <div class="game-thumb">${t.emoji}</div>
+      <div class="game-title">${t.title}</div>
+      <div class="game-desc">${t.desc}</div>
+    </a>
+  `
+  ).join("");
+
+  const searchInput = document.getElementById("search-input");
+  const searchResults = document.getElementById("search-results");
+
+  searchInput.addEventListener("input", () => {
+    const results = searchSite(searchInput.value);
+    if (!searchInput.value.trim()) {
+      searchResults.classList.remove("open");
+      return;
+    }
+    searchResults.innerHTML = results.length
+      ? results.slice(0, 8).map((r) => `<a href="${r.url}"><span>${r.title}</span><span class="type-tag">${r.type}</span></a>`).join("")
+      : `<div class="no-result">"${searchInput.value}"에 대한 결과가 없어요.</div>`;
+    searchResults.classList.add("open");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!document.getElementById("site-search").contains(e.target)) {
+      searchResults.classList.remove("open");
+    }
+  });
 </script>
 </body>
 </html>

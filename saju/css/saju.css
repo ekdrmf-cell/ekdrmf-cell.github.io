@@ -96,7 +96,7 @@ details.raw-detail { color: var(--text-faint); font-size: 13px; margin-top: 8px;
 details.raw-detail summary { cursor: pointer; }
 
 .upsell-card {
-  background: linear-gradient(135deg, rgba(139,107,255,0.14), rgba(34,211,170,0.08));
+  background: linear-gradient(135deg, rgba(109,74,255,0.14), rgba(10,125,94,0.08));
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   padding: 24px;
