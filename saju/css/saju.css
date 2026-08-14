@@ -1,0 +1,138 @@
+/* 사주/궁합/타로/꿈해몽 등 운세 계열 도구 공용 스타일 */
+.saju-wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+.saju-title {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.saju-sub {
+  text-align: center;
+  color: var(--text-dim);
+  margin-bottom: 32px;
+}
+.saju-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+}
+.saju-form .row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.saju-form select, .saju-form input[type="checkbox"], .saju-form textarea {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 15px;
+  font-family: inherit;
+}
+.saju-form label.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.saju-submit {
+  background: var(--accent);
+  color: #0a0a0f;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+}
+.saju-submit:hover { filter: brightness(1.08); }
+
+.person-block {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+.person-block h3 { margin: 0 0 10px; font-size: 15px; color: var(--text-dim); }
+
+#saju-result, #gunghap-result, #tarot-result, #dream-result { display: none; margin-top: 28px; }
+.result-hero {
+  display: flex;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.result-hero .badge-big {
+  font-size: 40px;
+  line-height: 1;
+}
+.result-hero h2 { margin: 0 0 4px; }
+.result-hero .sub { color: var(--text-dim); font-size: 14px; }
+
+.oheng-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.oheng-bars { display: grid; gap: 8px; margin: 16px 0; }
+.oheng-bar-row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.oheng-bar-row .name { width: 64px; color: var(--text-dim); }
+.oheng-bar-track { flex: 1; height: 10px; background: var(--bg-elevated); border-radius: 6px; overflow: hidden; }
+.oheng-bar-fill { height: 100%; background: var(--accent-soft); }
+.oheng-summary { line-height: 1.8; }
+
+details.raw-detail { color: var(--text-faint); font-size: 13px; margin-top: 8px; }
+details.raw-detail summary { cursor: pointer; }
+
+.upsell-card {
+  background: linear-gradient(135deg, rgba(139,107,255,0.14), rgba(34,211,170,0.08));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+}
+.upsell-card h3 { margin-top: 0; }
+.upsell-card button {
+  margin-top: 12px;
+  background: var(--accent);
+  color: #0a0a0f;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 타로 전용 */
+.tarot-card-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+.tarot-card-back {
+  aspect-ratio: 2/3;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-radius: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s;
+}
+.tarot-card-back:hover { transform: translateY(-4px); }
+.tarot-card-back.picked { opacity: 0.25; pointer-events: none; }
+.tarot-result-card {
+  text-align: center;
+  padding: 24px;
+}
+.tarot-result-card .emoji { font-size: 56px; }

@@ -82,3 +82,28 @@ function buildOhengSummary(result) {
   }
   return text;
 }
+
+/**
+ * 두 사람의 오행 분포를 비교해서 "보완"·"공통" 기운을 찾는다.
+ * 특정 띠·별자리 조합이 좋다/나쁘다는 식의 근거 불명확한 궁합론은 쓰지 않고,
+ * 이미 검증된 오행 계산 결과만으로 설명 가능한 것만 말한다.
+ */
+function buildCompatibilitySummary(resultA, resultB) {
+  const complementAtoB = resultA.dominant.filter((k) => resultB.missing.includes(k));
+  const complementBtoA = resultB.dominant.filter((k) => resultA.missing.includes(k));
+  const shared = resultA.dominant.filter((k) => resultB.dominant.includes(k));
+
+  const parts = [];
+  if (complementAtoB.length || complementBtoA.length) {
+    const names = [...new Set([...complementAtoB, ...complementBtoA])].map((k) => OHENG_INFO[k].label).join(", ");
+    parts.push(`한쪽이 강한 ${names} 기운을 다른 쪽이 못 채우고 있어서, 서로 부족한 부분을 채워주는 보완 관계로 볼 수 있어요.`);
+  }
+  if (shared.length) {
+    const names = shared.map((k) => OHENG_INFO[k].label).join(", ");
+    parts.push(`둘 다 ${names} 기운이 강해서, 성향이 비슷해 대화가 잘 통하는 대신 같은 지점에서 부딪힐 수도 있어요.`);
+  }
+  if (!parts.length) {
+    parts.push("두 사람의 기운이 서로 겹치는 부분도 크게 없고 보완되는 부분도 뚜렷하지 않아요 — 서로 다른 개성을 있는 그대로 존중하는 관계에 가까워요.");
+  }
+  return parts.join(" ");
+}

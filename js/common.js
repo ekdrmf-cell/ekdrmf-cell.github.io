@@ -5,7 +5,7 @@
   const nav = [
     { href: `${root}index.html`, key: "home", label: "홈" },
     { href: `${root}games/index.html`, key: "games", label: "게임" },
-    { href: `${root}saju/index.html`, key: "saju", label: "사주" },
+    { href: `${root}unse/index.html`, key: "saju", label: "운세" },
     { href: `${root}services.html`, key: "services", label: "서비스" },
     { href: `${root}ebooks.html`, key: "ebooks", label: "전자책" },
     { href: `${root}resources.html`, key: "resources", label: "자료" },

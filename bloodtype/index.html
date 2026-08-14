@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+<link rel="alternate icon" href="../favicon.ico" />
+<link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-NR3D3FD597"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-NR3D3FD597');
+</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>혈액형 성격 테스트 — 서비스허브</title>
+<meta name="description" content="A형·B형·O형·AB형 혈액형별 성격 특징을 바로 확인해보세요." />
+<link rel="stylesheet" href="../css/style.css" />
+<link rel="stylesheet" href="../saju/css/saju.css" />
+<script src="../js/config.js"></script>
+<style>
+  .blood-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .blood-btn {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px 8px; font-size: 20px; font-weight: 800; color: var(--text); cursor: pointer;
+  }
+  .blood-btn:hover { border-color: var(--accent); }
+</style>
+</head>
+<body data-active="saju" data-root="../">
+<header id="site-header" class="site-header"></header>
+
+<div class="saju-wrap">
+  <h1 class="saju-title">혈액형 성격 테스트</h1>
+  <p class="saju-sub">혈액형을 골라보세요.</p>
+
+  <div class="blood-pick">
+    <button class="blood-btn" data-type="A">A형</button>
+    <button class="blood-btn" data-type="B">B형</button>
+    <button class="blood-btn" data-type="O">O형</button>
+    <button class="blood-btn" data-type="AB">AB형</button>
+  </div>
+
+  <div id="blood-result" style="display:none;margin-top:24px;">
+    <div class="oheng-card tarot-result-card">
+      <h2 id="r-title"></h2>
+      <p class="oheng-summary" id="r-text"></p>
+      <div class="oheng-summary" style="margin-top:10px;"><b>잘 맞는 상대:</b> <span id="r-match"></span></div>
+    </div>
+  </div>
+</div>
+
+<footer id="site-footer" class="site-footer"></footer>
+
+<script>
+  const BLOOD_INFO = {
+    A: { title: "A형", text: "신중하고 꼼꼼해서 맡은 일을 끝까지 책임지고 해내는 타입이에요. 주변을 잘 배려하지만 스스로에게는 엄격해서 스트레스를 속으로 쌓아두는 경향이 있어요.", match: "O형 — 시원시원한 O형이 A형의 신중함을 든든하게 받쳐줘요." },
+    B: { title: "B형", text: "자유롭고 개성이 뚜렷해서 하고 싶은 걸 확실히 밀고 나가는 타입이에요. 마이페이스라 눈치는 덜 보지만, 그만큼 창의적이고 매력적인 아이디어가 많이 나와요.", match: "AB형 — 예측불허인 B형을 AB형의 유연함이 잘 받아줘요." },
+    O: { title: "O형", text: "목표지향적이고 리더십이 강한 타입이에요. 사람들을 잘 이끌고 추진력이 있지만, 승부욕이 강해서 지는 걸 유난히 싫어하는 편이에요.", match: "A형 — O형의 추진력과 A형의 꼼꼼함이 서로 잘 보완돼요." },
+    AB: { title: "AB형", text: "이성적이면서도 감성적인 양면을 다 가진 타입이에요. 상황 판단이 빠르고 다재다능하지만, 속마음을 잘 안 드러내서 종잡을 수 없다는 말을 듣기도 해요.", match: "B형 — 자유로운 영혼끼리 서로의 개성을 인정해주는 조합이에요." },
+  };
+
+  document.querySelectorAll(".blood-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const info = BLOOD_INFO[btn.dataset.type];
+      document.getElementById("r-title").textContent = info.title;
+      document.getElementById("r-text").textContent = info.text;
+      document.getElementById("r-match").textContent = info.match;
+      const resultEl = document.getElementById("blood-result");
+      resultEl.style.display = "block";
+      resultEl.scrollIntoView({ behavior: "smooth" });
+      gtag('event', 'bloodtype_pick', { type: btn.dataset.type });
+    });
+  });
+</script>
+<script src="../js/common.js"></script>
+</body>
+</html>
