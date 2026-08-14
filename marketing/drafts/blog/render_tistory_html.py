@@ -113,7 +113,7 @@ def render(md_path: Path) -> Path:
 <style>
 body {{ font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 720px;
   margin: 40px auto; line-height: 1.8; color: #222; padding: 0 16px; }}
-h1 {{ font-size: 26px; }}
+h2.post-title {{ font-size: 26px; border-left: none; padding-left: 0; margin-top: 0; }}
 h2 {{ font-size: 20px; margin-top: 36px; border-left: 4px solid #444; padding-left: 10px; }}
 p {{ font-size: 16px; }}
 ol {{ font-size: 16px; }}
@@ -126,7 +126,7 @@ ol {{ font-size: 16px; }}
 a {{ color: #1a5fd0; }}
 </style></head>
 <body>
-<h1>{title}</h1>
+<h2 class="post-title">{title}</h2>
 {body_html}
 {cta_html}
 {tags_html}
