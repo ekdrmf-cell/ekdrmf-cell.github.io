@@ -94,6 +94,14 @@ def render(md_path: Path) -> Path:
     if link:
         cta_html = f'<p><a href="{link}">{title} — 전체 가이드 보러가기</a></p>'
 
+    tags = sections.get("태그", "").strip()
+    tags_html = ""
+    if tags:
+        tags_html = f"""<div class="tag-box">
+<p class="tag-label">🏷 태그 (본문에 붙여넣지 말고, 발행 설정의 "태그" 입력란에 따로 입력하세요)</p>
+<p class="tag-text">{tags}</p>
+</div>"""
+
     html = f"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><title>{title}</title>
 <style>
@@ -105,12 +113,17 @@ p {{ font-size: 16px; }}
 ol {{ font-size: 16px; }}
 .img-slot {{ background: #f0f0f0; border: 2px dashed #999; padding: 24px;
   text-align: center; color: #777; margin: 16px 0; font-size: 14px; }}
+.tag-box {{ margin-top: 40px; padding: 14px 16px; background: #f4f7ff;
+  border: 1px solid #cdd8f5; border-radius: 8px; }}
+.tag-label {{ font-size: 13px; color: #555; margin: 0 0 6px; }}
+.tag-text {{ font-size: 15px; color: #1a3a8f; margin: 0; font-weight: 600; }}
 a {{ color: #1a5fd0; }}
 </style></head>
 <body>
 <h1>{title}</h1>
 {body_html}
 {cta_html}
+{tags_html}
 </body></html>"""
 
     out_path = md_path.with_suffix(".html")
