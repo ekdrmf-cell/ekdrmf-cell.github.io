@@ -1,5 +1,7 @@
 .DS_Store
 Thumbs.db
+__pycache__/
+*.pyc
 
 # 크로스노틱스 — 실제 고객 PII/생성물, API 키 (절대 커밋 금지)
 tools/crossnotics-report/orders/
