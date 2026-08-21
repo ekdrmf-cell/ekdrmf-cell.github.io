@@ -1,4 +1,67 @@
-/* 크로스노틱스 전용 — 가격 카드 선택, 동적 질문 입력 필드 */
+/* 크로스노틱스 전용 — 브랜드 로고/가치관, 가격 카드 선택, 동적 질문 입력 필드 */
+
+/* 서비스허브 공용 헤더/푸터 스타일(.site-header/.brand/.logo-mark)을 재사용하되,
+   로고만 크로스노틱스 전용 3원 교차 마크(사주=주황ㆍ점성술=보라ㆍ타로=초록,
+   가운데 흰 점 = 세 체계가 만나는 "일치점")로 교체 — 색상은 기존 --accent/
+   --accent-2/--accent-3 값을 그대로 씀(사이트 팔레트와 통일감 유지). */
+#cn-header .logo-mark,
+#cn-footer .logo-mark {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  box-shadow: none;
+}
+#cn-header .logo-mark svg,
+#cn-footer .logo-mark svg {
+  width: 20px;
+  height: 20px;
+}
+
+.cn-tagline {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin: 4px 0 10px;
+}
+
+.cn-values {
+  margin: 8px 0 36px;
+}
+.cn-values-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin: 0 0 14px;
+}
+.cn-values-grid {
+  display: grid;
+  gap: 14px;
+}
+@media (min-width: 700px) {
+  .cn-values-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.cn-value-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.cn-value-num {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.cn-value-name {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+.cn-value-desc {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
 .cn-wrap {
   max-width: 760px;
   margin: 0 auto;
