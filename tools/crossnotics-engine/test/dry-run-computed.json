@@ -1,0 +1,578 @@
+{
+  "customer": {
+    "name": "드라이런고객",
+    "birth_year": 1990,
+    "birth_month": 5,
+    "birth_day": 14,
+    "birth_hour": 14,
+    "birth_minute": 0,
+    "unknown_time": false,
+    "gender": "F",
+    "latitude": 37.5665,
+    "longitude": 126.978,
+    "questions": [
+      "올해 이직운이 궁금해요",
+      "결혼운도 궁금해요"
+    ]
+  },
+  "tier": "master",
+  "systems_included": [
+    "saju",
+    "astrology",
+    "tarot"
+  ],
+  "generated_at_note": "타임스탬프는 배송 파이프라인(2단계)에서 채움 — 이 엔진은 순수 계산만 담당",
+  "saju": {
+    "birth_solar": "1990-05-14",
+    "unknown_time": false,
+    "lunar_text": "一九九〇年四月二十",
+    "pillars": {
+      "year": {
+        "ganzhi_hanja": "庚午",
+        "ganzhi_ko": "경오",
+        "gan_oheng": "금",
+        "zhi_oheng": "화",
+        "shi_shen_gan": "상관",
+        "shi_shen_zhi": [
+          "편인",
+          "비견"
+        ],
+        "ji_jang_gan": [
+          "정",
+          "기"
+        ],
+        "twelve_stage": "임관",
+        "gong_mang": "戌亥"
+      },
+      "month": {
+        "ganzhi_hanja": "辛巳",
+        "ganzhi_ko": "신사",
+        "gan_oheng": "금",
+        "zhi_oheng": "화",
+        "shi_shen_gan": "식신",
+        "shi_shen_zhi": [
+          "정인",
+          "상관",
+          "겁재"
+        ],
+        "ji_jang_gan": [
+          "병",
+          "경",
+          "무"
+        ],
+        "twelve_stage": "제왕",
+        "gong_mang": "申酉"
+      },
+      "day": {
+        "ganzhi_hanja": "己卯",
+        "ganzhi_ko": "기묘",
+        "gan_oheng": "토",
+        "zhi_oheng": "목",
+        "shi_shen_gan": "일주(일간 본인)",
+        "shi_shen_zhi": [
+          "칠살(편관)"
+        ],
+        "ji_jang_gan": [
+          "을"
+        ],
+        "twelve_stage": "병",
+        "gong_mang": "申酉"
+      },
+      "hour": {
+        "ganzhi_hanja": "辛未",
+        "ganzhi_ko": "신미",
+        "gan_oheng": "금",
+        "zhi_oheng": "토",
+        "shi_shen_gan": "식신",
+        "shi_shen_zhi": [
+          "비견",
+          "편인",
+          "칠살(편관)"
+        ],
+        "ji_jang_gan": [
+          "기",
+          "정",
+          "을"
+        ],
+        "twelve_stage": "관대",
+        "gong_mang": "戌亥"
+      }
+    },
+    "oheng_count": {
+      "목": 1,
+      "화": 2,
+      "토": 2,
+      "금": 3,
+      "수": 0
+    },
+    "dominant_elements": [
+      "금"
+    ],
+    "missing_elements": [
+      "수"
+    ],
+    "dae_yun": [
+      {
+        "start_age": 4,
+        "start_year": 1993,
+        "end_year": 2002,
+        "ganzhi_ko": "경진"
+      },
+      {
+        "start_age": 14,
+        "start_year": 2003,
+        "end_year": 2012,
+        "ganzhi_ko": "기묘"
+      },
+      {
+        "start_age": 24,
+        "start_year": 2013,
+        "end_year": 2022,
+        "ganzhi_ko": "무인"
+      },
+      {
+        "start_age": 34,
+        "start_year": 2023,
+        "end_year": 2032,
+        "ganzhi_ko": "정축"
+      },
+      {
+        "start_age": 44,
+        "start_year": 2033,
+        "end_year": 2042,
+        "ganzhi_ko": "병자"
+      },
+      {
+        "start_age": 54,
+        "start_year": 2043,
+        "end_year": 2052,
+        "ganzhi_ko": "을해"
+      },
+      {
+        "start_age": 64,
+        "start_year": 2053,
+        "end_year": 2062,
+        "ganzhi_ko": "갑술"
+      },
+      {
+        "start_age": 74,
+        "start_year": 2063,
+        "end_year": 2072,
+        "ganzhi_ko": "계유"
+      }
+    ],
+    "dae_yun_note": null,
+    "se_un": [
+      {
+        "year": 2025,
+        "ganzhi_ko": "을사"
+      },
+      {
+        "year": 2026,
+        "ganzhi_ko": "병오"
+      },
+      {
+        "year": 2027,
+        "ganzhi_ko": "정미"
+      },
+      {
+        "year": 2028,
+        "ganzhi_ko": "무신"
+      }
+    ],
+    "se_un_note": "작년ㆍ올해ㆍ내후년까지(리포트 생성 시점 기준) 세운만 제공 — 이 범위를 벗어난 연도는 언급하지 말 것"
+  },
+  "astrology": {
+    "sun_sign": "황소자리",
+    "moon_sign": "염소자리",
+    "ascendant": "처녀자리",
+    "unknown_time_note": null,
+    "planets": [
+      {
+        "body": "태양",
+        "sign": "황소자리",
+        "element": "땅",
+        "degree": 23.1,
+        "house": 9,
+        "retrograde": false
+      },
+      {
+        "body": "달",
+        "sign": "염소자리",
+        "element": "땅",
+        "degree": 11.4,
+        "house": 5,
+        "retrograde": false
+      },
+      {
+        "body": "수성",
+        "sign": "황소자리",
+        "element": "땅",
+        "degree": 8.2,
+        "house": 9,
+        "retrograde": true
+      },
+      {
+        "body": "금성",
+        "sign": "양자리",
+        "element": "불",
+        "degree": 11.3,
+        "house": 8,
+        "retrograde": false
+      },
+      {
+        "body": "화성",
+        "sign": "물고기자리",
+        "element": "물",
+        "degree": 17.4,
+        "house": 7,
+        "retrograde": false
+      },
+      {
+        "body": "목성",
+        "sign": "게자리",
+        "element": "물",
+        "degree": 9.3,
+        "house": 11,
+        "retrograde": false
+      },
+      {
+        "body": "토성",
+        "sign": "염소자리",
+        "element": "땅",
+        "degree": 25.3,
+        "house": 5,
+        "retrograde": true
+      },
+      {
+        "body": "천왕성",
+        "sign": "염소자리",
+        "element": "땅",
+        "degree": 9.2,
+        "house": 5,
+        "retrograde": true
+      },
+      {
+        "body": "해왕성",
+        "sign": "염소자리",
+        "element": "땅",
+        "degree": 14.4,
+        "house": 5,
+        "retrograde": true
+      },
+      {
+        "body": "명왕성",
+        "sign": "전갈자리",
+        "element": "물",
+        "degree": 16.2,
+        "house": 3,
+        "retrograde": true
+      }
+    ],
+    "aspects": [
+      {
+        "body1": "태양",
+        "body2": "명왕성",
+        "type": "대립(오퍼지션)",
+        "orb": 6.9
+      },
+      {
+        "body1": "태양",
+        "body2": "토성",
+        "type": "삼각(트라인)",
+        "orb": 2.1
+      },
+      {
+        "body1": "태양",
+        "body2": "화성",
+        "type": "육각(섹스타일)",
+        "orb": 5.8
+      },
+      {
+        "body1": "달",
+        "body2": "천왕성",
+        "type": "합(컨정션)",
+        "orb": 2.1
+      },
+      {
+        "body1": "달",
+        "body2": "해왕성",
+        "type": "합(컨정션)",
+        "orb": 3
+      },
+      {
+        "body1": "달",
+        "body2": "목성",
+        "type": "대립(오퍼지션)",
+        "orb": 2.1
+      },
+      {
+        "body1": "달",
+        "body2": "수성",
+        "type": "삼각(트라인)",
+        "orb": 3.1
+      },
+      {
+        "body1": "달",
+        "body2": "금성",
+        "type": "사각(스퀘어)",
+        "orb": 0
+      },
+      {
+        "body1": "달",
+        "body2": "명왕성",
+        "type": "육각(섹스타일)",
+        "orb": 4.8
+      },
+      {
+        "body1": "수성",
+        "body2": "명왕성",
+        "type": "대립(오퍼지션)",
+        "orb": 8
+      },
+      {
+        "body1": "수성",
+        "body2": "천왕성",
+        "type": "삼각(트라인)",
+        "orb": 1
+      },
+      {
+        "body1": "수성",
+        "body2": "해왕성",
+        "type": "삼각(트라인)",
+        "orb": 6.1
+      },
+      {
+        "body1": "수성",
+        "body2": "목성",
+        "type": "육각(섹스타일)",
+        "orb": 1.1
+      },
+      {
+        "body1": "금성",
+        "body2": "목성",
+        "type": "사각(스퀘어)",
+        "orb": 2
+      },
+      {
+        "body1": "금성",
+        "body2": "천왕성",
+        "type": "사각(스퀘어)",
+        "orb": 2.1
+      },
+      {
+        "body1": "금성",
+        "body2": "해왕성",
+        "type": "사각(스퀘어)",
+        "orb": 3
+      },
+      {
+        "body1": "화성",
+        "body2": "명왕성",
+        "type": "삼각(트라인)",
+        "orb": 1.2
+      },
+      {
+        "body1": "화성",
+        "body2": "해왕성",
+        "type": "육각(섹스타일)",
+        "orb": 3
+      },
+      {
+        "body1": "목성",
+        "body2": "천왕성",
+        "type": "대립(오퍼지션)",
+        "orb": 0.1
+      },
+      {
+        "body1": "목성",
+        "body2": "해왕성",
+        "type": "대립(오퍼지션)",
+        "orb": 5.1
+      },
+      {
+        "body1": "목성",
+        "body2": "명왕성",
+        "type": "삼각(트라인)",
+        "orb": 6.9
+      },
+      {
+        "body1": "천왕성",
+        "body2": "해왕성",
+        "type": "합(컨정션)",
+        "orb": 5.2
+      },
+      {
+        "body1": "해왕성",
+        "body2": "명왕성",
+        "type": "육각(섹스타일)",
+        "orb": 1.8
+      }
+    ],
+    "element_count": {
+      "불": 1,
+      "땅": 6,
+      "바람": 0,
+      "물": 3
+    }
+  },
+  "tarot": {
+    "spread_type": "켈틱 크로스(10장)",
+    "deck_completeness_note": "타로 78장(메이저 22 + 마이너 56) 전체 범위에서 뽑음.",
+    "draws": [
+      {
+        "position": "현재 상황",
+        "card_name": "소드 기사",
+        "keyword": "직진하는 추진력",
+        "upright_text": "망설임 없이 빠르게 밀고 나가고 싶어지는 시기예요. 속도는 좋지만, 주변을 살피는 걸 잊지 않도록 하세요.",
+        "orientation": "역방향",
+        "orientation_note": "역방향 — 카드 에너지가 막혀있거나 내면화된 상태로 해석(정방향 의미의 반대ㆍ지연ㆍ내적 버전)"
+      },
+      {
+        "position": "당면 과제(장애물)",
+        "card_name": "펜타클 9",
+        "keyword": "홀로 이룬 여유",
+        "upright_text": "스스로의 힘으로 안정을 만들어 여유를 누리게 되는 시기예요. 그동안의 독립적인 노력이 결실을 맺은 거예요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      },
+      {
+        "position": "의식 속 목표",
+        "card_name": "13. 죽음",
+        "keyword": "끝과 새 출발",
+        "upright_text": "무섭게 들리지만 실제로는 '완전히 끝나야 새로 시작할 수 있다'는 뜻이에요. 미련 남는 걸 놓아줘야 다음 단계로 갈 수 있어요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      },
+      {
+        "position": "무의식의 기반",
+        "card_name": "12. 매달린 사람",
+        "keyword": "발상의 전환",
+        "upright_text": "지금은 뭘 해도 안 풀리는 것 같지만, 관점을 바꿔보면 새로운 답이 보여요. 잠깐 멈추는 것도 필요한 과정이에요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      },
+      {
+        "position": "가까운 과거",
+        "card_name": "완드 기사",
+        "keyword": "저돌적 추진",
+        "upright_text": "생각보다 몸이 먼저 움직이는 시기예요. 열정은 좋지만 너무 성급하게 밀어붙이지 않도록 한 번씩 점검하세요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      },
+      {
+        "position": "가까운 미래",
+        "card_name": "펜타클 4",
+        "keyword": "지키려는 마음",
+        "upright_text": "가진 걸 잃을까 봐 꽉 움켜쥐게 되는 시기예요. 안정도 중요하지만, 너무 움츠러들면 기회도 함께 놓칠 수 있어요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      },
+      {
+        "position": "본인의 태도",
+        "card_name": "4. 황제",
+        "keyword": "안정과 통제",
+        "upright_text": "체계와 원칙을 세울 때예요. 즉흥적으로 움직이기보다 계획을 세우고 책임감 있게 밀고 나가면 좋은 결과가 따라와요.",
+        "orientation": "역방향",
+        "orientation_note": "역방향 — 카드 에너지가 막혀있거나 내면화된 상태로 해석(정방향 의미의 반대ㆍ지연ㆍ내적 버전)"
+      },
+      {
+        "position": "주변 환경/영향",
+        "card_name": "컵 기사",
+        "keyword": "낭만적인 접근",
+        "upright_text": "감정에 이끌려 다가가고 싶어지는 시기예요. 진심은 통하지만, 분위기에만 휩쓸리지 않도록 중심은 잡아두세요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      },
+      {
+        "position": "희망 또는 두려움",
+        "card_name": "컵 9",
+        "keyword": "만족스러운 성취",
+        "upright_text": "바라던 것이 이루어져 마음이 편안해지는 시기예요. 지금의 만족을 충분히 느끼고 누려도 좋아요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      },
+      {
+        "position": "최종 결과",
+        "card_name": "펜타클 시종",
+        "keyword": "배움의 시작",
+        "upright_text": "실용적인 기술이나 돈 관리에 대해 새롭게 배우고 싶어지는 시기예요. 작은 것부터 차근차근 익혀가면 돼요.",
+        "orientation": "정방향",
+        "orientation_note": null
+      }
+    ]
+  },
+  "correlation": {
+    "mode": "cross_correlation",
+    "dominant_axis": "땅",
+    "element_vectors": {
+      "saju": {
+        "불": 0.25,
+        "땅": 0.625,
+        "바람": 0.125,
+        "물": 0
+      },
+      "astrology": {
+        "불": 0.1,
+        "땅": 0.6,
+        "바람": 0,
+        "물": 0.3
+      },
+      "tarot": {
+        "불": 0.16666666666666666,
+        "땅": 0.3333333333333333,
+        "바람": 0.05555555555555555,
+        "물": 0.4444444444444444
+      }
+    },
+    "combined_vector": {
+      "불": 0.1722222222222222,
+      "땅": 0.5194444444444445,
+      "바람": 0.06018518518518518,
+      "물": 0.24814814814814815
+    },
+    "agreement_score": 0.797,
+    "pairwise_similarity": [
+      {
+        "pair": [
+          "saju",
+          "astrology"
+        ],
+        "similarity": 0.861,
+        "same_top_element": true
+      },
+      {
+        "pair": [
+          "saju",
+          "tarot"
+        ],
+        "similarity": 0.644,
+        "same_top_element": false
+      },
+      {
+        "pair": [
+          "astrology",
+          "tarot"
+        ],
+        "similarity": 0.886,
+        "same_top_element": false
+      }
+    ],
+    "systems_agreeing": [
+      "saju",
+      "astrology"
+    ],
+    "complementary_points": [
+      {
+        "element": "물",
+        "strong_in": [
+          "tarot"
+        ],
+        "weak_in": [
+          "saju"
+        ]
+      }
+    ],
+    "mapping_note": "오행→4원소, 타로카드→4원소 매핑은 이 프로젝트의 v1 상응표(파일 상단 주석 참고) — 절대 정설이 아님을 리포트 톤에도 반영할 것."
+  }
+}
