@@ -20,18 +20,29 @@
 <link rel="stylesheet" href="css/crossnotics.css" />
 <script src="../js/config.js"></script>
 </head>
-<body data-active="services" data-root="../">
-<header id="site-header" class="site-header"></header>
+<body data-root="../">
+<header id="cn-header" class="site-header">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <span class="logo-mark">🔮</span>
+      크로스노틱스
+    </a>
+    <nav class="nav-links">
+      <a href="#cn-philosophy">교차진단이란</a>
+      <a href="#cn-form">신청하기</a>
+    </nav>
+  </div>
+</header>
 
 <main>
-  <div class="wrap page-head">
+  <div class="wrap page-head" id="top">
     <span class="kicker">🔮 사주 × 점성술 × 타로 — 독립 계산 후 교차검증</span>
     <h1>크로스노틱스</h1>
     <p>세 체계를 각각 검증된 계산 엔진으로 따로 계산한 뒤, 어디서 서로 일치하는지를 수학적으로 비교합니다. AI는 그 계산 결과를 글로 옮기는 역할만 하고, 숫자나 카드ㆍ간지를 스스로 지어내지 않습니다.</p>
   </div>
 
   <div class="cn-wrap">
-    <div class="cn-philosophy">
+    <div class="cn-philosophy" id="cn-philosophy">
       <b>왜 여러 체계를 겹쳐 보나요?</b> 사주 하나, 별자리 하나만으로는 놓치는 부분이 있을 수 있습니다.
       서로 다른 체계가 <b>같은 결론을 가리킬 때</b> 그 결론의 신뢰도가 높아지고, <b>서로 다른 부분을
       말할 때</b>는 놓치기 쉬운 면을 보완해서 볼 수 있습니다 — 이게 "교차진단"의 핵심입니다.
@@ -101,7 +112,19 @@
   </div>
 </main>
 
-<footer id="site-footer" class="site-footer"></footer>
+<footer id="cn-footer" class="site-footer">
+  <div class="wrap footer-inner">
+    <a class="brand" href="#top">
+      <span class="logo-mark">🔮</span>
+      크로스노틱스
+    </a>
+    <div class="tagline">사주ㆍ서양점성술ㆍ타로를 계산 엔진으로 먼저 계산한 뒤, 일치하는 지점만 교차검증합니다.</div>
+    <div style="display:flex; gap:16px;">
+      <a class="footer-link" href="javascript:void(0)" onclick="contactMail('크로스노틱스 문의', '안녕하세요, 크로스노틱스 관련 문의드립니다.\n\n')">문의</a>
+      <a class="footer-link" href="../privacy.html">개인정보처리방침</a>
+    </div>
+  </div>
+</footer>
 
 <script>
   const CN_TIERS = [
@@ -281,7 +304,5 @@
     contactPurchase(subject, body);
   });
 </script>
-<script src="../js/adsense.js"></script>
-<script src="../js/common.js"></script>
 </body>
 </html>
