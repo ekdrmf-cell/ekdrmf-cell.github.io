@@ -81,14 +81,28 @@ function computeSaju(input) {
 
   // 대운 — 생시를 모르면 대운 계산 자체는 가능(연/월주 기반)하나, 정밀도가 떨어짐을 결과에 표시
   let daeYun = null;
+  let seUn = null;
   if (input.gender === "M" || input.gender === "F") {
     const yun = ec.getYun(input.gender === "M" ? 1 : 0);
-    daeYun = yun.getDaYun().slice(1, 9).map((d) => ({
+    const daYunRaw = yun.getDaYun().slice(1, 9);
+    daeYun = daYunRaw.map((d) => ({
       start_age: d.getStartAge(),
       start_year: d.getStartYear(),
       end_year: d.getEndYear(),
       ganzhi_ko: ganzhiToKo(d.getGanZhi()),
     }));
+
+    // 세운(연도별 간지) — 2026-08-21 추가: LLM이 "2025년 을사년" 식으로 특정 연도를
+    // 언급하면서 실제로는 계산 안 된 값을 지어내는 걸 실사용 테스트에서 발견해서 추가함.
+    // "지금"은 실행 시점 기준(주문 처리 시점)이라 new Date()를 직접 씀 — 이 파일은 Workflow
+    // 스크립트가 아니라 일반 Node 실행 파일이라 여기서 new Date() 쓰는 건 문제없음.
+    const nowYear = new Date().getFullYear();
+    const relevantDaYun = daYunRaw.find((d) => nowYear >= d.getStartYear() && nowYear <= d.getEndYear())
+      || daYunRaw[0];
+    seUn = relevantDaYun
+      .getLiuNian()
+      .filter((l) => l.getYear() >= nowYear - 1 && l.getYear() <= nowYear + 2)
+      .map((l) => ({ year: l.getYear(), ganzhi_ko: ganzhiToKo(l.getGanZhi()) }));
   }
 
   return {
@@ -101,6 +115,10 @@ function computeSaju(input) {
     missing_elements: missingElements,
     dae_yun: daeYun,
     dae_yun_note: input.gender ? null : "성별 미입력으로 대운 계산 생략",
+    se_un: seUn,
+    se_un_note: input.gender
+      ? "작년ㆍ올해ㆍ내후년까지(리포트 생성 시점 기준) 세운만 제공 — 이 범위를 벗어난 연도는 언급하지 말 것"
+      : "성별 미입력으로 세운 계산 생략",
   };
 }
 

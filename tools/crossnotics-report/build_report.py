@@ -61,6 +61,10 @@ SYSTEM_PROMPT = """당신은 크로스노틱스(사주ㆍ서양점성술ㆍ타�
    말라는 뜻입니다:
    - 사주: 연ㆍ월ㆍ일ㆍ시주 네 기둥 전부(십신ㆍ지장간ㆍ12운성ㆍ공망 포함), 대운이 있다면
      제공된 대운 구간을 전부(현재 구간만이 아니라 처음부터 끝까지) 각각 짧게라도 언급.
+     **연도를 언급할 때는 반드시 se_un 필드에 있는 연도만 쓰세요** — se_un에 없는
+     연도(예: se_un 범위 밖의 "2025년" 등)는 당신이 알고 있는 일반 지식이라도 절대
+     언급하지 마세요. 실제로 se_un 없이 특정 연도를 언급했다가 검증되지 않은 정보가
+     섞인 사례가 있었습니다(se_un 필드는 이런 문제를 막으려고 새로 추가된 실제 계산값).
    - 점성술: 제공된 행성 전부(태양부터 명왕성까지)와 그 사인ㆍ하우스, 제공된 어스펙트를
      전부(일부만 골라 쓰지 말고) 다루세요.
    - 타로: 뽑힌 카드를 전부(포지션 하나도 빠짐없이) 해석하세요.
@@ -119,17 +123,23 @@ def call_llm(computed):
         "리포트를 작성해 submit_report 도구로 제출하세요.\n\n"
         f"```json\n{json.dumps(computed, ensure_ascii=False, indent=2)}\n```"
     )
-    # 2026-08-21: 8번ㆍ9번 규칙(모든 데이터 빠짐없이 다루기 + 질문답변 섹션) 추가로 응답
-    # 길이가 늘어날 것으로 예상돼 4096->8192에 이어 16000으로 재상향.
-    max_tokens = 16000
-    response = client.messages.create(
+    # 2026-08-21: 8번ㆍ9번 규칙(모든 데이터 빠짐없이 다루기 + 질문답변 섹션) 추가 후
+    # 4096->8192->16000까지 올렸는데도 마스터 티어(3체계+질문 3개)에서 16000마저 실제로
+    # 잘리는 걸 확인함(질문 최대 10개까지 갈 수 있으니 이보다 더 필요할 수 있음) — 32000으로
+    # 재상향. call_llm()의 stop_reason 검사가 있어 그래도 잘리면 조용히 넘어가지 않고 죽는다.
+    #
+    # max_tokens가 크면(오래 걸릴 수 있으면) Anthropic SDK가 non-streaming 호출을 거부하고
+    # 스트리밍을 요구함(실제로 32000에서 ValueError로 확인) — messages.stream()으로 전환.
+    max_tokens = 32000
+    with client.messages.stream(
         model=MODEL,
         max_tokens=max_tokens,
         system=SYSTEM_PROMPT,
         tools=[REPORT_SCHEMA],
         tool_choice={"type": "tool", "name": "submit_report"},
         messages=[{"role": "user", "content": user_message}],
-    )
+    ) as stream:
+        response = stream.get_final_message()
     # 그래도 잘릴 가능성에 대비해 명시적으로 검사 — 잘린 걸 모르고 그대로 발송하는 사고를 막는다.
     if response.stop_reason == "max_tokens":
         raise RuntimeError(
@@ -164,13 +174,32 @@ def collect_known_terms(computed):
     return terms
 
 
-def check_hallucination(report, known_terms):
-    """리포트 본문에서 핵심 용어를 뽑아 known_terms와 대조 — 발송을 막지는 않고 경고만 남긴다."""
+def collect_valid_years(computed):
+    """se_un/dae_yun/생년 등 computed.json에 실제로 등장하는 '정당한' 연도만 모은다.
+    이 목록 밖의 연도가 리포트에 나오면 se_un 없이 AI가 일반 지식으로 채운 것일 가능성이
+    높다(실사용 테스트에서 실제로 발견된 문제 — build_report.py 8번 규칙 참고)."""
+    years = set()
+    saju = computed.get("saju") or {}
+    if saju.get("birth_solar"):
+        years.add(int(saju["birth_solar"][:4]))
+    for entry in saju.get("se_un") or []:
+        years.add(entry["year"])
+    for entry in saju.get("dae_yun") or []:
+        years.add(entry["start_year"])
+        years.add(entry["end_year"])
+    return years
+
+
+def check_hallucination(report, known_terms, valid_years):
+    """리포트 본문에서 핵심 용어를 뽑아 known_terms/valid_years와 대조 — 발송을 막지는
+    않고 경고만 남긴다."""
     all_text = report.get("intro", "") + report.get("closing", "")
     for sec in report.get("system_sections", []):
         all_text += sec.get("body", "")
     if report.get("cross_analysis"):
         all_text += report["cross_analysis"].get("body", "")
+    if report.get("question_answer"):
+        all_text += report["question_answer"].get("body", "")  # 이전엔 여기가 검사 대상에서 빠져있었음
 
     # 간지(2글자 한글, 예: "경오"), 별자리("~자리"로 끝남), 원소(단일 한글자+조사) 패턴만
     # 가볍게 검사 — 완벽한 NLP가 아니라 "발송 전 훑어볼 신호"로만 쓴다(설계 문서 참고).
@@ -180,6 +209,14 @@ def check_hallucination(report, known_terms):
         print(f"⚠ 경고: 리포트에 computed.json에 없는 별자리 표현이 있을 수 있음: {unknown}")
     else:
         print("✓ 별자리 용어 대조 통과(단순 패턴 검사, 완벽하지 않음 — 최종 발송 전 사람이 한 번 읽을 것)")
+
+    # 연도 대조 — se_un 없이 특정 연도를 언급했던 실제 사례를 계기로 추가함.
+    year_candidates = {int(y) for y in re.findall(r"(?:19|20)\d{2}(?=년)", all_text)}
+    unknown_years = year_candidates - valid_years
+    if unknown_years:
+        print(f"⚠ 경고: computed.json의 se_un/dae_yun/생년에 없는 연도 언급 발견: {sorted(unknown_years)} — AI가 일반 지식으로 채웠을 가능성, 발송 전 확인할 것")
+    else:
+        print("✓ 연도 언급 전부 se_un/dae_yun/생년 범위 안에 있음")
 
 
 def main():
@@ -200,7 +237,8 @@ def main():
     print(f"완료. 토큰 사용량: 입력 {usage.input_tokens} / 출력 {usage.output_tokens}")
 
     known_terms = collect_known_terms(computed)
-    check_hallucination(report, known_terms)
+    valid_years = collect_valid_years(computed)
+    check_hallucination(report, known_terms, valid_years)
 
     out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else computed_path.with_suffix(".report.json")
     out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
