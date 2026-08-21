@@ -49,14 +49,22 @@ async function fulfillCrossnotics(product, order) {
   await execFileAsync("node", [path.join(ENGINE_DIR, "run.js"), tmpIntake, tmpComputed]);
   const computed = JSON.parse(fs.readFileSync(tmpComputed, "utf8"));
 
-  // 2) Python 리포트 생성(LLM 합성 + PDF) — TODO: 계획서 3ㆍ4단계 완료 후 아래 fetch 활성화.
+  // 2) Python 리포트 생성(LLM 합성 + PDF)
+  // tools/crossnotics-report/build_report.py(LLM 합성)ㆍreport_kit.py(PDF)는 완성ㆍ검증됨
+  // (목업 데이터로 실제 PDF 생성 확인 완료). 다만 이 route-product.js는 Vercel Node 함수 안에서
+  // 돌아서 Python을 직접 spawn할 수 없다 — 같은 Vercel 프로젝트의 Python 런타임 함수
+  // (`api/generate-report.py`)로 HTTP 위임해야 하는데 그 브리지 파일이 아직 없다.
+  // TODO: api/generate-report.py 작성 후 아래 fetch 활성화. 그 함수 안에서는
+  // build_report.py의 call_llm()과 report_kit.py의 build_pdf()를 그대로 import해서 쓰면 됨
+  // (ANTHROPIC_API_KEY 없이는 실제 호출 테스트 불가 — 계획서 8번, 사용자 액션 대기 중).
   // const reportRes = await fetch(`${process.env.SITE_CHECKOUT_BASE_URL}/api/generate-report`, {
   //   method: "POST", body: JSON.stringify(computed), headers: { "Content-Type": "application/json" },
   // });
   // const { pdfBase64, filename } = await reportRes.json();
   throw new Error(
-    "NOT_IMPLEMENTED: computed.json까지는 정상 생성됨(아래 로그 참고), 이후 LLM 합성+PDF " +
-    "단계(api/generate-report.py)가 아직 없음 — 계획서 3ㆍ4단계 완료 후 이어서 구현할 것.\n" +
+    "NOT_IMPLEMENTED: computed.json까지는 정상 생성됨(아래 로그 참고). LLM 합성ㆍPDF 코드 " +
+    "자체는 완성됐지만(tools/crossnotics-report/) 이 Node 함수에서 Python을 직접 실행 못해 " +
+    "api/generate-report.py 브리지가 아직 필요함.\n" +
     `computed.json 요약: dominant_axis=${computed.correlation.dominant_axis}, ` +
     `agreement_score=${computed.correlation.agreement_score}`
   );

@@ -7,10 +7,12 @@
 **전체 설계는 `C:\Users\ekdrm\.claude\plans\idempotent-rolling-hopcroft.md`에 승인된 계획으로 남아있음
 — 큰 방향이 헷갈리면 그 파일부터 참고할 것.**
 
-## 0. 지금 상태 요약 (2026-08-21)
+## 0. 지금 상태 요약 (2026-08-21, 2차 갱신)
 
-**1단계(Node 계산 엔진) 핵심 부분 완료ㆍ검증됨.** 아직 결제 연동ㆍLLM 합성ㆍPDF 생성ㆍ마케팅 콘텐츠는
-전혀 안 됨 — 계산 엔진만 끝난 상태.
+**1ㆍ3ㆍ4ㆍ5단계 핵심 코드 전부 작성ㆍ검증 완료.** "무료 우선, 어려운 것부터"라는 사용자
+지시에 따라 API 키 없이도 진행 가능한 하드코어 엔지니어링(계산 엔진 → 결제 백엔드 → LLM
+프롬프트+PDF)을 먼저 끝냈다. 남은 건 대부분 **사용자 액션(계정 가입ㆍAPI 키)이나 콘텐츠
+집필**이지 추가 설계가 아니다.
 
 완료:
 - `tools/crossnotics-engine/saju.js` — 사주 엔진. lunar-javascript(npm, MIT, v1.7.7)의 EightChar API를
@@ -35,10 +37,35 @@
   둘 다 통과 확인.
 - Node.js 자체가 이 컴퓨터에 없어서 winget으로 신규 설치함(v24.19.0) — 사용자 승인받고 진행.
 - `saju/lib/lunar.js`(기존 무료 도구가 쓰는 vendored 사본)에 라이선스/버전 주석 추가.
-- `.gitignore`에 크로스노틱스 관련 시크릿/PII 경로(`tools/crossnotics-report/orders/`, `.env` 등) 추가.
+- `.gitignore`에 크로스노틱스 관련 시크릿/PII 경로(`tools/crossnotics-report/orders/`, `.env`,
+  `__pycache__/` 등) 추가.
+- **`site-checkout/`(신규, 계획서 5단계) — 서비스허브 전체가 공유하는 결제 웹훅 백엔드 완성.**
+  포트원(PortOne) V2 웹훅 서명 검증(`@portone/server-sdk`), 결제금액 서버 재조회로 위변조 방지,
+  상품 카탈로그(`lib/catalog.js` — 전자책 13종 실제 가격 확정 반영, 서비스 11종은 가격 미확인이라
+  TODO로 남김, 크로스노틱스 3티어는 백서 제안가로 임시 채움), Gmail SMTP 기반 무료 이메일 발송
+  (`lib/deliver-email.js`, 유료 SendGrid 등 안 씀). 크로스노틱스 주문이 오면 Node 계산 엔진을
+  서브프로세스로 실행해 `computed.json`까지 실제로 생성하는 것까지 mock 결제로 확인함.
+  **PortOne REST API 응답의 정확한 필드명(금액/customData 위치)은 문서로 100% 확정 못해 합리적
+  추정으로 작성 — 실제 테스트 결제 때 재확인 필요(`api/webhook.js` 상단 주석 참고).**
+- **`tools/crossnotics-report/`(신규, 계획서 3ㆍ4단계) — LLM 합성 + PDF 생성 파이프라인 완성.**
+  `build_report.py`: computed.json을 Anthropic API(tool-forced JSON 스키마로 강제해 자유 텍스트
+  파싱보다 안전하게)에 넣어 리포트 문장만 생성 — correlate.js가 계산한 결과를 "번역"만 하도록
+  프롬프트로 강제(환각 방지). `report_kit.py`: pdf_kit.py를 확장해 실제 브랜드 PDF 생성, 오행/원소
+  분포를 stat_row로 병기해 LLM 문장 옆에 원본 숫자도 같이 보여줌. **목업 데이터로 싱글/마스터
+  티어 PDF를 실제로 뽑아봄**(`tools/crossnotics-report/test/sample-*.pdf`) — 디자인 정상 확인.
+  이 과정에서 **Pretendard 폰트가 한자 글리프를 지원 안 해 "신금(辛金)"처럼 한자가 섞이면 빈칸으로
+  깨지는 버그 발견**(큐텐재팬 전자책 때와 동일 부류) → SYSTEM_PROMPT에 "한자 절대 금지" 규칙 추가로
+  방지 완료.
+  **Anthropic API 실제 호출은 아직 한 번도 안 해봄** — ANTHROPIC_API_KEY가 없어서 테스트 불가.
+- **연결 안 된 부분(다음 세션 최우선)**: `site-checkout/lib/route-product.js`의 크로스노틱스
+  처리 로직이 Node 계산까지는 실행하지만, 그 다음 `tools/crossnotics-report/`(Python)로 못
+  넘어감 — Vercel Node 함수는 Python을 직접 spawn 못하기 때문. **`site-checkout/api/generate-report.py`
+  (Vercel Python 런타임 함수)를 새로 만들어서 build_report.py의 `call_llm()`ㆍreport_kit.py의
+  `build_pdf()`를 그 안에서 import해 쓰고, route-product.js가 HTTP로 그 함수를 호출하게 이어붙이는
+  작업이 남음.** ANTHROPIC_API_KEY가 있어야 실제 테스트 가능.
 
-**다음 세션이 이어받을 때 먼저 할 일**: `node --version`으로 Node 인식되는지 확인(새 창이면 PATH
-갱신 안 됐을 수 있음 — 완전히 앱 재시작 필요, Git 설치 때와 동일한 이슈).
+**다음 세션이 이어받을 때 먼저 할 일**: `node --version`/`python --version`으로 둘 다 인식되는지
+확인(새 창이면 PATH 갱신 안 됐을 수 있음 — 완전히 앱 재시작 필요, Git 설치 때와 동일한 이슈).
 
 ## 1. 백서 원본과 벤치마킹 영상
 
@@ -61,18 +88,19 @@
 
 **2단계(콘텐츠, 병행 가능, 아직 안 함)**: 마이너 아르카나 56장 신규 집필(전자책 한 챕터 분량).
 
-**3단계(아직 안 함)**: `tools/crossnotics-report/`(Python) 신설 — `synthesis_prompt.md` 작성,
-Anthropic API 연동(사용자가 Console 계정+API 키 필요), 리포트 5~10건 생성해 환각/톤 검수, 실사용
-단가 확인 후 사용자 승인.
+**3ㆍ4단계(코드 완료, 실사용 검증만 남음)**: `tools/crossnotics-report/`(Python) — `build_report.py`
+(LLM 합성)ㆍ`report_kit.py`(PDF) 둘 다 작성ㆍ목업 테스트 완료. **남은 건 오직**: ①사용자가
+Anthropic Console에서 API 키 발급 ②실제 리포트 5~10건 생성해 환각/톤 검수 ③Console 사용량으로
+실사용 단가 확인 후 승인.
 
-**4단계(아직 안 함)**: `report_kit.py`(products/_shared/pdf_kit.py 확장)로 티어별 PDF 레이아웃.
-
-**5단계(아직 안 함, 비중 큼)**: `site-checkout/` 신설 — 서비스허브 전체(전자책+서비스+크로스노틱스)가
-공유하는 결제 백엔드. 포트원 연동 + 웹훅 서버리스 함수(Vercel 등 신규 계정 필요) + 상품별 라우팅 +
-이메일 자동발송.
+**5단계(코드 완료, 실사용 검증만 남음)**: `site-checkout/` — 결제 웹훅 백엔드 작성ㆍmock 테스트
+완료. **남은 건**: ①포트원 가입(사업자등록 필요 여부 확인) ②Vercel 계정 개설+배포 ③`api/
+generate-report.py` 브리지 작성(Node→Python 연결, 위 0번 "연결 안 된 부분" 참고) ④Gmail 앱
+비밀번호 발급 ⑤실제 테스트 결제로 PortOne 응답 필드 가정 검증(`api/webhook.js` 주석 참고).
 
 **6단계(아직 안 함)**: `crossnotics/index.html`, `js/crossnotics-data.js`, `services.html` 등재,
-기존 무료 사주/궁합/타로 결과 화면에 업셀 CTA, 릴스/스레드 콘텐츠 제작.
+기존 무료 사주/궁합/타로 결과 화면에 업셀 CTA, 릴스/스레드 콘텐츠 제작. 결제 버튼이 실제로
+site-checkout을 호출하도록 `js/config.js`의 `contactPurchase()` 확장도 이 단계.
 
 **7단계(아직 안 함)**: 실제 주문 1건 처음부터 끝까지(콘텐츠 유입→결제→자동 리포트 수령) 드라이런.
 
