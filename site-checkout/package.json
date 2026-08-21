@@ -1,0 +1,12 @@
+{
+  "name": "site-checkout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "서비스허브 전체(전자책ㆍ서비스ㆍ크로스노틱스)가 공유하는 결제 웹훅 백엔드. Vercel Serverless Functions로 배포(무료 티어). 정적 사이트(GitHub Pages) 저장소와 별개로 이 폴더만 별도 Vercel 프로젝트로 배포한다.",
+  "type": "commonjs",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@portone/server-sdk": "^0.19.0",
+    "nodemailer": "^9.0.5"
+  }
+}
