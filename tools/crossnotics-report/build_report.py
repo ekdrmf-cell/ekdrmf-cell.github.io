@@ -56,6 +56,20 @@ SYSTEM_PROMPT = """당신은 크로스노틱스(사주ㆍ서양점성술ㆍ타�
    괄호 안에 한자를 병기하지 마세요. PDF 폰트(Pretendard)가 한자 글리프를 지원하지 않아
    빈칸으로 깨집니다(실제로 확인된 버그). computed.json의 간지ㆍ오행ㆍ십신 값은 이미
    전부 한글로 번역되어 있으니("신", "겁재" 등) 그 한글 표기만 그대로 쓰세요.
+8. **JSON에 있는 데이터를 절대 빠짐없이 전부 다루세요 — 요약하거나 일부만 골라 쓰지
+   마세요.** 이건 분량을 늘리라는 뜻이 아니라, 이미 계산되어 주어진 실제 정보를 버리지
+   말라는 뜻입니다:
+   - 사주: 연ㆍ월ㆍ일ㆍ시주 네 기둥 전부(십신ㆍ지장간ㆍ12운성ㆍ공망 포함), 대운이 있다면
+     제공된 대운 구간을 전부(현재 구간만이 아니라 처음부터 끝까지) 각각 짧게라도 언급.
+   - 점성술: 제공된 행성 전부(태양부터 명왕성까지)와 그 사인ㆍ하우스, 제공된 어스펙트를
+     전부(일부만 골라 쓰지 말고) 다루세요.
+   - 타로: 뽑힌 카드를 전부(포지션 하나도 빠짐없이) 해석하세요.
+   빠뜨린 데이터가 있으면 안 됩니다 — 이미 계산해서 드린 정보인데 리포트에 안 쓰면 고객이
+   돈을 낸 값어치를 못 받는 것과 같습니다.
+9. **고객이 questions 필드에 남긴 질문에 직접 답하는 전용 섹션(question_answer)을
+   반드시 작성하세요.** 다른 섹션에서 슬쩍 언급하고 넘어가지 말고, 질문과 가장 관련 있는
+   데이터(예: 이직운 질문이면 관련 대운 구간, 관련 하우스, 관련 카드)를 다시 모아서
+   질문에 정면으로 답하는 별도 문단을 쓰세요. questions가 비어있으면 null로 두세요.
 """
 
 REPORT_SCHEMA = {
@@ -81,10 +95,15 @@ REPORT_SCHEMA = {
                 "type": ["object", "null"],
                 "properties": {"heading": {"type": "string"}, "body": {"type": "string"}},
             },
+            "question_answer": {
+                "type": ["object", "null"],
+                "description": "고객이 questions에 남긴 질문에 직접 답하는 전용 섹션. 질문이 없으면 null.",
+                "properties": {"heading": {"type": "string"}, "body": {"type": "string"}},
+            },
             "closing": {"type": "string"},
             "disclaimer": {"type": "string"},
         },
-        "required": ["intro", "system_sections", "closing", "disclaimer"],
+        "required": ["intro", "system_sections", "question_answer", "closing", "disclaimer"],
     },
 }
 
@@ -96,11 +115,12 @@ def call_llm(computed):
         "리포트를 작성해 submit_report 도구로 제출하세요.\n\n"
         f"```json\n{json.dumps(computed, ensure_ascii=False, indent=2)}\n```"
     )
+    # 2026-08-21: 8번ㆍ9번 규칙(모든 데이터 빠짐없이 다루기 + 질문답변 섹션) 추가로 응답
+    # 길이가 늘어날 것으로 예상돼 4096->8192에 이어 16000으로 재상향.
+    max_tokens = 16000
     response = client.messages.create(
         model=MODEL,
-        # 마스터 티어(3체계 + 교차분석)는 4096으로 실제 테스트해보니 중간에 잘렸음(실측 확인,
-        # cross_analysis/closing/disclaimer가 통째로 누락된 채 저장될 뻔함) — 8192로 올림.
-        max_tokens=8192,
+        max_tokens=max_tokens,
         system=SYSTEM_PROMPT,
         tools=[REPORT_SCHEMA],
         tool_choice={"type": "tool", "name": "submit_report"},
@@ -109,7 +129,7 @@ def call_llm(computed):
     # 그래도 잘릴 가능성에 대비해 명시적으로 검사 — 잘린 걸 모르고 그대로 발송하는 사고를 막는다.
     if response.stop_reason == "max_tokens":
         raise RuntimeError(
-            f"LLM 응답이 max_tokens(8192)에서 잘림 — 리포트가 불완전할 수 있음. "
+            f"LLM 응답이 max_tokens({max_tokens})에서 잘림 — 리포트가 불완전할 수 있음. "
             f"이대로 저장/발송하면 안 됨. max_tokens를 더 늘리거나 프롬프트를 손볼 것."
         )
     for block in response.content:

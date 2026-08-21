@@ -38,7 +38,11 @@ const ASPECT_KO = {
   square: "사각(스퀘어)", sextile: "육각(섹스타일)",
 };
 
-const CORE_BODIES = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"];
+// 2026-08-21 확장: 천왕성ㆍ해왕성ㆍ명왕성은 라이브러리가 이미 계산해주고 있었는데 리포트에
+// 안 쓰고 버리고 있었음(사용자 지적으로 발견) — 개인적 성향보다 세대적ㆍ심층적 주제를
+// 다루는 외행성 3개를 추가해 실제로 있는 데이터를 활용한다. 지어내는 게 아니라 이미 계산되던
+// 값을 리포트에 반영하는 것뿐이라 환각 위험 없음.
+const CORE_BODIES = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune", "pluto"];
 
 /**
  * @param {object} input {year, month, day, hour(0-23 또는 null), unknownTime, latitude, longitude}

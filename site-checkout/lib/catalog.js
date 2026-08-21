@@ -30,10 +30,13 @@ const SERVICES = {
 };
 
 const CROSSNOTICS_TIERS = {
-  // TODO(0단계 완료 후 확정): 백서 제안가 그대로 — 계획서 9번 "다중소스 시장조사" 아직 안 함.
-  "crossnotics-single": { name: "크로스노틱스 싱글 진단(1체계)", price: 39900, tier: "single", systems: ["saju"] },
-  "crossnotics-dual": { name: "크로스노틱스 듀얼 크로스 매트릭스(2체계)", price: 89900, tier: "dual", systems: ["saju", "astrology"] },
-  "crossnotics-master": { name: "크로스노틱스 마스터 다차원 통합(3체계)", price: 159000, tier: "master", systems: ["saju", "astrology", "tarot"] },
+  // 2026-08-21 사용자 확정: 딱 떨어지는 5만ㆍ10만ㆍ15만원. 가격만 정한 게 아니라 "그 가격에
+  // 맞는 정보량"을 요구했음 — build_report.py SYSTEM_PROMPT 8ㆍ9번 규칙(계산된 데이터
+  // 전부 다루기, 질문 전용 답변 섹션)과 tarot.js의 티어별 스프레드 깊이(싱글/듀얼=3장,
+  // 마스터=켈틱크로스 10장)가 이 가격 차등을 실제 콘텐츠 분량으로 뒷받침하도록 설계됨.
+  "crossnotics-single": { name: "크로스노틱스 싱글 진단(1체계)", price: 50000, tier: "single", systems: ["saju"] },
+  "crossnotics-dual": { name: "크로스노틱스 듀얼 크로스 매트릭스(2체계)", price: 100000, tier: "dual", systems: ["saju", "astrology"] },
+  "crossnotics-master": { name: "크로스노틱스 마스터 다차원 통합(3체계)", price: 150000, tier: "master", systems: ["saju", "astrology", "tarot"] },
 };
 
 const CATALOG = { ...EBOOKS, ...SERVICES, ...CROSSNOTICS_TIERS };

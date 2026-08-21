@@ -78,6 +78,13 @@ def build_pdf(computed, report, out_path, product_name):
         k.body(report["cross_analysis"]["body"])
         ch += 1
 
+    if report.get("question_answer"):
+        k.chapter_header(ch, report["question_answer"]["heading"], eyebrow="Q&A")
+        if computed["customer"].get("questions"):
+            k.callout_box("고객님이 남기신 질문", computed["customer"]["questions"])
+        k.body(report["question_answer"]["body"])
+        ch += 1
+
     k.h1("마치며")
     k.body(report["closing"])
 
