@@ -4,15 +4,15 @@
  * 뽑기만 했다 — 셔플/스프레드/역방향 로직이 아예 없었음. 여기서는 진짜 카드게임처럼
  * Fisher-Yates 셔플로 덱을 섞고, 포지션별로 카드를 배분하며, 정/역방향을 무작위 결정한다.
  *
- * 마이너 아르카나 56장(수트별 핍카드+코트카드) 콘텐츠 집필은 백서 2단계(콘텐츠 작업)로 분리돼
- * 아직 없음 — 지금은 기존 22장 메이저 아르카나 데이터로 엔진 매커니즘을 완성한다. 78장 데이터가
- * 채워지면 DECK 배열만 교체하면 되도록 구조를 짜둔다.
+ * 2026-08-21: 마이너 아르카나 56장(수트별 핍카드+코트카드) 집필 완료 — 이제 78장 전체
+ * 범위에서 뽑는다. tarot-data.js의 TAROT_DECK 배열만 읽어오는 구조라 콘텐츠가 늘어나도
+ * 이 파일은 수정할 필요 없었음(원래 그렇게 설계해둔 대로 그대로 반영됨).
  */
 const path = require("path");
 
 // tarot/js/tarot-data.js는 브라우저 전역(const TAROT_DECK)이라 Node에서 그대로 require할 수
 // 없다 — 파일을 읽어서 배열 리터럴만 안전하게 추출한다(외부 코드 실행 없이 값만 가져옴).
-function loadMajorArcana() {
+function loadTarotDeck() {
   const fs = require("fs");
   const filePath = path.resolve(__dirname, "../../tarot/js/tarot-data.js");
   const src = fs.readFileSync(filePath, "utf8");
@@ -22,9 +22,8 @@ function loadMajorArcana() {
   return eval(match[1]);
 }
 
-const MAJOR_ARCANA = loadMajorArcana();
-const DECK_COMPLETENESS_NOTE = `현재 메이저 아르카나 22장만 있음(마이너 아르카나 56장은 아직 미집필,
-CROSSNOTICS 백서 2단계 콘텐츠 작업 대상) — 78장 완성 전까지는 이 22장 범위 내에서만 뽑는다.`;
+const TAROT_DECK = loadTarotDeck();
+const DECK_COMPLETENESS_NOTE = `타로 78장(메이저 22 + 마이너 56) 전체 범위에서 뽑음.`;
 
 const SPREADS = {
   three_card: {
@@ -58,11 +57,11 @@ function computeTarot(input) {
   const spreadKey = input.spreadType || "three_card";
   const spread = SPREADS[spreadKey];
   if (!spread) throw new Error(`알 수 없는 스프레드: ${spreadKey}`);
-  if (spread.positions.length > MAJOR_ARCANA.length) {
-    throw new Error(`덱(${MAJOR_ARCANA.length}장)이 스프레드 포지션 수(${spread.positions.length})보다 적음`);
+  if (spread.positions.length > TAROT_DECK.length) {
+    throw new Error(`덱(${TAROT_DECK.length}장)이 스프레드 포지션 수(${spread.positions.length})보다 적음`);
   }
 
-  const shuffled = fisherYatesShuffle(MAJOR_ARCANA);
+  const shuffled = fisherYatesShuffle(TAROT_DECK);
   const draws = spread.positions.map((position, i) => {
     const card = shuffled[i];
     const orientation = Math.random() < 0.5 ? "역방향" : "정방향";
@@ -86,4 +85,4 @@ function computeTarot(input) {
   };
 }
 
-module.exports = { computeTarot, SPREADS, MAJOR_ARCANA };
+module.exports = { computeTarot, SPREADS, TAROT_DECK };

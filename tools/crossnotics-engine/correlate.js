@@ -39,6 +39,17 @@ const MAJOR_ARCANA_ELEMENT = {
   "20. 심판": "불", "21. 세계": "땅",
 };
 
+// 2026-08-21 마이너 아르카나 56장 추가 시 발견ㆍ수정: 이 매핑에 없는 카드가 뽑히면
+// tarotToElementVector()의 `if (!el) return;`에서 조용히 스킵돼 교차분석 계산에서 빠지는
+// 버그가 될 뻔함(마이너 아르카나 56장이 새로 생겼는데 이 표를 안 넓히면 그 카드들만 원소
+// 계산에서 누락됨). 마이너 아르카나는 수트(문양)별 원소가 타로 전통에서 이미 확립돼 있어
+// 지어내는 게 아님: 완드=불, 컵=물, 소드=바람, 펜타클=땅.
+const MINOR_SUIT_ELEMENT = { "완드": "불", "컵": "물", "소드": "바람", "펜타클": "땅" };
+function minorArcanaElement(cardName) {
+  const suit = cardName.split(" ")[0];
+  return MINOR_SUIT_ELEMENT[suit] || null;
+}
+
 const ELEMENTS = ["불", "땅", "바람", "물"];
 
 function normalize(countObj) {
@@ -63,7 +74,7 @@ function astrologyToElementVector(astrologyResult) {
 function tarotToElementVector(tarotResult) {
   const elementCount = { 불: 0, 땅: 0, 바람: 0, 물: 0 };
   tarotResult.draws.forEach((d) => {
-    const el = MAJOR_ARCANA_ELEMENT[d.card_name];
+    const el = MAJOR_ARCANA_ELEMENT[d.card_name] || minorArcanaElement(d.card_name);
     if (!el) return;
     // 역방향은 해당 원소 에너지가 절반만 발현된다고 보고 가중치 0.5 적용(v1 가설, 문서화됨)
     const weight = d.orientation === "역방향" ? 0.5 : 1;
