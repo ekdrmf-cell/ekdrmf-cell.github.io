@@ -1,0 +1,17 @@
+{
+  "tier": "dual",
+  "systems_included": ["saju", "astrology"],
+  "customer": {
+    "name": "테스트고객3",
+    "birth_year": 1988,
+    "birth_month": 9,
+    "birth_day": 22,
+    "birth_hour": 9,
+    "birth_minute": 15,
+    "unknown_time": false,
+    "gender": "F",
+    "latitude": 35.1796,
+    "longitude": 129.0756,
+    "questions": ["지금 하는 일이 저랑 잘 맞는 걸까요", "가족 관계에서 신경 써야 할 부분이 있을까요"]
+  }
+}

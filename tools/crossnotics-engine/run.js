@@ -15,6 +15,7 @@ const { computeSaju } = require("./saju.js");
 const { computeAstrology } = require("./astrology.js");
 const { computeTarot } = require("./tarot.js");
 const { computeCorrelation } = require("./correlate.js");
+const { getCrossnoticsTierConfig } = require("../../site-checkout/lib/catalog.js");
 
 function main() {
   const [, , intakePath, outPath] = process.argv;
@@ -25,6 +26,19 @@ function main() {
 
   const intake = JSON.parse(fs.readFileSync(path.resolve(intakePath), "utf8"));
   const systems = intake.systems_included || [];
+
+  // 가격표(catalog.js)의 질문 개수 제한을 여기서 강제 — 초과 주문은 비싼 LLM 호출까지
+  // 가기 전에 여기서 바로 걸러낸다(2026-08-21, 사용자가 확정한 "체계 개수+질문 개수"
+  // 가격 구조를 실제로 지키게 하는 코드).
+  const tierConfig = getCrossnoticsTierConfig(intake.tier);
+  const questionCount = (intake.customer.questions || []).length;
+  if (questionCount > tierConfig.question_limit) {
+    throw new Error(
+      `질문이 ${questionCount}개인데 "${intake.tier}" 티어는 최대 ${tierConfig.question_limit}개까지만 ` +
+      `허용됨(${tierConfig.name}, ${tierConfig.price}원). 초과분을 빼거나 상위 티어로 안내할 것.`
+    );
+  }
+
   const result = {
     customer: intake.customer,
     tier: intake.tier,

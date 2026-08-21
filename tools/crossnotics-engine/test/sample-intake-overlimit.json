@@ -2,7 +2,7 @@
   "tier": "master",
   "systems_included": ["saju", "astrology", "tarot"],
   "customer": {
-    "name": "테스트고객",
+    "name": "초과테스트",
     "birth_year": 1990,
     "birth_month": 5,
     "birth_day": 14,
@@ -12,6 +12,6 @@
     "gender": "F",
     "latitude": 37.5665,
     "longitude": 126.978,
-    "questions": ["올해 이직운이 궁금해요", "지금 만나는 사람과 결혼까지 갈 수 있을까요", "돈 관련해서 특히 조심해야 할 시기가 있을까요"]
+    "questions": ["질문1", "질문2", "질문3", "질문4", "질문5", "질문6", "질문7", "질문8", "질문9", "질문10", "질문11"]
   }
 }

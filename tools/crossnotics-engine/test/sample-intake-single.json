@@ -9,6 +9,6 @@
     "birth_hour": null,
     "unknown_time": true,
     "gender": "M",
-    "questions": []
+    "questions": ["올해 사업을 시작해도 괜찮을까요", "돈 관리할 때 조심해야 할 성향이 있을까요"]
   }
 }

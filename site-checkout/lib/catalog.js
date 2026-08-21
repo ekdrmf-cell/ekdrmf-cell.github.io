@@ -30,13 +30,38 @@ const SERVICES = {
 };
 
 const CROSSNOTICS_TIERS = {
-  // 2026-08-21 사용자 확정: 딱 떨어지는 5만ㆍ10만ㆍ15만원. 가격만 정한 게 아니라 "그 가격에
-  // 맞는 정보량"을 요구했음 — build_report.py SYSTEM_PROMPT 8ㆍ9번 규칙(계산된 데이터
-  // 전부 다루기, 질문 전용 답변 섹션)과 tarot.js의 티어별 스프레드 깊이(싱글/듀얼=3장,
-  // 마스터=켈틱크로스 10장)가 이 가격 차등을 실제 콘텐츠 분량으로 뒷받침하도록 설계됨.
-  "crossnotics-single": { name: "크로스노틱스 싱글 진단(1체계)", price: 50000, tier: "single", systems: ["saju"] },
-  "crossnotics-dual": { name: "크로스노틱스 듀얼 크로스 매트릭스(2체계)", price: 100000, tier: "dual", systems: ["saju", "astrology"] },
-  "crossnotics-master": { name: "크로스노틱스 마스터 다차원 통합(3체계)", price: 150000, tier: "master", systems: ["saju", "astrology", "tarot"] },
+  // 2026-08-21 사용자 확정(2차): "체계 개수"를 가격의 1차 기준으로 삼고, "질문 개수"를 그
+  // 안에 딸린 혜택으로 얹는 구조. 순수 질문개수제(3/6/10개=5/10/15만원)를 검토했으나,
+  // 질문당 단가가 16,667/16,667/15,000원으로 거의 평평해서 업셀 유인이 없고, 이 상품의
+  // 핵심 차별점(체계를 여러 개 겹쳐 교차검증)이 가격표에서 안 드러난다는 문제가 있어 기각.
+  // 대신 체계 개수(=계산 깊이ㆍ교차분석 유무)로 가격을 정당화하고, 질문 개수는 상위
+  // 티어일수록 더 준다: 5만원=1체계+질문3개, 10만원=2체계+교차분석+질문6개,
+  // 15만원=3체계+교차분석+질문10개+타로 스프레드 심화(3장->켈틱크로스10장).
+  //
+  // name은 "싱글ㆍ듀얼ㆍ마스터" 같은 내부 코드명 대신 손님이 보자마자 뭘 받는지 알 수
+  // 있게 내용을 그대로 풀어씀(사용자가 코드명을 그대로 노출하는 데 대해 지적함).
+  // tier 필드(single/dual/master)는 코드 내부 식별자로만 쓰고 고객에게 노출 안 함.
+  "crossnotics-saju-only": {
+    name: "사주 단독 진단 (질문 3개)",
+    price: 50000,
+    tier: "single",
+    systems: ["saju"],
+    question_limit: 3,
+  },
+  "crossnotics-saju-astrology": {
+    name: "사주 + 별자리 교차진단 (질문 6개)",
+    price: 100000,
+    tier: "dual",
+    systems: ["saju", "astrology"],
+    question_limit: 6,
+  },
+  "crossnotics-full": {
+    name: "사주 + 별자리 + 타로 통합진단 (질문 10개)",
+    price: 150000,
+    tier: "master",
+    systems: ["saju", "astrology", "tarot"],
+    question_limit: 10,
+  },
 };
 
 const CATALOG = { ...EBOOKS, ...SERVICES, ...CROSSNOTICS_TIERS };
@@ -55,4 +80,12 @@ function productType(productCode) {
   throw new Error(`상품 코드 접두어로 타입을 판별할 수 없음: ${productCode}`);
 }
 
-module.exports = { CATALOG, getProduct, productType };
+// tools/crossnotics-engine/run.js가 여기서 question_limit을 가져다 씀 — 가격표(이 파일)를
+// 유일한 기준으로 삼아서, 질문 개수 제한이 여러 파일에 따로 적혀 어긋나는 걸 방지한다.
+function getCrossnoticsTierConfig(tier) {
+  const found = Object.values(CROSSNOTICS_TIERS).find((p) => p.tier === tier);
+  if (!found) throw new Error(`알 수 없는 크로스노틱스 티어: ${tier}`);
+  return found;
+}
+
+module.exports = { CATALOG, getProduct, productType, getCrossnoticsTierConfig };

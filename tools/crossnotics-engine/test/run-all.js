@@ -1,6 +1,8 @@
 /*
- * 크로스노틱스 엔진 스모크 테스트 — 샘플 intake 2건(싱글/마스터)을 실제로 돌려서
- * 에러 없이 computed.json이 나오는지, 각 필드가 채워지는지 확인한다.
+ * 크로스노틱스 엔진 스모크 테스트 — 샘플 intake 3건(사주단독/사주+별자리/전체)을 실제로
+ * 돌려서 에러 없이 computed.json이 나오는지, 각 필드가 채워지는지, 질문 개수 제한이
+ * 정상 통과하는지 확인한다(초과 케이스는 test/sample-intake-overlimit.json으로 수동
+ * 확인 — 의도적으로 에러가 나야 정상이라 이 스모크 테스트엔 안 넣음).
  * 알려진 만세력/점성술 값과의 정확도 대조는 run.js 실행 후 사람이 결과를 직접 눈으로
  * 확인하는 방식으로 진행(계획서 "검증 방법" 1단계 항목).
  */
@@ -10,6 +12,7 @@ const fs = require("fs");
 
 const cases = [
   { intake: "sample-intake-single.json", out: "out-single.json" },
+  { intake: "sample-intake-dual.json", out: "out-dual.json" },
   { intake: "sample-intake-master.json", out: "out-master.json" },
 ];
 
