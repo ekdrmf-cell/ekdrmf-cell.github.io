@@ -1,4 +1,4 @@
-"""크로스노틱스 페이지 실제 화면 캡처 — 블로그 글용(6-2 규칙: 7장 고정).
+"""천지인운명관 페이지 실제 화면 캡처 — 블로그 글용(6-2 규칙: 7장 고정).
 로컬 서버(http://localhost:8768)가 떠있는 상태에서 실행."""
 import time
 from pathlib import Path
@@ -18,6 +18,15 @@ def go(page, name, wait=1.2, clip=None):
         print(name, "실패:", e)
 
 
+def go_el(page, name, el):
+    # clip은 뷰포트 기준이라, 페이지가 길어져 요소가 초기 뷰포트(900px) 밖에 있으면
+    # "Clipped area is outside the resulting image" 에러가 남 — 캡처 전에 항상
+    # 스크롤해서 뷰포트 안으로 넣은 뒤 좌표를 다시 읽어야 함(실제로 이 문제로 실패해서 확인함).
+    el.scroll_into_view_if_needed()
+    page.wait_for_timeout(150)
+    go(page, name, clip=el.bounding_box())
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
     page = browser.new_page(viewport={"width": 1280, "height": 900})
@@ -30,14 +39,14 @@ with sync_playwright() as p:
     # 02: 철학 박스
     el = page.query_selector(".cn-philosophy")
     if el:
-        go(page, "02_philosophy", clip=el.bounding_box())
+        go_el(page, "02_philosophy", el)
 
     # 03: 가격 카드 3개 전체 — 가격은 가림(6-3 원칙: 홍보 콘텐츠에 가격 노출 금지,
     # 판매 페이지 자체는 예외지만 이건 그 화면을 "홍보 이미지"로 재사용하는 거라 적용됨)
     page.evaluate("document.querySelectorAll('.cn-tier-price').forEach(el => el.style.visibility = 'hidden')")
     el = page.query_selector(".cn-tiers")
     if el:
-        go(page, "03_tiers", clip=el.bounding_box())
+        go_el(page, "03_tiers", el)
 
     # 04~06: 각 티어 카드 클릭했을 때 폼이 바뀌는 모습(질문개수/출생지 필드)
     # renderTiers()가 매 클릭마다 카드 DOM을 통째로 새로 그리므로, 이전에 잡아둔 핸들이
@@ -49,7 +58,7 @@ with sync_playwright() as p:
         time.sleep(0.3)
         el = page.query_selector("#cn-form")
         if el:
-            go(page, label, clip=el.bounding_box())
+            go_el(page, label, el)
 
     # 07: 전체 페이지 풀샷(축소)
     go(page, "07_full_page")

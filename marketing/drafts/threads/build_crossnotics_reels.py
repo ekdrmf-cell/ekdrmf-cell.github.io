@@ -1,4 +1,4 @@
-"""크로스노틱스 — 릴스용 9:16 손글씨 카드뉴스 + 슬라이드쇼 영상."""
+"""천지인운명관 — 릴스용 9:16 손글씨 카드뉴스 + 슬라이드쇼 영상."""
 from pathlib import Path
 
 from build_crossnotics_cards import SLIDES

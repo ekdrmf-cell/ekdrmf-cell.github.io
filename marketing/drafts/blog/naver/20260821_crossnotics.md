@@ -67,7 +67,7 @@ https://ekdrmf-cell.github.io/crossnotics/index.html
 
 [태그 - 발행 화면 하단 "태그 편집"에 이대로 입력]
 사주, AI사주, 서양점성술, 타로, 사주풀이, 네이탈차트, 사주별자리타로,
-크로스노틱스
+천지인운명관
 
 [쓰는 법 — 이제 이 방법을 기본으로 쓰세요]
 ⚠ 발행 전 필수 확인: 이 글의 링크(crossnotics/index.html)는 오늘 만든
