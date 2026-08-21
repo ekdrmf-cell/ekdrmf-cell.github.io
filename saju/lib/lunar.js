@@ -1,3 +1,9 @@
+/*
+ * lunar.js — 6tail/lunar-javascript (https://github.com/6tail/lunar-javascript)
+ * 라이선스: MIT. npm 패키지명 lunar-javascript, 이 프로젝트에서 참고한 버전: v1.7.7.
+ * (크로스노틱스 계산 엔진 tools/crossnotics-engine/saju.js는 동일 라이브러리를 npm으로
+ * 별도 설치해서 씀 — 이 파일은 브라우저용 무료 사주 도구(saju/js/saju-calc.js)에서만 사용.)
+ */
 ;(function(root,factory){
   if (typeof define==='function'&&define.amd){
     define(factory);

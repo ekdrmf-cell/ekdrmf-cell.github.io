@@ -1,0 +1,17 @@
+{
+  "tier": "master",
+  "systems_included": ["saju", "astrology", "tarot"],
+  "customer": {
+    "name": "테스트고객",
+    "birth_year": 1990,
+    "birth_month": 5,
+    "birth_day": 14,
+    "birth_hour": 14,
+    "birth_minute": 30,
+    "unknown_time": false,
+    "gender": "F",
+    "latitude": 37.5665,
+    "longitude": 126.978,
+    "questions": ["올해 이직운이 궁금해요"]
+  }
+}

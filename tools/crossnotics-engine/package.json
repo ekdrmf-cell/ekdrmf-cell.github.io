@@ -1,0 +1,15 @@
+{
+  "name": "crossnotics-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "크로스노틱스 계산 엔진 — 사주/점성술/타로 독립 계산 + 교차상관 알고리즘. 서비스허브 static 사이트와 별개로 로컬/서버리스에서만 실행됨.",
+  "type": "commonjs",
+  "main": "run.js",
+  "scripts": {
+    "test": "node test/run-all.js"
+  },
+  "dependencies": {
+    "circular-natal-horoscope-js": "^1.1.0",
+    "lunar-javascript": "^1.7.7"
+  }
+}

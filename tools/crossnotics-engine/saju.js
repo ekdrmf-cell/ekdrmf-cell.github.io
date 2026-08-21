@@ -1,0 +1,107 @@
+/*
+ * 크로스노틱스 — 사주 계산 엔진.
+ * lunar-javascript(6tail, MIT, npm v1.7.7 — https://github.com/6tail/lunar-javascript)의
+ * EightChar API를 깊이 활용해 십신ㆍ12운성ㆍ지장간ㆍ공망ㆍ대운까지 전부 산출한다.
+ * saju/js/saju-calc.js(무료 도구)와 동일한 GAN_KO/ZHI_KO/오행 매핑을 재사용해 두 도구의
+ * 번역 결과가 어긋나지 않게 한다. 여기서는 검증 없이 지어내는 부분이 전혀 없다 — 전부
+ * lunar-javascript가 계산한 값을 한국어로 옮기기만 한다(크로스노틱스 0번 원칙: 환각 차단).
+ */
+const { Solar } = require("lunar-javascript");
+
+const GAN_KO = { 甲: "갑", 乙: "을", 丙: "병", 丁: "정", 戊: "무", 己: "기", 庚: "경", 辛: "신", 壬: "임", 癸: "계" };
+const ZHI_KO = { 子: "자", 丑: "축", 寅: "인", 卯: "묘", 辰: "진", 巳: "사", 午: "오", 未: "미", 申: "신", 酉: "유", 戌: "술", 亥: "해" };
+
+const GAN_OHENG = { 甲: "목", 乙: "목", 丙: "화", 丁: "화", 戊: "토", 己: "토", 庚: "금", 辛: "금", 壬: "수", 癸: "수" };
+const ZHI_OHENG = { 寅: "목", 卯: "목", 巳: "화", 午: "화", 辰: "토", 戌: "토", 丑: "토", 未: "토", 申: "금", 酉: "금", 亥: "수", 子: "수" };
+
+// 십신(十神) — 七杀은 현대 명리학 소프트웨어에서 흔히 偏官 대신 쓰는 표기라 병기한다.
+const SHI_SHEN_KO = {
+  比肩: "비견", 劫财: "겁재", 食神: "식신", 伤官: "상관",
+  偏财: "편재", 正财: "정재", 七杀: "칠살(편관)", 正官: "정관",
+  偏印: "편인", 正印: "정인",
+};
+
+// 12운성(十二运星)
+const DI_SHI_KO = {
+  长生: "장생", 沐浴: "목욕", 冠带: "관대", 临官: "임관", 帝旺: "제왕", 衰: "쇠",
+  病: "병", 死: "사", 墓: "묘", 绝: "절", 胎: "태", 养: "양",
+};
+
+function ganzhiToKo(gz) {
+  return gz.split("").map((c) => GAN_KO[c] || ZHI_KO[c] || c).join("");
+}
+
+function pillarDetail(ec, key) {
+  // key: Year | Month | Day | Time
+  const gan = ec[`get${key}Gan`]();
+  const zhi = ec[`get${key}Zhi`]();
+  const hideGan = ec[`get${key}HideGan`]();
+  return {
+    ganzhi_hanja: gan + zhi,
+    ganzhi_ko: ganzhiToKo(gan + zhi),
+    gan_oheng: GAN_OHENG[gan] || null,
+    zhi_oheng: ZHI_OHENG[zhi] || null,
+    shi_shen_gan: key === "Day" ? "일주(일간 본인)" : SHI_SHEN_KO[ec[`get${key}ShiShenGan`]()] || null,
+    shi_shen_zhi: ec[`get${key}ShiShenZhi`]().map((s) => SHI_SHEN_KO[s] || s),
+    ji_jang_gan: hideGan.map((g) => GAN_KO[g] || g),
+    twelve_stage: DI_SHI_KO[ec[`get${key}DiShi`]()] || null,
+    gong_mang: ec[`get${key}XunKong`](),
+  };
+}
+
+/**
+ * @param {object} input {year, month, day, hour(0-23 또는 null), unknownTime, gender: "M"|"F"}
+ * @returns {object} computed.json의 "saju" 필드에 그대로 들어갈 구조
+ */
+function computeSaju(input) {
+  const hour = input.unknownTime ? 12 : input.hour;
+  const solar = Solar.fromYmdHms(input.year, input.month, input.day, hour, 0, 0);
+  const lunar = solar.getLunar();
+  const ec = lunar.getEightChar();
+
+  const pillars = {
+    year: pillarDetail(ec, "Year"),
+    month: pillarDetail(ec, "Month"),
+    day: pillarDetail(ec, "Day"),
+    hour: input.unknownTime ? null : pillarDetail(ec, "Time"),
+  };
+
+  // 오행 집계 (시간 모르면 3기둥만)
+  const ohengCount = { 목: 0, 화: 0, 토: 0, 금: 0, 수: 0 };
+  const rawPillars = [ec.getYear(), ec.getMonth(), ec.getDay()];
+  if (!input.unknownTime) rawPillars.push(ec.getTime());
+  rawPillars.forEach((gz) => {
+    const gan = gz[0], zhi = gz[1];
+    if (GAN_OHENG[gan]) ohengCount[GAN_OHENG[gan]]++;
+    if (ZHI_OHENG[zhi]) ohengCount[ZHI_OHENG[zhi]]++;
+  });
+  const sortedOheng = Object.entries(ohengCount).sort((a, b) => b[1] - a[1]);
+  const dominantElements = sortedOheng.filter(([, n]) => n === sortedOheng[0][1] && n > 0).map(([k]) => k);
+  const missingElements = sortedOheng.filter(([, n]) => n === 0).map(([k]) => k);
+
+  // 대운 — 생시를 모르면 대운 계산 자체는 가능(연/월주 기반)하나, 정밀도가 떨어짐을 결과에 표시
+  let daeYun = null;
+  if (input.gender === "M" || input.gender === "F") {
+    const yun = ec.getYun(input.gender === "M" ? 1 : 0);
+    daeYun = yun.getDaYun().slice(1, 9).map((d) => ({
+      start_age: d.getStartAge(),
+      start_year: d.getStartYear(),
+      end_year: d.getEndYear(),
+      ganzhi_ko: ganzhiToKo(d.getGanZhi()),
+    }));
+  }
+
+  return {
+    birth_solar: `${input.year}-${String(input.month).padStart(2, "0")}-${String(input.day).padStart(2, "0")}`,
+    unknown_time: !!input.unknownTime,
+    lunar_text: lunar.toString(),
+    pillars,
+    oheng_count: ohengCount,
+    dominant_elements: dominantElements,
+    missing_elements: missingElements,
+    dae_yun: daeYun,
+    dae_yun_note: input.gender ? null : "성별 미입력으로 대운 계산 생략",
+  };
+}
+
+module.exports = { computeSaju, ganzhiToKo, GAN_OHENG, ZHI_OHENG, SHI_SHEN_KO, DI_SHI_KO };

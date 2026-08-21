@@ -1,2 +1,11 @@
 .DS_Store
 Thumbs.db
+
+# 크로스노틱스 — 실제 고객 PII/생성물, API 키 (절대 커밋 금지)
+tools/crossnotics-report/orders/
+tools/crossnotics-report/.env
+tools/crossnotics-engine/.env
+tools/crossnotics-engine/node_modules/
+tools/crossnotics-engine/test/out-*.json
+site-checkout/.env
+site-checkout/node_modules/
