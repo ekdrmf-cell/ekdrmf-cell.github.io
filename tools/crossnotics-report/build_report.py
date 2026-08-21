@@ -9,7 +9,9 @@ LLM에게 "어디서 체계가 일치하는지 찾아봐"라고 시키지 않고
 correlation 필드를 문장으로 번역하는 것만 시킨다(강제 tool-call로 JSON 스키마를 지키게 해서
 자유 텍스트 파싱보다 안전하게 만듦).
 
-필요 환경변수: ANTHROPIC_API_KEY (Anthropic Console에서 발급 — 사용자 액션, 계획서 8번 참고)
+필요 환경변수: ANTHROPIC_API_KEY (Anthropic Console에서 발급 — 사용자 액션, 계획서 8번 참고).
+같은 폴더의 .env 파일(절대 커밋 안 됨, .gitignore 등록됨)에 넣어두면 아래 load_dotenv()가
+자동으로 읽어온다 — 매번 터미널에서 환경변수를 새로 설정할 필요 없음.
 """
 import json
 import os
@@ -18,6 +20,15 @@ import sys
 from pathlib import Path
 
 import anthropic
+from dotenv import load_dotenv
+
+# Windows 콘솔 기본 인코딩(cp949)은 ✓ㆍ⚠ 같은 유니코드 기호를 못 담아 print()가 죽는다
+# (실제로 여기서 첫 실행 때 API 호출은 성공했는데 이 로그 출력 단계에서 죽어서 파일 저장 전에
+# 멈췄던 걸 확인함) — stdout을 UTF-8로 강제 전환해서 방지.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "_shared"))  # products/_shared는 아님 — report_kit은 이 폴더에 있음
@@ -87,15 +98,27 @@ def call_llm(computed):
     )
     response = client.messages.create(
         model=MODEL,
-        max_tokens=4096,
+        # 마스터 티어(3체계 + 교차분석)는 4096으로 실제 테스트해보니 중간에 잘렸음(실측 확인,
+        # cross_analysis/closing/disclaimer가 통째로 누락된 채 저장될 뻔함) — 8192로 올림.
+        max_tokens=8192,
         system=SYSTEM_PROMPT,
         tools=[REPORT_SCHEMA],
         tool_choice={"type": "tool", "name": "submit_report"},
         messages=[{"role": "user", "content": user_message}],
     )
+    # 그래도 잘릴 가능성에 대비해 명시적으로 검사 — 잘린 걸 모르고 그대로 발송하는 사고를 막는다.
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError(
+            f"LLM 응답이 max_tokens(8192)에서 잘림 — 리포트가 불완전할 수 있음. "
+            f"이대로 저장/발송하면 안 됨. max_tokens를 더 늘리거나 프롬프트를 손볼 것."
+        )
     for block in response.content:
         if block.type == "tool_use" and block.name == "submit_report":
-            return block.input, response.usage
+            report = block.input
+            missing = [f for f in REPORT_SCHEMA["input_schema"]["required"] if f not in report]
+            if missing:
+                raise RuntimeError(f"LLM 응답에 필수 필드 누락: {missing} — 이대로 저장/발송하면 안 됨")
+            return report, response.usage
     raise RuntimeError("LLM이 submit_report 도구를 호출하지 않음 — 응답 확인 필요")
 
 
