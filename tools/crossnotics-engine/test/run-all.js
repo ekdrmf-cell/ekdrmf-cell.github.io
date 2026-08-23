@@ -14,6 +14,9 @@ const cases = [
   { intake: "sample-intake-single.json", out: "out-single.json" },
   { intake: "sample-intake-dual.json", out: "out-dual.json" },
   { intake: "sample-intake-master.json", out: "out-master.json" },
+  // 2026-08-23 추가 — 궁합 계산 엔진(gunghap.js) 스모크 테스트. partner 정보가 있으면
+  // computed.json에 gunghap 필드가 채워지는지 확인한다.
+  { intake: "sample-intake-gunghap.json", out: "out-gunghap.json" },
 ];
 
 let allOk = true;

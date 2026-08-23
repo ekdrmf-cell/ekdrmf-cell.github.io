@@ -6,6 +6,7 @@
  * 계산한다. 여기서도 지어내는 부분 없이 라이브러리 산출값을 한국어로 옮기기만 한다.
  */
 const { Origin, Horoscope } = require("circular-natal-horoscope-js");
+const { buildAstroCorrespondence } = require("./astrology-correspondence.js");
 
 const SIGN_KO = {
   Aries: { label: "양자리", element: "불" },
@@ -104,7 +105,7 @@ function computeAstrology(input) {
   const elementCount = { 불: 0, 땅: 0, 바람: 0, 물: 0 };
   planets.forEach((p) => elementCount[p.element]++);
 
-  return {
+  const result = {
     sun_sign: planets[0].sign,
     moon_sign: planets[1].sign,
     ascendant: ascendant ? ascendant.sign : null,
@@ -113,6 +114,11 @@ function computeAstrology(input) {
     aspects,
     element_count: elementCount,
   };
+  // 2026-08-23 추가 — 점성술 대응표 지식베이스(astrology-correspondence.js). saju쪽
+  // correspondence.js와 동일한 이유(별자리ㆍ행성ㆍ하우스ㆍ어스펙트 "의미" 사전이 없었음)로
+  // 신설, 이 손님의 실제 계산값만 근거로 조회한다.
+  result.correspondence = buildAstroCorrespondence(result);
+  return result;
 }
 
 module.exports = { computeAstrology, SIGN_KO, BODY_KO, ASPECT_KO };

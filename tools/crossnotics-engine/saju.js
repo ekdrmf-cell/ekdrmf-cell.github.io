@@ -6,7 +6,9 @@
  * 번역 결과가 어긋나지 않게 한다. 여기서는 검증 없이 지어내는 부분이 전혀 없다 — 전부
  * lunar-javascript가 계산한 값을 한국어로 옮기기만 한다(크로스노틱스 0번 원칙: 환각 차단).
  */
-const { Solar } = require("lunar-javascript");
+const { Solar, Lunar } = require("lunar-javascript");
+const { buildCorrespondence } = require("./correspondence.js");
+const { computeShensha } = require("./shensha.js");
 
 const GAN_KO = { 甲: "갑", 乙: "을", 丙: "병", 丁: "정", 戊: "무", 己: "기", 庚: "경", 辛: "신", 壬: "임", 癸: "계" };
 const ZHI_KO = { 子: "자", 丑: "축", 寅: "인", 卯: "묘", 辰: "진", 巳: "사", 午: "오", 未: "미", 申: "신", 酉: "유", 戌: "술", 亥: "해" };
@@ -50,12 +52,40 @@ function pillarDetail(ec, key) {
 }
 
 /**
- * @param {object} input {year, month, day, hour(0-23 또는 null), unknownTime, gender: "M"|"F"}
+ * 손님이 입력한 생년월일이 음력(윤달 포함)이면 양력으로 변환한다. 사주ㆍ점성술 두 엔진
+ * 모두 양력 기준으로 계산하므로, 두 엔진에 서로 다른 날짜가 들어가지 않도록 run.js가 이
+ * 함수 하나로 먼저 변환한 뒤 양쪽에 같은 결과를 넘긴다 — 여기서만 변환하고, 변환 결과는
+ * 그대로 리포트에 노출해 고객이 직접 확인할 수 있게 한다(크로스노틱스 0번 원칙: 지어내지
+ * 않고, 검증 가능하게).
+ * @param {object} input {year, month, day, calendarType: "solar"|"lunar" (기본 solar), isLeapMonth}
+ * @returns {object} {year, month, day, lunar_conversion_note: string|null}
+ */
+function resolveSolarDate({ year, month, day, calendarType = "solar", isLeapMonth = false }) {
+  if (calendarType !== "lunar") {
+    return { year, month, day, lunar_conversion_note: null };
+  }
+  const lunar = Lunar.fromYmd(year, isLeapMonth ? -month : month, day);
+  const solar = lunar.getSolar();
+  const solarYmd = `${solar.getYear()}-${String(solar.getMonth()).padStart(2, "0")}-${String(solar.getDay()).padStart(2, "0")}`;
+  return {
+    year: solar.getYear(),
+    month: solar.getMonth(),
+    day: solar.getDay(),
+    lunar_conversion_note:
+      `입력하신 음력 ${year}년 ${isLeapMonth ? "윤" : ""}${month}월 ${day}일은 ` +
+      `양력 ${solarYmd}로 환산해 계산했습니다.`,
+  };
+}
+
+/**
+ * @param {object} input {year, month, day, hour(0-23 또는 null), unknownTime, gender: "M"|"F",
+ *   calendarType: "solar"|"lunar" (기본 solar), isLeapMonth}
  * @returns {object} computed.json의 "saju" 필드에 그대로 들어갈 구조
  */
 function computeSaju(input) {
+  const resolved = resolveSolarDate(input);
   const hour = input.unknownTime ? 12 : input.hour;
-  const solar = Solar.fromYmdHms(input.year, input.month, input.day, hour, 0, 0);
+  const solar = Solar.fromYmdHms(resolved.year, resolved.month, resolved.day, hour, 0, 0);
   const lunar = solar.getLunar();
   const ec = lunar.getEightChar();
 
@@ -105,8 +135,9 @@ function computeSaju(input) {
       .map((l) => ({ year: l.getYear(), ganzhi_ko: ganzhiToKo(l.getGanZhi()) }));
   }
 
-  return {
-    birth_solar: `${input.year}-${String(input.month).padStart(2, "0")}-${String(input.day).padStart(2, "0")}`,
+  const result = {
+    birth_solar: `${resolved.year}-${String(resolved.month).padStart(2, "0")}-${String(resolved.day).padStart(2, "0")}`,
+    lunar_conversion_note: resolved.lunar_conversion_note,
     unknown_time: !!input.unknownTime,
     lunar_text: lunar.toString(),
     pillars,
@@ -120,6 +151,16 @@ function computeSaju(input) {
       ? "작년ㆍ올해ㆍ내후년까지(리포트 생성 시점 기준) 세운만 제공 — 이 범위를 벗어난 연도는 언급하지 말 것"
       : "성별 미입력으로 세운 계산 생략",
   };
+  // 2026-08-23 추가 — 명리학 대응표 지식베이스(correspondence.js). 띠ㆍ오행 생활정보ㆍ
+  // 십신ㆍ12운성의 "의미"까지 이 손님의 실제 계산값을 키로 조회해 붙여준다 — LLM이 이런
+  // 질문(예: "제 띠 특징이 뭔가요", "저한테 부족한 오행에 어울리는 음식은요")에 일반
+  // 지식으로 답하지 않고 이 필드를 근거로 direct 답변할 수 있게 한다(CROSSNOTICS_HANDOFF.md
+  // "다음에 이어서 할 일" 항목 반영).
+  result.correspondence = buildCorrespondence(result);
+  // 2026-08-23 추가 — 신살(도화ㆍ역마ㆍ화개ㆍ홍염) 계산(shensha.js). question_taxonomy.md
+  // 1절에서 확인된 실제 손님 질문("저 도화살 있나요")에 direct로 답할 수 있게 함.
+  result.shensha = computeShensha(result);
+  return result;
 }
 
-module.exports = { computeSaju, ganzhiToKo, GAN_OHENG, ZHI_OHENG, SHI_SHEN_KO, DI_SHI_KO };
+module.exports = { computeSaju, resolveSolarDate, ganzhiToKo, GAN_OHENG, ZHI_OHENG, SHI_SHEN_KO, DI_SHI_KO };

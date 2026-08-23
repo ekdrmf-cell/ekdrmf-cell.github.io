@@ -11,10 +11,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const { computeSaju } = require("./saju.js");
+const { computeSaju, resolveSolarDate } = require("./saju.js");
 const { computeAstrology } = require("./astrology.js");
 const { computeTarot } = require("./tarot.js");
 const { computeCorrelation } = require("./correlate.js");
+const { computeGunghap } = require("./gunghap.js");
 const { getCrossnoticsTierConfig } = require("../../site-checkout/lib/catalog.js");
 
 function main() {
@@ -39,22 +40,65 @@ function main() {
     );
   }
 
+  // 음력 생일이면 사주ㆍ점성술 두 엔진 모두 같은 양력 날짜를 써야 하므로 여기서 한 번만
+  // 변환한다(saju.js에 따로 맡기면 astrology.js는 변환 안 된 음력 숫자를 양력인 것처럼
+  // 받아 별자리가 완전히 틀어짐 — 2026-08-22 발견).
+  const resolvedDate = resolveSolarDate({
+    year: intake.customer.birth_year,
+    month: intake.customer.birth_month,
+    day: intake.customer.birth_day,
+    calendarType: intake.customer.calendar_type || "solar",
+    isLeapMonth: !!intake.customer.is_leap_month,
+  });
+
   const result = {
     customer: intake.customer,
     tier: intake.tier,
+    // build_report.py가 리포트 분량ㆍ깊이를 조절하는 데 쓰는 필드(mini/light/full) —
+    // 여기서 catalog.js 값을 그대로 실어 보내서, 가격표와 리포트 프롬프트가 서로 다른
+    // 파일에 따로 정의된 채 어긋나지 않게 한다.
+    scope: tierConfig.scope,
     systems_included: systems,
+    lunar_conversion_note: resolvedDate.lunar_conversion_note,
     generated_at_note: "타임스탬프는 배송 파이프라인(2단계)에서 채움 — 이 엔진은 순수 계산만 담당",
   };
 
   if (systems.includes("saju")) {
     result.saju = computeSaju({
-      year: intake.customer.birth_year,
-      month: intake.customer.birth_month,
-      day: intake.customer.birth_day,
+      year: resolvedDate.year,
+      month: resolvedDate.month,
+      day: resolvedDate.day,
       hour: intake.customer.birth_hour,
       unknownTime: !!intake.customer.unknown_time,
       gender: intake.customer.gender, // "M" | "F"
     });
+  }
+
+  // 2026-08-23 추가 — 궁합 계산 엔진(gunghap.js). intake.customer.partner에 상대방 생년월일이
+  // 있으면(사주가 계산 대상일 때만 의미가 있음) 상대방 사주까지 계산해 궁합을 산출한다.
+  // CROSSNOTICS_HANDOFF.md "-7번"에서 지적된 구멍(상대방 정보 없어 궁합 질문이 전부
+  // "redirected"였던 것)을 메움 — build_report.py는 이 필드가 있으면 궁합 질문을 "direct"로
+  // 승격해 답한다.
+  if (systems.includes("saju") && intake.customer.partner) {
+    const partnerResolved = resolveSolarDate({
+      year: intake.customer.partner.birth_year,
+      month: intake.customer.partner.birth_month,
+      day: intake.customer.partner.birth_day,
+      calendarType: intake.customer.partner.calendar_type || "solar",
+      isLeapMonth: !!intake.customer.partner.is_leap_month,
+    });
+    const partnerSaju = computeSaju({
+      year: partnerResolved.year,
+      month: partnerResolved.month,
+      day: partnerResolved.day,
+      hour: intake.customer.partner.birth_hour,
+      unknownTime: !!intake.customer.partner.unknown_time,
+      gender: intake.customer.partner.gender,
+    });
+    result.partner_saju = partnerSaju;
+    // 2026-08-23 추가 — relationship_type(연인ㆍ동업ㆍ가족). 손님이 폼에서 선택 안 하면
+    // "romantic"으로 기본 처리(gunghap.js의 기본값과 동일).
+    result.gunghap = computeGunghap(result.saju, partnerSaju, intake.customer.partner.relationship_type);
   }
 
   if (systems.includes("astrology")) {
@@ -62,9 +106,9 @@ function main() {
       throw new Error("점성술 계산에는 출생지 위도/경도가 필요함 — intake.customer.latitude/longitude 확인");
     }
     result.astrology = computeAstrology({
-      year: intake.customer.birth_year,
-      month: intake.customer.birth_month,
-      day: intake.customer.birth_day,
+      year: resolvedDate.year,
+      month: resolvedDate.month,
+      day: resolvedDate.day,
       hour: intake.customer.birth_hour,
       minute: intake.customer.birth_minute || 0,
       unknownTime: !!intake.customer.unknown_time,
@@ -74,8 +118,9 @@ function main() {
   }
 
   if (systems.includes("tarot")) {
-    // 백서/계획서 9번: 싱글ㆍ듀얼은 3장, 마스터는 켈틱크로스(10장)
-    const spreadType = intake.tier === "master" ? "celtic_cross" : "three_card";
+    // 백서/계획서 9번: 싱글ㆍ듀얼은 3장, 마스터ㆍ프리미엄은 켈틱크로스(10장) — 2026-08-22
+    // premium(20만원) 신설 시 마스터와 같은 최상급 스프레드 유지.
+    const spreadType = ["master", "premium"].includes(intake.tier) ? "celtic_cross" : "three_card";
     result.tarot = computeTarot({ spreadType });
   }
 

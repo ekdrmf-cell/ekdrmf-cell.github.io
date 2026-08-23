@@ -1,0 +1,22 @@
+{
+  "tier": "single",
+  "systems_included": ["saju"],
+  "customer": {
+    "name": "테스트고객3",
+    "birth_year": 1994,
+    "birth_month": 5,
+    "birth_day": 20,
+    "birth_hour": 9,
+    "unknown_time": false,
+    "gender": "F",
+    "partner": {
+      "birth_year": 1992,
+      "birth_month": 11,
+      "birth_day": 8,
+      "birth_hour": 15,
+      "unknown_time": false,
+      "gender": "M"
+    },
+    "questions": ["저희 궁합이 어떤가요", "결혼하면 잘 살 수 있을까요"]
+  }
+}
