@@ -376,6 +376,13 @@ body::before {
   gap: 18px;
   box-shadow: var(--shadow-card);
 }
+.cn-privacy-note {
+  margin: -4px 0 4px;
+  font-size: 13px;
+  color: var(--text-faint);
+  line-height: 1.7;
+}
+.cn-privacy-note a { color: var(--gold); text-decoration: underline; }
 .cn-form label { font-size: 15px; color: var(--text-dim); display: block; margin-bottom: 6px; font-weight: 500; }
 .cn-form .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .cn-form .row > * { flex: 1; min-width: 100px; }
