@@ -427,6 +427,45 @@ body::before {
 .cn-submit:hover { filter: brightness(1.06); }
 .cn-submit:active { transform: scale(0.99); }
 
+/* 신청 접수 결과 패널 — mailto 팝업을 대체한 진행상황 안내(2026-08-23) */
+.cn-apply-result {
+  background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 30px 28px;
+  text-align: center;
+  box-shadow: var(--shadow-card);
+}
+.cn-apply-ok .cn-apply-icon {
+  font-size: 26px;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+.cn-apply-title {
+  font-family: "Noto Serif KR", "Pretendard Variable", serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.cn-apply-result p {
+  font-size: 15px;
+  color: var(--text-dim);
+  line-height: 1.8;
+}
+.cn-apply-result p b { color: var(--gold); }
+.cn-apply-note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+.cn-apply-fail .cn-submit {
+  margin: 16px auto 0;
+  max-width: 280px;
+}
+
 .cn-disclaimer {
   margin-top: 26px;
   font-size: 13.5px;
