@@ -264,6 +264,12 @@
               <option value="M">상대방: 남성</option>
             </select>
           </div>
+          <div id="cn-partner-city-field" style="display:none; margin-top:8px;">
+            <label>상대방 태어난 지역 (별자리 궁합 계산에 필요 — 가장 가까운 도시로 선택, 모르면 비워두면 사주 궁합만 계산됩니다)</label>
+            <select id="f-partner-city">
+              <option value="">선택 안 함(사주 궁합만 계산)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -459,9 +465,18 @@
   // ---- 도시 선택 렌더 + 표시 여부(사주만 선택 시엔 숨김) ----
   const citySel = document.getElementById("f-city");
   citySel.innerHTML = CN_CITIES.map((c) => `<option value="${c.name}">${c.name}</option>`).join("");
+  // 상대방 출생지(선택) — 있으면 점성술 시너스트리(synastry.js)까지 계산되고, 비워두면
+  // 사주 궁합(gunghap.js)만 계산됨(astrology가 포함 안 된 티어에선 이 칸 자체를 숨김).
+  const pCitySel = document.getElementById("f-partner-city");
+  CN_CITIES.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.name; opt.textContent = c.name;
+    pCitySel.appendChild(opt);
+  });
   function updateCityFieldVisibility() {
     const needsAstrology = currentTier().systems.includes("astrology");
     document.getElementById("cn-city-field").style.display = needsAstrology ? "block" : "none";
+    document.getElementById("cn-partner-city-field").style.display = needsAstrology ? "block" : "none";
   }
   updateCityFieldVisibility();
 
@@ -645,14 +660,20 @@
       const pGender = document.getElementById("f-partner-gender").value;
       const pRelationshipType = document.getElementById("f-partner-relationship-type").value;
       const pRelationshipLabel = { romantic: "연인ㆍ부부", business: "동업ㆍ사업 파트너", family: "가족ㆍ기타" }[pRelationshipType];
+      // 상대방 출생지(선택) — 골랐을 때만 위경도를 채워 시너스트리(synastry.js)까지
+      // 계산되게 한다. astrology가 없는 티어면 필드 자체가 숨겨져 있어 항상 빈 값.
+      const pCity = pCitySel.value ? CN_CITIES.find((c) => c.name === pCitySel.value) : null;
       partner = {
         birth_year: pYear, birth_month: pMonth, birth_day: pDay,
         calendar_type: pCalendarType, is_leap_month: pIsLeapMonth,
-        birth_hour: pHour, unknown_time: pUnknownTime, gender: pGender,
+        birth_hour: pHour, birth_minute: pUnknownTime ? null : 0,
+        unknown_time: pUnknownTime, gender: pGender,
         relationship_type: pRelationshipType,
+        ...(pCity ? { latitude: pCity.lat, longitude: pCity.lng } : {}),
       };
       partnerSummaryLine = `상대방 생년월일(${pCalendarLabel}): ${pYear}-${String(pMonth).padStart(2, "0")}-${String(pDay).padStart(2, "0")}, ` +
-        `태어난시간: ${pUnknownTime ? "모름" : pHour + "시"}, 성별: ${pGender === "F" ? "여성" : "남성"}, 관계: ${pRelationshipLabel}\n`;
+        `태어난시간: ${pUnknownTime ? "모름" : pHour + "시"}, 성별: ${pGender === "F" ? "여성" : "남성"}, 관계: ${pRelationshipLabel}` +
+        (pCity ? `, 출생지: ${pCity.name} (위도 ${pCity.lat}, 경도 ${pCity.lng})` : "") + "\n";
     }
 
     const intakeJson = {

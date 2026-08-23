@@ -9,6 +9,7 @@
 const { Solar, Lunar } = require("lunar-javascript");
 const { buildCorrespondence } = require("./correspondence.js");
 const { computeShensha } = require("./shensha.js");
+const { computeYearlyFortune } = require("./yearly-fortune.js");
 
 const GAN_KO = { 甲: "갑", 乙: "을", 丙: "병", 丁: "정", 戊: "무", 己: "기", 庚: "경", 辛: "신", 壬: "임", 癸: "계" };
 const ZHI_KO = { 子: "자", 丑: "축", 寅: "인", 卯: "묘", 辰: "진", 巳: "사", 午: "오", 未: "미", 申: "신", 酉: "유", 戌: "술", 亥: "해" };
@@ -160,6 +161,10 @@ function computeSaju(input) {
   // 2026-08-23 추가 — 신살(도화ㆍ역마ㆍ화개ㆍ홍염) 계산(shensha.js). question_taxonomy.md
   // 1절에서 확인된 실제 손님 질문("저 도화살 있나요")에 direct로 답할 수 있게 함.
   result.shensha = computeShensha(result);
+  // 2026-08-23 추가 — 띠별 신년(세운) 운세 계산(yearly-fortune.js). 인수인계 문서에서
+  // 지적된 구멍("올해 이 띠에게 어떤 해인지" 계산이 유료 엔진엔 없었음)을 메움. se_un이
+  // 없으면(성별 미입력) null.
+  result.yearly_fortune = computeYearlyFortune(result);
   return result;
 }
 

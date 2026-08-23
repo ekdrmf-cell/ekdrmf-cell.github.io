@@ -16,6 +16,7 @@ const { computeAstrology } = require("./astrology.js");
 const { computeTarot } = require("./tarot.js");
 const { computeCorrelation } = require("./correlate.js");
 const { computeGunghap } = require("./gunghap.js");
+const { computeSynastry } = require("./synastry.js");
 // 2026-08-23: 서비스허브의 site-checkout/lib/catalog.js에서 분리된 이 폴더의 로컬 가격표
 const { getCrossnoticsTierConfig } = require("./catalog.js");
 
@@ -75,19 +76,26 @@ function main() {
     });
   }
 
+  // intake.customer.partner의 양력 변환 날짜 — 사주 궁합(gunghap.js)과 점성술 시너스트리
+  // (synastry.js)가 둘 다 상대방의 같은 생년월일을 다른 형식으로 필요로 해서 한 번만 계산해
+  // 아래 두 블록에서 공유한다(위쪽 resolvedDate와 같은 이유로 여기서도 한 번만 변환해야
+  // 사주ㆍ점성술이 서로 다른 날짜를 보는 사고를 막을 수 있음).
+  const partnerResolved = intake.customer.partner
+    ? resolveSolarDate({
+        year: intake.customer.partner.birth_year,
+        month: intake.customer.partner.birth_month,
+        day: intake.customer.partner.birth_day,
+        calendarType: intake.customer.partner.calendar_type || "solar",
+        isLeapMonth: !!intake.customer.partner.is_leap_month,
+      })
+    : null;
+
   // 2026-08-23 추가 — 궁합 계산 엔진(gunghap.js). intake.customer.partner에 상대방 생년월일이
   // 있으면(사주가 계산 대상일 때만 의미가 있음) 상대방 사주까지 계산해 궁합을 산출한다.
   // CROSSNOTICS_HANDOFF.md "-7번"에서 지적된 구멍(상대방 정보 없어 궁합 질문이 전부
   // "redirected"였던 것)을 메움 — build_report.py는 이 필드가 있으면 궁합 질문을 "direct"로
   // 승격해 답한다.
   if (systems.includes("saju") && intake.customer.partner) {
-    const partnerResolved = resolveSolarDate({
-      year: intake.customer.partner.birth_year,
-      month: intake.customer.partner.birth_month,
-      day: intake.customer.partner.birth_day,
-      calendarType: intake.customer.partner.calendar_type || "solar",
-      isLeapMonth: !!intake.customer.partner.is_leap_month,
-    });
     const partnerSaju = computeSaju({
       year: partnerResolved.year,
       month: partnerResolved.month,
@@ -116,6 +124,27 @@ function main() {
       latitude: intake.customer.latitude,
       longitude: intake.customer.longitude,
     });
+
+    // 2026-08-23 추가 — 점성술 시너스트리(synastry.js). 인수인계 문서 "B. 궁합 계산 엔진
+    // 확장" 항목을 메움. 상대방의 출생 위경도까지 있어야만 상대방 네이탈 차트를 완전히
+    // 계산할 수 있으므로(어센던트ㆍ하우스는 위경도와 무관하지만 astrology.js가 latitude/
+    // longitude를 필수값으로 요구함), partner.latitude/longitude가 있을 때만 계산한다 —
+    // 궁합(gunghap.js)은 상대방 생년월일만 있으면 되지만 시너스트리는 그보다 요구 조건이
+    // 하나 더 있다는 뜻이라, gunghap과 다르게 이 조건을 따로 검사함.
+    if (intake.customer.partner && intake.customer.partner.latitude != null && intake.customer.partner.longitude != null) {
+      const partnerAstrology = computeAstrology({
+        year: partnerResolved.year,
+        month: partnerResolved.month,
+        day: partnerResolved.day,
+        hour: intake.customer.partner.birth_hour,
+        minute: intake.customer.partner.birth_minute || 0,
+        unknownTime: !!intake.customer.partner.unknown_time,
+        latitude: intake.customer.partner.latitude,
+        longitude: intake.customer.partner.longitude,
+      });
+      result.partner_astrology = partnerAstrology;
+      result.astrology_synastry = computeSynastry(result.astrology, partnerAstrology);
+    }
   }
 
   if (systems.includes("tarot")) {

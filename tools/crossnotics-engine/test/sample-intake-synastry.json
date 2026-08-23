@@ -1,0 +1,29 @@
+{
+  "tier": "master",
+  "systems_included": ["saju", "astrology"],
+  "customer": {
+    "name": "테스트고객4",
+    "birth_year": 1990,
+    "birth_month": 5,
+    "birth_day": 14,
+    "birth_hour": 14,
+    "birth_minute": 30,
+    "unknown_time": false,
+    "gender": "F",
+    "latitude": 37.5665,
+    "longitude": 126.978,
+    "partner": {
+      "birth_year": 1988,
+      "birth_month": 9,
+      "birth_day": 2,
+      "birth_hour": 21,
+      "birth_minute": 0,
+      "unknown_time": false,
+      "gender": "M",
+      "relationship_type": "romantic",
+      "latitude": 35.1796,
+      "longitude": 129.0756
+    },
+    "questions": ["저희 별자리 궁합이 어떤가요"]
+  }
+}

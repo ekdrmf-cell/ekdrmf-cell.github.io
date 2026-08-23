@@ -80,6 +80,10 @@ function computeAstrology(input) {
       sign: signInfo.label,
       element: signInfo.element,
       degree: Math.round(b.ChartPosition.Ecliptic.DecimalDegrees % 30 * 10) / 10,
+      // 시너스트리(synastry.js)가 두 사람의 행성 사이 실제 각도를 계산하려면 별자리 안에서의
+      // 위치(위 degree, 0~30)가 아니라 황도 전체 기준 절대 경도(0~360)가 필요해서 추가함
+      // (2026-08-23, 시너스트리 엔진 신설과 함께 추가 — 기존 필드는 그대로 두고 덧붙이기만 함).
+      ecliptic_longitude: Math.round(b.ChartPosition.Ecliptic.DecimalDegrees * 10) / 10,
       // 생시를 모르면 하우스는 신뢰도가 없으므로 null 처리(어센던트 의존 데이터)
       house: hasTime ? HOUSE_NUM_KO[b.House && b.House.label] || null : null,
       retrograde: !!b.isRetrograde,

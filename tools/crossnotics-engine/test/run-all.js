@@ -17,6 +17,9 @@ const cases = [
   // 2026-08-23 추가 — 궁합 계산 엔진(gunghap.js) 스모크 테스트. partner 정보가 있으면
   // computed.json에 gunghap 필드가 채워지는지 확인한다.
   { intake: "sample-intake-gunghap.json", out: "out-gunghap.json" },
+  // 2026-08-23 추가 — 점성술 시너스트리(synastry.js) 스모크 테스트. partner에 위경도까지
+  // 있으면 computed.json에 astrology_synastry 필드가 채워지는지 확인한다.
+  { intake: "sample-intake-synastry.json", out: "out-synastry.json" },
 ];
 
 let allOk = true;
