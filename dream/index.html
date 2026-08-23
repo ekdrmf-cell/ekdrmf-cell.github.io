@@ -13,13 +13,13 @@
 </script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>무료 꿈해몽 검색 — 서비스허브</title>
+<title>무료 꿈해몽 검색 — 천지인운명관</title>
 <meta name="description" content="꿈에 나온 대상을 검색하면 전통 꿈해몽 풀이를 바로 보여드립니다." />
-<link rel="stylesheet" href="../css/style.css" />
+<link rel="stylesheet" href="../crossnotics/css/base.css" />
 <link rel="stylesheet" href="../saju/css/saju.css" />
-<script src="../js/config.js"></script>
+<script src="../crossnotics/js/config.js"></script>
 </head>
-<body data-active="saju" data-root="../">
+<body data-active="tools" data-root="../">
 <header id="site-header" class="site-header"></header>
 
 <div class="saju-wrap">
@@ -35,8 +35,8 @@
 
   <div class="upsell-card" id="dream-upsell" style="display:none;margin-top:16px;">
     <h3>이 꿈이 지금 내 상황과 어떻게 이어지는지 궁금하다면?</h3>
-    <p>검색 결과를 바탕으로 개인 맞춤 해석을 만들어드립니다.</p>
-    <button id="upsell-btn">상세 해석 신청하기</button>
+    <p>사주ㆍ별자리ㆍ타로까지 실제로 계산해서, 지금 이 시기와 어떻게 이어지는지 천지인운명관에서 더 깊게 확인할 수 있어요.</p>
+    <a href="../crossnotics/index.html" id="upsell-btn">천지인운명관에서 자세히 보기</a>
   </div>
 </div>
 
@@ -68,11 +68,7 @@
     upsellEl.style.display = "block";
     resultEl.scrollIntoView({ behavior: "smooth" });
   });
-
-  document.getElementById("upsell-btn").addEventListener("click", () => {
-    contactPurchase("꿈해몽 상세 해석 신청", "무료 꿈해몽 검색 결과로 상세 해석을 받고 싶습니다. 검색어: " + document.getElementById("dream-input").value);
-  });
 </script>
-<script src="../js/common.js"></script>
+<script src="../crossnotics/js/common.js"></script>
 </body>
 </html>

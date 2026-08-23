@@ -16,7 +16,8 @@ const { computeAstrology } = require("./astrology.js");
 const { computeTarot } = require("./tarot.js");
 const { computeCorrelation } = require("./correlate.js");
 const { computeGunghap } = require("./gunghap.js");
-const { getCrossnoticsTierConfig } = require("../../site-checkout/lib/catalog.js");
+// 2026-08-23: 서비스허브의 site-checkout/lib/catalog.js에서 분리된 이 폴더의 로컬 가격표
+const { getCrossnoticsTierConfig } = require("./catalog.js");
 
 function main() {
   const [, , intakePath, outPath] = process.argv;

@@ -1,4 +1,4 @@
-# 크로스노틱스(Cross-Notics) 트랙 인수인계 문서
+﻿# 크로스노틱스(Cross-Notics) 트랙 인수인계 문서
 
 이 문서는 전자책 트랙(`EBOOK_HANDOFF.md`), 서비스 트랙(`SERVICES_HANDOFF.md`), 마케팅 트랙
 (`MARKETING_HANDOFF.md`), 배포 트랙(`DEPLOY_HANDOFF.md`)과 독립적인 **다섯 번째 트랙**입니다.
@@ -6,6 +6,340 @@
 
 **전체 설계는 `C:\Users\ekdrm\.claude\plans\idempotent-rolling-hopcroft.md`에 승인된 계획으로
 남아있음 — 큰 방향이 헷갈리면 그 파일부터 참고할 것.**
+
+**2026-08-23(-12번) 이후로 천지인운명관은 서비스허브와 코드ㆍ콘텐츠상 완전히 분리됐다** —
+같은 GitHub 저장소ㆍ같은 배포 도메인은 유지하되(URL 안 바뀜), 공유 파일(js/config.js,
+js/common.js, css/style.css, pdf_kit.py, catalog.js)은 전부 독립 사본으로 갈라졌고,
+`crossnotics/index.html`ㆍ`crossnotics/privacy.html`까지 포함해 **분리가 완료됨**. 아래
+-11ㆍ-12번 항목 참고. **크로스노틱스 관련 작업을 할 때 이제 서비스허브 쪽 공유 파일을
+참고하거나 고칠 필요가 없다 — 전부 crossnotics/ 폴더 또는 tools/crossnotics-* 폴더 안에서
+끝난다.**
+
+## -12. 2026-08-23 업데이트 — 분리 마무리(index.html/privacy.html 배관 전환) + 그 사이
+다른 세션이 진행한 상세페이지 개편 반영 확인
+
+-11번에서 "다른 세션이 crossnotics/index.html·crossnotics.css를 동시에 수정 중"이라 그 두
+파일만 보류해뒀는데, 사용자가 "작업 시작하자"고 재개 지시 → git log로 그 사이 다른 세션이
+커밋한 내용을 먼저 확인한 뒤 진행함(중요 — 다음에도 "대기" 뒤에 재개할 땐 무작정 이어가지
+말고 git log부터 확인할 것, 실제로 이번에 상세페이지가 대폭 바뀌어 있었음).
+
+### 그 사이 다른 세션이 이미 해놓은 것 (git log로 확인, 내용 겹치지 않게 조율함)
+
+- **`crossnotics/privacy.html` 신규** — 개인정보처리방침이 서비스허브 루트 페이지 대신
+  천지인운명관 자체 페이지로 이미 분리되어 있었음(-11번 "다음에 할 일"에 남겨뒀던 항목이
+  이미 해결됨). 서버ㆍDB에 개인정보 저장 안 함, Google Apps Script로만 전달한다는 내용.
+- **신청 흐름 개편** — mailto 팝업 대신 Google Apps Script 웹앱(`crossnotics/apps-script/
+  Code.gs`, `CN_MAIL_ENDPOINT`)으로 조용히 접수 후 진행상황 패널 표시. 엔드포인트가
+  비어있으면 예전 mailto로 자동 폴백하는 안전장치 있음.
+- **질문칸 placeholder 개선** — 이 세션이 만든 `question_taxonomy.md`의 "direct 판정 가능한
+  유형"을 그대로 가져다 써서, 예전에 전부 "올해 이직운이 궁금해요"로 똑같던 placeholder를
+  티어별 보유 체계에 맞게 다양화함(`CN_QUESTION_EXAMPLES` 배열).
+- **다크 럭셔리 리디자인** — 글래스모피즘ㆍ노이즈텍스처ㆍ스크롤 등장 애니메이션, 가격
+  비교표를 카드 스펙으로 통합, 신뢰배지, 환불 불가 정책 명시 등.
+- **이번 세션이 신설한 궁합 상대방 입력칸(관계유형 선택 포함)은 그대로 보존되어 있었음** —
+  다른 세션이 지우거나 바꾸지 않고 그 위에 얹어서 작업했음, 충돌 없음.
+
+### 이번 세션이 마무리한 것
+
+`crossnotics/index.html`ㆍ`crossnotics/privacy.html` 둘 다:
+- `<link rel="stylesheet" href="../css/style.css">` → `href="css/base.css"`(같은 폴더 안의
+  독립 사본이라 상대경로가 `../css/`가 아니라 `css/`로 바뀜, 헷갈리지 않게 기록).
+- `<script src="../js/config.js">` → `src="js/config.js"`.
+- 헤더ㆍ푸터는 애초에 `#site-header`/`#site-footer`를 common.js로 채우는 방식이 아니라
+  두 파일 다 마크업이 직접 하드코딩되어 있어서(다른 세션의 "-8c442f0 서비스허브 공용
+  헤더/푸터에서 분리" 커밋에서 이미 그렇게 됨) `crossnotics/js/common.js`를 이 두 파일에
+  연결할 필요가 없었음 — 무료 도구 7개(saju/gunghap/tarot/dream/name/bloodtype/unse)만
+  common.js를 실제로 씀.
+
+### 검증
+
+- 로컬 서버로 `crossnotics/index.html`ㆍ`privacy.html` 둘 다 콘솔 에러 없이 로드 확인.
+- `SITE_CONFIG`가 새 `crossnotics/js/config.js`에서 정상 로드되는 것, 다크 배경(rgb(10,8,20))
+  등 crossnotics.css 스타일이 그대로 적용되는 것 확인.
+- 유료 티어(SINGLE) 선택 → 이름ㆍ이메일 입력 → 궁합 토글 켜기(관계유형 select 정상 노출
+  확인) → 폼 제출 → **입금 안내 모달이 정상적으로 뜨는 것까지 확인**(실제 Google Apps
+  Script 엔드포인트로 네트워크 요청을 보내는 단계 직전에서 멈춤 — 실제 배포된 엔드포인트에
+  진짜 요청을 보내면 운영자에게 실제 이메일이 갈 수 있어 의도적으로 거기까지는 테스트 안 함).
+- `node test/run-all.js` 재확인 통과.
+- 저장소 전체 U+3186(가운뎃점 오타) 재확인 — 없음.
+
+이제 -11번 "다음에 이어서 할 일"의 4개 항목 중 **완료**: crossnotics/index.html·privacy.html
+전환, 개인정보처리방침(다른 세션이 이미 처리). **여전히 남음**: 파비콘ㆍGoogle Analytics
+분리(계정 작업 필요), URL 경로(`/crossnotics/`) 자체 분리(완전 별도 저장소 전환은 아직 안
+함, 원하면 그때 다시 논의).
+
+## -11. 2026-08-23 업데이트 — 서비스허브와 완전 분리(사용자 지시: "연결된 모든 것을 끊어라")
+
+사용자가 pdf_kit.py 공유 이유를 묻다가, "애초에 천지인운명관은 서비스허브와 별개로 제대로 된
+사주 사이트를 만들겠다고 시작한 것이니 지금이라도 완전히 분리하라"고 명확히 지시함. 확인
+질문(AskUserQuestion)으로 범위를 좁힘 — **①같은 저장소ㆍ같은 배포 URL(ekdrmf-cell.github.io/
+crossnotics/) 유지, 코드만 완전 독립(사용자가 "2번" 선택ㆍ화면에 보이는 사이트 이름은 이미
+전부 "천지인운명관"이라 이 조건 만족 확인함) ②동시에 다른 세션이 crossnotics/index.html
+ㆍcrossnotics/css/crossnotics.css를 수정 중이라 그 두 파일은 "일단 대기"(그 세션이 끝날 때까지
+건드리지 않되, 충돌 없는 나머지는 지금 바로 진행)로 확정.**
+
+### 1. 천지인운명관 전용 공유 자산 신설 (crossnotics/js/, crossnotics/css/)
+
+- `crossnotics/js/config.js` — 서비스허브 js/config.js의 독립 사본(연락처ㆍ결제안내ㆍ
+  contactMail/contactPurchase/showPaymentGuide).
+- `crossnotics/js/common.js` — 서비스허브 js/common.js를 그대로 복제하지 않고 **새로 작성**:
+  브랜드명 "천지인운명관", 내비게이션(홈/무료 도구/신청하기), FAQ 챗봇 내용을
+  question_taxonomy.md를 참고해 천지인운명관 전용으로 재작성(서비스허브의 게임ㆍ전자책ㆍ
+  서비스 안내가 더 이상 안 나옴).
+- `crossnotics/css/base.css` — 서비스허브 css/style.css(942줄)를 그대로 복제한 독립 사본.
+- `crossnotics/js/unse-data.js` — 서비스허브 js/unse-data.js(운세 도구 목록, 내용 전체가
+  천지인운명관 전용이었음)를 **이전**(복제 아님, 원본 삭제) — 두 사이트에 나눠 가질 이유가
+  없는 데이터였음.
+
+### 2. 무료 도구 7개(saju/gunghap/tarot/dream/name/bloodtype/unse) 배관 교체
+
+각 `index.html`의 `<link rel="stylesheet" href="../css/style.css">` → `../crossnotics/css/
+base.css`, `<script src="../js/config.js">`/`js/common.js` → `../crossnotics/js/` 아래
+사본으로 교체. `data-active="saju"`(전부 똑같이 saju였음, 기존 오타 겸 방치됐던 부분) →
+`data-active="tools"`로 통일. `<title>` 태그의 "— 서비스허브"도 전부 "— 천지인운명관"으로
+수정. 브라우저로 4개 페이지(saju/dream/name/gunghap) 실제 폼 제출까지 확인 — 헤더ㆍ푸터
+브랜드명ㆍ내비게이션ㆍFAQ봇 전부 천지인운명관으로 정상 표시됨.
+
+### 3. PDF 엔진 완전 분리 (`tools/crossnotics-report/pdf_kit.py` 신규)
+
+-10번에서 `products/_shared/pdf_kit.py`(전자책 13종과 공유)에 "선택적 파라미터"로 추가했던
+크로스노틱스 전용 기능(accent/accent2, brand_emblem)을 **전부 되돌리고**, 그 기능을 포함한
+완전한 사본을 `tools/crossnotics-report/pdf_kit.py`로 새로 만듦(author 기본값도 "천지인운명관"
+으로, watermark_text 기본값도 "천지인운명관 · ..."으로). 폰트도 `tools/crossnotics-report/
+fonts/`에 별도 복사(Pretendard 6종) — 이제 SHARED_DIR이 이 폴더 자신을 가리켜 완전히
+독립적으로 동작함. `report_kit.py`의 import 경로도 `products/_shared`에서 로컬 파일로 변경.
+**격리 테스트로 양쪽 다 확인**: 로컬 pdf_kit.py로 크로스노틱스 PDF 빌드 성공(3페이지), 되돌린
+공유 pdf_kit.py로 회귀 테스트 PDF 빌드 성공(2페이지) — 서로 전혀 참조하지 않음 확인.
+
+### 4. 가격표 분리 (`tools/crossnotics-engine/catalog.js` 신규)
+
+`site-checkout/lib/catalog.js`에 있던 `CROSSNOTICS_TIERS`ㆍ`getCrossnoticsTierConfig`를
+`tools/crossnotics-engine/catalog.js`로 통째로 옮김(EBOOKS/SERVICES/getProduct/productType은
+site-checkout 쪽에 그대로 남김). `run.js`의 require 경로도 로컬 파일로 변경. `productType()`의
+"crossnotics" 분기도 제거(더 이상 site-checkout이 처리할 상품 타입이 아님).
+**site-checkout/lib/route-product.js의 `fulfillCrossnotics()` 함수 전체를 제거** — 원래
+`NOT_IMPLEMENTED` 스텁이었고 카드결제 자동화 자체가 아직 배포 전(계좌이체 수동 확인만
+씀)이라 지금 당장 영향받는 실사용은 없음. **천지인운명관이 카드결제 자동화가 필요해지면
+site-checkout을 공유하지 말고 별도로 새로 만들 것.**
+
+### 5. 서비스허브 쪽에서 천지인운명관을 홍보ㆍ링크하던 곳 전부 제거
+
+grep으로 찾은 실제 잔여 연결 3곳을 발견해 제거:
+- `index.html`(서비스허브 홈) — "운세" 섹션(featured-unse 카드 3개), 히어로 통계의 "무료
+  운세 도구 6개" 항목, `<script src="js/unse-data.js">` 전부 제거.
+- `services.html` — "천지인운명관 — 사주ㆍ별자리ㆍ타로 교차진단" 상품 카드(5~15만원 표기,
+  다른 실제 서비스 상품들과 나란히 판매중으로 노출되고 있었음) 전체 제거.
+- `js/search-data.js` — 사이트 전체 검색 인덱스에 있던 운세 도구 6개 항목(사주ㆍ궁합ㆍ타로ㆍ
+  꿈해몽ㆍ혈액형ㆍ이름풀이) 전부 제거.
+- `js/common.js`(서비스허브 자체 공용 헤더/FAQ) — 내비게이션의 "운세" 링크, FAQ 챗봇의
+  "운세 도구도 결제해야 하나요?" 항목 제거.
+
+브라우저로 서비스허브 홈ㆍservices.html을 직접 열어 콘솔 에러 없음ㆍ운세 관련 요소가 실제로
+안 남아있음(`document.getElementById('featured-unse')` → null)을 확인.
+
+### 검증
+
+- `node tools/crossnotics-engine/test/run-all.js` 통과(새 catalog.js 사용).
+- `python -c "import ast; ast.parse(...)"`로 로컬ㆍ공유 pdf_kit.py 둘 다 문법 확인.
+- 로컬 서버로 서비스허브 홈/services.html/unse 허브, 그리고 무료 도구 4개(saju/dream/name/
+  gunghap)까지 전부 브라우저로 직접 열어 실제 동작(폼 제출, 결과 표시, 업셀 링크, 헤더ㆍ푸터
+  브랜드명) 확인.
+- 저장소 전체를 U+3186(가운뎃점 대신 반복적으로 잘못 입력되는 한글 자모) 문자로 다시 grep해
+  이번 세션에서도 재발한 것을 발견ㆍ전부 제거 확인.
+
+### 다음에 이어서 할 일 (남겨둠, 이번 세션에서 결정하지 않음)
+
+- **crossnotics/index.html ㆍ crossnotics/css/crossnotics.css 전환** — 다른 세션의
+  다크ㆍ골드 리디자인 작업이 끝나면, 그 두 파일도 `../css/style.css`/`../js/config.js`/
+  `../js/common.js` 대신 `crossnotics/css/base.css`(또는 새로 만들 전용 CSS)ㆍ`crossnotics/
+  js/config.js`ㆍ`crossnotics/js/common.js`를 쓰도록 바꿔야 분리가 완성됨. **지금은 이
+  두 파일만 아직 서비스허브 공유 경로를 그대로 쓰고 있음(사용자 지시로 의도적으로 보류).**
+- **개인정보처리방침** — `crossnotics/js/common.js`의 푸터가 여전히 서비스허브의
+  `privacy.html`을 가리키고 있음(`${root}privacy.html`). 천지인운명관은 생년월일시ㆍ질문
+  내용ㆍ결제정보 등 서비스허브(전자책 쇼핑몰)와는 다른 개인정보를 수집하므로, 완전히
+  분리하려면 천지인운명관 전용 개인정보처리방침 페이지가 필요할 수 있음(법적 문서라
+  임의로 새로 쓰지 않고 다음에 사용자 확인 후 작성할 것).
+- **파비콘ㆍGoogle Analytics** — favicon.svg/apple-touch-icon.png와 GA 추적 ID
+  (G-NR3D3FD597)는 아직 공유 중. 파비콘은 브랜드 아이덴티티 문제라 원하면 천지인운명관
+  전용으로 새로 만들 수 있고, GA는 별도 속성(계정)을 새로 만들어야 분리 가능(사용자의
+  구글 계정 작업 필요) — 둘 다 이번 세션 범위 밖으로 남겨둠.
+- **URL 경로("crossnotics")** — 사이트 "이름"은 이미 전부 천지인운명관이지만, 배포 경로
+  자체는 여전히 `/crossnotics/`. 사용자가 이후 URL까지 바꾸고 싶다면(예: 완전 별도 저장소로
+  독립) 처음 확인했던 "완전 독립(새 저장소+새 주소)" 옵션으로 다시 전환 가능.
+
+## -10. 2026-08-23 업데이트 — 무료 도구 콘텐츠 확장ㆍPDF 브랜딩ㆍ마케팅 전략 메모 (-9번 이후
+계속 진행, "끝에 다다를 때까지 끊임없이 넓혀"라는 사용자 지시에 따라 사주 인접 영역까지 확장)
+
+### 1. 무료 도구 콘텐츠 확장
+
+- `dream/js/dream-data.js` — 꿈해몽 사전 24개 → **82개**(동물ㆍ신체ㆍ자연ㆍ장소ㆍ물건ㆍ식물ㆍ
+  사람ㆍ행동ㆍ숫자색깔 카테고리 추가). 국내 전통 해몽에서 널리 통용되는 상징을 리서치(2026-08-23
+  WebSearch)해서 새로 집필, 기존 24개와 같은 톤 유지. `node --check` 통과ㆍ`searchDream()`
+  실제 호출로 82개 로드ㆍ검색 정상 동작 확인.
+- `bloodtype/index.html` — 4개 항목(성격+최고궁합 한 줄)만 있던 걸 연애ㆍ직장ㆍ스트레스
+  대처법 + **4개 혈액형 전부와의 궁합**(기존엔 "잘 맞는 상대" 1개만)으로 확장. 일본 혈액형
+  성격론은 학문적 근거가 약하다는 게 정설이라 "전통적으로 통용되는 대중문화" 톤 유지.
+- **명리학 대응표(correspondence.js)ㆍ궁합 엔진(gunghap.js)ㆍ신살(shensha.js) 자체는
+  이미 -8ㆍ-9번에서 완성** — 이번엔 그 옆의 무료 도구 콘텐츠 깊이를 넓힌 것.
+- 타로(`tarot/js/tarot-data.js`, 78장 전체 이미 완비)는 점검만 하고 추가 작업 없음 확인(-9번 4절).
+
+### 2. PDF 퀄리티 개선 — "고급스럽게" 요청 반영
+
+**`products/_shared/pdf_kit.py`(13종 전자책과 공유하는 파일)를 선택적(optional, 기본값 None)
+파라미터만 추가하는 방식으로 확장** — 기존 호출부가 안 바뀌면 100% 예전과 동일하게 동작:
+- `chapter_header(accent=None, accent2=None)` 신설 — 크로스노틱스가 체계별로 다른 배지 색을
+  쓸 수 있게 함.
+- `build(brand_emblem=None)` 신설 — (색1,색2,색3)을 주면 표지 오른쪽 위에 웹 로고와 동일한
+  3원 겹침 엠블럼을 그림.
+- **회귀 검증**: 격리 테스트(새 파라미터 없이 `PDFKit` 호출) 정상 빌드 확인, 기존 전자책
+  (`youtube-monetization-guide/build_pdf.py`)을 실제로 실행해 `k.build()`까지 에러 없이
+  도달하는 것 확인(마지막 파일 저장 단계에서만 실패했는데, 원인은 스크립트에 하드코딩된
+  다른 컴퓨터의 사용자 경로(`C:\Users\nalla\...`) — 이번 세션과 무관한 기존 버그라 손대지
+  않음).
+
+**`tools/crossnotics-report/report_kit.py`**:
+- `SYSTEM_ACCENT`(사주=#e8562f 주황ㆍ별자리=#6d4aff 보라ㆍ타로=#0a7d5e 초록 — 웹 로고
+  `<svg class="logo-mark">`의 원 색과 정확히 동일)를 `chapter_header()`에 전달해 체계별
+  챕터가 색으로 바로 구분되게 함. cross_analysis는 골드(#a67c1e, "종합"을 뜻함).
+- `k.build(brand_emblem=CROSSNOTICS_EMBLEM, watermark_text="천지인운명관 · ...")` —
+  **watermark_text를 명시적으로 오버라이드하지 않으면 기본값이 "서비스허브"(상위 우산
+  브랜드)라서, 표지엔 "CHUNJIIN PERSONAL REPORT"라고 써놓고 워터마크는 다른 브랜드명이
+  반복되는 불일치가 실제로 있었음 — pypdfium2로 실제 렌더링해서 시각 확인 중 발견.**
+- 신살(shensha) callout_box의 `found_in`이 "year"/"month"/"day"/"hour" 영문 키를 그대로
+  노출하던 버그도 같은 시각 점검에서 발견ㆍ수정(년주/월주/일주/시주로 번역).
+
+**검증 방법(중요 — 처음으로 실제 PDF를 눈으로 봄)**: `pymupdf`가 이 컴퓨터에서 DLL 로드
+실패로 안 됐고(`pip install --force-reinstall`로도 미해결, VC++ 재배포 패키지 문제로 추정,
+더 안 팠음), 대신 **`pypdfium2`(프리빌드 wheel이 안정적으로 동작)로 mock PDF를 실제
+PNG로 렌더링해 Read 도구로 시각 확인** — 이번 세션 전까지는 텍스트 추출로만 검증했었는데,
+이번에 처음으로 색ㆍ레이아웃ㆍ엠블럼 배치까지 실제로 눈으로 봤고 그 결과 위 두 버그(워터마크
+브랜드명ㆍ신살 영문 키)를 잡아냄 — **다음 세션도 디자인 관련 변경은 텍스트 추출만으로
+끝내지 말고 pypdfium2로 실제 렌더링해서 볼 것.**
+
+### 3. `tools/crossnotics-report/knowledge/sales_marketing_strategy.md` 신규 — 판매ㆍ마케팅 전략 메모
+
+사용자가 "판매는 어떻게 할지 생각해보라"고 요청 → 기존 계획(성장엔진 원안ㆍ운영가이드ㆍ
+`MARKETING_HANDOFF.md`)을 재작성하지 않고, **이번 세션에 새로 생긴 기능(궁합ㆍ신살ㆍ대응표)이
+기존 홍보 자료(이미 완성된 `marketing/drafts/blog/naver/20260821_crossnotics.md`, 아직
+미발행)에 반영이 안 됐다는 것**과 **가격 비교표에 정직하게 추가할 수 있게 된 항목**을
+중심으로 정리. 후기 0건 문제에 대한 "베타 체험가로 실제 후기 받기(가짜 후기 금지 원칙은
+유지)" 제안도 포함.
+
+### 4. 무료 도구 → 크로스노틱스 업셀 CTA 실태 점검 (3번 메모에서 예고한 것을 바로 실행)
+
+grep으로 확인한 결과 **saju/tarot에만 실제로 `crossnotics/index.html`로 연결되는 업셀이
+있었고, dream/name/gunghap(무료)은 `contactPurchase()`(구식 이메일 문의 팝업)로 연결되고
+있었으며, bloodtype은 업셀 자체가 아예 없었음**(성장엔진 계획서의 "무료 도구 결과 화면에
+업셀 CTA" 의도와 실제 구현 사이의 간극 — 이번에 발견). 네 파일 전부 saju/tarot와 동일한
+패턴(`<a href="../crossnotics/index.html">천지인운명관에서 자세히 보기</a>`)으로 통일하고,
+낡은 `contactPurchase()` 클릭 핸들러는 제거함(CSS `.upsell-card a#upsell-btn` 셀렉터가
+이미 준비되어 있어서 스타일 깨짐 없음). 브라우저로 4개 페이지 전부 실제 폼 제출 → 업셀
+링크가 `../crossnotics/index.html`을 정확히 가리키는지 JS로 직접 확인.
+
+### 검증
+
+- `node tools/crossnotics-engine/test/run-all.js` 통과(4개 케이스).
+- `python -c "import ast; ast.parse(...)"`로 `build_report.py`ㆍ`report_kit.py`ㆍ`pdf_kit.py`
+  전부 문법 확인.
+- 로컬 서버(`python -m http.server`)로 bloodtype/dream/name/gunghap 4개 페이지를 브라우저로
+  직접 열어 콘솔 에러 없음ㆍ결과 정상 표시ㆍ업셀 링크 정확함을 확인.
+- 저장소 전체를 U+3186(편집 중 가운뎃점 U+318D 대신 반복적으로 잘못 입력된 한글 자모) 문자로
+  다시 grep해 전부 제거 확인(이번에도 여러 파일에서 재발 — 다음 세션도 편집 후 이 문자를
+  한 번 grep해보는 습관을 들일 것).
+
+### 다음에 이어서 할 일 (남겨둠)
+
+- `sales_marketing_strategy.md` 6번 "다음 세션이 결정해야 할 것" 참고(로테이션 시작 여부,
+  베타 후기 수집 여부, 블로그 초안 반영 여부).
+- pymupdf DLL 문제 — 필요해지면 Visual C++ 재배포 패키지 설치 여부부터 확인. 지금은
+  pypdfium2로 대체 가능해서 급하지 않음.
+- 랜딩페이지 담당 세션(동시 진행 중, 다크ㆍ골드 리디자인)과 "가격 비교표에 궁합ㆍ신살 항목
+  추가" 반영 여부 조율 필요.
+
+## -9. 2026-08-23 업데이트 — 지식베이스 2차 확장(신살ㆍ궁합 관계유형ㆍ점성술 대응표) — "상품화는
+나중, 지금은 어떤 질문이 와도 대응 가능한 방대한 데이터베이스 구축이 우선"이라는 사용자
+방향 확정 후 진행
+
+-8번 작업 직후 사용자가 "왜 신살ㆍ관계유형을 사용자 판단이 필요하다고 미뤘냐"고 지적함 —
+돌아보니 신살은 "판단 필요"가 아니라 "라이브러리 지원 여부 미확인 + 세션 범위상 보류"였고,
+관계유형(동업ㆍ가족 궁합)은 애초에 손님이 어떤 질문을 할지 막지 않는 이 서비스 설계상
+**질문에 답하기 위해 반드시 필요한 것**이지 나중에 결정할 마케팅 문제가 아니었음(사용자가
+직접 지적: "데이터베이스를 구축하려는 이유와 같다"). 이어서 사용자가 "상품화ㆍ가격 결정은
+나중 일이고, 지금은 사주와 유사한 모든 것을 총망라한 데이터베이스 구축이 목표"라고 명확히
+방향을 확정 → 그 방향에 따라 세 가지를 추가로 구현.
+
+### 1. `tools/crossnotics-engine/shensha.js` 신규 — 신살(도화ㆍ역마ㆍ화개ㆍ홍염) 계산
+
+lunar-javascript(EightChar API)에 이 네 신살을 계산하는 메서드가 없음을 코드 직접 확인
+(라이브러리에 `sn.*` 신살 상수가 있지만 이는 택일용 황력(通勝) 신살이지 사주 명리학의
+도화ㆍ역마ㆍ화개ㆍ홍염살이 아님) → 삼합 그룹 기준 고정 지지 표(도화ㆍ역마ㆍ화개)와 일간
+기준 표(홍염)를 직접 구현. 2026-08-23 WebSearch로 sajustudy.com/namu.wiki/daysaju.com
+교차확인(홍염살은 갑ㆍ경ㆍ임 일간이 지지 2개를 함께 보는 "국내 실무 표"를 채택 —
+namu.wiki가 언급한 변형과 daysaju.com의 완전한 10간 표가 서로 모순 없이 겹침을 확인).
+일지 기준을 기본으로 삼고 년지 기준(고전식)은 `by_year_branch`에 참고용으로 병기.
+`saju.js`의 `computeSaju()`가 `result.shensha`로 자동 포함. `report_kit.py`의 "종합
+지표" 페이지에 "이 손님 사주에 있는 신살" callout_box 추가(present인 것만 나열, LLM 개입
+없음).
+
+### 2. `gunghap.js` — relationshipType(연인ㆍ동업ㆍ가족) 파라미터화
+
+`computeGunghap(sajuA, sajuB, relationshipType)` 3번째 인자 신설(기본값 "romantic").
+**점수 산출 공식(WEIGHT)은 관계 유형과 무관하게 동일** — 관계 유형별로 가중치 자체를
+다르게 매길 명확한 학설적 근거까지는 확인하지 못했기 때문. 대신 **해석 문구(highlights)
+만 관계 유형별로 분기**: business는 "배우자 자리" 대신 "생활 리듬을 보는 일지"로, 일간
+비화(같은 오행)는 "성향이 비슷함"이 아니라 "같은 오행끼리는 자원ㆍ주도권을 두고 경쟁하는
+비겁 관계로 흐르기 쉬우니 역할ㆍ지분을 명확히 나누는 게 중요"로 재해석(명리학에서 동업
+궁합을 볼 때 비겁 과다를 재물 다툼 위험으로 보는 통설 반영). family는 disclaimer 필드가
+자동으로 채워져 "이 점수는 잘 맞는지 판정이 아니라 기질 차이 이해용 참고자료"라는 안내가
+붙음(가족은 선택해서 맺는 관계가 아니므로). `run.js`가 `intake.customer.partner.
+relationship_type`을 그대로 전달, `crossnotics/index.html`에 "상대방과의 관계"
+선택지(연인ㆍ부부 / 동업ㆍ사업 파트너 / 가족ㆍ기타) 추가, `build_report.py` SYSTEM_PROMPT
+10-B번에 관계 유형별 톤 유지 지시 추가.
+
+### 3. `tools/crossnotics-engine/astrology-correspondence.js` 신규 — 점성술 대응표 지식베이스
+
+saju쪽 `correspondence.js`와 완전히 같은 이유로 신설 — `astrology.js`는 지금까지 별자리ㆍ
+행성ㆍ하우스ㆍ어스펙트의 "이름 번역"만 있었고 "의미" 사전이 전혀 없었음(같은 유형의 구멍이
+점성술 쪽에도 그대로 있었던 것). 서양 점성술의 표준 상징 체계(별자리 12개 기질, 행성 10개
+상징, 하우스 12개 삶의 영역, 어스펙트 5종 관계)를 정리 — 명리학 지지 합충형파해보다 유파
+간 이견이 훨씬 적은 편이지만 "전통적으로 여겨지는 상징" 톤은 동일하게 유지. `buildAstroCorrespondence()`
+가 이 손님 차트에 **실제로 등장한 행성ㆍ하우스ㆍ어스펙트만** 걸러서 반환(saju쪽과 동일한
+필터링 원칙). `astrology.js`의 `computeAstrology()`가 `result.correspondence`로 자동
+포함. `build_report.py` SYSTEM_PROMPT 10-D번 추가.
+
+### 4. `tarot.js`/`tarot-data.js` 점검 결과 — 추가 작업 불필요
+
+"총망라" 방향에 맞춰 타로 쪽에도 같은 유형의 구멍이 있는지 점검함 — 78장 전체(메이저22+
+마이너56) 카드마다 keyword/text가 이미 전부 집필되어 있고(2026-08-21 완료분), 뽑힌 카드는
+`computed.tarot.draws`로 이미 direct 답변 가능한 구조라 **추가 작업 없음**으로 확인.
+
+### 검증
+
+- `node tools/crossnotics-engine/test/run-all.js` — 기존 4개 케이스 전부 통과(shensha/
+  astrology.correspondence 필드가 자동으로 채워지는 것 확인).
+- `shensha.js`를 실제 생년월일로 직접 호출해 도화ㆍ역마ㆍ화개ㆍ홍염 판정이 삼합/일간 표와
+  일치하는지 확인 — 일지가 진술축미(화개 지지)인 손님은 "일지 자신이 곧 화개살"이 되는
+  자기지시적 케이스가 실제로 나왔는데, 이건 버그가 아니라 명리학에서 실제로 언급되는
+  "일지 화개" 패턴과 일치함을 확인.
+- `gunghap.js`를 romantic/business/family 세 관계 유형으로 직접 호출해 문구가 올바르게
+  분기되는지, family에서 disclaimer가 채워지는지 확인.
+- `astrology-correspondence.js`를 dual 티어 샘플로 확인 — planet_meanings/house_meanings/
+  aspect_meanings가 이 손님 차트에 실제 등장한 것만 담겨 반환됨을 확인.
+- `python -c "import ast; ast.parse(...)"`로 build_report.py 문법 오류 없음 확인(SYSTEM_PROMPT
+  안에 10-D번 추가 후에도 파싱 정상).
+- 오타 발견ㆍ수정: 편집 도중 가운뎃점(U+318D) 대신 U+3186(다른 한글 자모, 오타)를
+  반복적으로 잘못 입력한 걸 발견 — 전체 저장소를 grep해서 남김없이 수정함(index.html,
+  run.js, gunghap.js, astrology-correspondence.js, question_taxonomy.md).
+
+### 다음에 이어서 할 일 (남겨둠)
+
+- 점성술 시너스트리(궁합용 점성술) — 지금 gunghap.js는 사주 궁합만 계산함, 점성술까지
+  다루려면 상대방 위경도 입력 + synastry 어스펙트 계산이 추가로 필요.
+- 무료 도구(`bloodtype/`ㆍ`dream/`ㆍ`name/`)는 크로스노틱스처럼 "질문에 direct로 답하는"
+  구조 자체가 없는 별도 정적 도구라 이번 조사 범위 밖 — "총망라" 방향을 계속 넓힐 거면
+  다음 세션에서 이 도구들의 데이터 깊이도 별도로 점검할 만함.
+- 실제 API로 신살ㆍ궁합(3개 관계유형)ㆍ점성술 의미 질문이 포함된 리포트 최소 1건씩 생성해
+  사람이 읽고 확인 — 여전히 API 비용 발생 항목이라 이 세션에서 호출 안 함(기존 원칙 유지).
 
 ## -8. 2026-08-23 업데이트 — 명리학 대응표 지식베이스 + 궁합 계산 엔진 신설(-7번 "다음에
 이어서 할 일" 두 항목을 실제로 구현하고 배관까지 전부 연결)

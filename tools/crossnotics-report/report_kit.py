@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-크로스노틱스 리포트 PDF 빌더 — products/_shared/pdf_kit.py(전자책 13종에서 검증된 브랜드
-PDF 빌더)를 그대로 가져다 쓴다. pdf_kit.py 자체는 건드리지 않고(다른 상품에 영향 안 주려고),
-여기서 "LLM 합성 결과(report.json) + computed.json → PDF" 매핑 로직만 담당한다.
+크로스노틱스(천지인운명관) 리포트 PDF 빌더.
+
+2026-08-23 — 이 폴더의 pdf_kit.py는 서비스허브(전자책 13종)의 products/_shared/pdf_kit.py에서
+완전히 분리된 독립 사본이다(사용자 지시: 서비스허브와 천지인운명관 사이의 공유 파일을 전부
+분리할 것). 이제 이 파일을 자유롭게 고쳐도 전자책에 영향이 없다 — 여기서는
+"LLM 합성 결과(report.json) + computed.json → PDF" 매핑 로직을 담당한다.
 
 사용법: python report_kit.py <computed.json> <report.json> <출력 PDF 경로>
 (보통은 build_report.py가 이 모듈의 build_pdf()를 직접 import해서 이어붙여 쓴다.)
@@ -40,11 +43,18 @@ from pathlib import Path
 
 from reportlab.lib import colors
 
-SHARED_DIR = Path(__file__).resolve().parent.parent.parent / "products" / "_shared"
-sys.path.insert(0, str(SHARED_DIR))
-from pdf_kit import PDFKit  # noqa: E402
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from pdf_kit import PDFKit  # noqa: E402  — 2026-08-23: 서비스허브 공유 파일에서 분리된 이 폴더의 로컬 사본
 
 SYSTEM_LABEL = {"saju": "사주", "astrology": "서양 점성술", "tarot": "타로"}
+
+# 2026-08-23 추가 — PDF 퀄리티 개선(사용자 요청: "PDF를 더 고급스럽게"). 웹사이트 로고 마크의
+# 원 3개 색(index.html <svg class="logo-mark"> 그대로)을 PDF 챕터 배지ㆍ표지 엠블럼에도 써서
+# 웹ㆍPDF 브랜드를 통일한다. pdf_kit.py는 그대로 두고(다른 전자책 영향 없음) chapter_header()/
+# build()에 새로 생긴 선택적 accent/brand_emblem 파라미터만 여기서 사용.
+SYSTEM_ACCENT = {"saju": "#e8562f", "astrology": "#6d4aff", "tarot": "#0a7d5e"}
+CROSSNOTICS_EMBLEM = (SYSTEM_ACCENT["saju"], SYSTEM_ACCENT["astrology"], SYSTEM_ACCENT["tarot"])
 
 # 오행ㆍ4원소 막대색 — pdf_kit.py의 ACCENT 계열과 어울리되 항목별로 구분되게 직접 지정.
 OHENG_COLOR = {
@@ -77,7 +87,9 @@ def _element_bars(k, astrology):
 def _render_section(k, ch, sec, computed):
     """system_sections 항목 하나 — key_insight(pull_quote)ㆍ원본 계산값ㆍtakeaways(summary_box)까지
     전부 반영해서 한 섹션을 여러 시각 요소로 풍부하게 채운다."""
-    k.chapter_header(ch, sec["heading"], eyebrow=SYSTEM_LABEL.get(sec["system"], sec["system"].upper()))
+    sys_color = SYSTEM_ACCENT.get(sec["system"])
+    k.chapter_header(ch, sec["heading"], eyebrow=SYSTEM_LABEL.get(sec["system"], sec["system"].upper()),
+                      accent=sys_color, accent2=sys_color)
     if sec.get("key_insight"):
         k.pull_quote(sec["key_insight"])
     k.body(sec["body"])
@@ -174,8 +186,11 @@ def build_pdf(computed, report, out_path, product_name):
         # saju.shensha의 present/found_in만으로 그린다(환각 위험 0).
         shensha = saju.get("shensha") if saju else None
         if shensha:
+            # shensha.js가 주는 found_in은 "year"/"month"/"day"/"hour" 영문 키라 그대로 PDF에
+            # 노출하면 안 됨(2026-08-23 시각 점검에서 발견) — 한글 기둥 명칭으로 옮겨서 표기.
+            PILLAR_KO = {"year": "년주", "month": "월주", "day": "일주", "hour": "시주"}
             present_items = [
-                f"{label}: 있음({', '.join(shensha[key]['found_in'])} 기둥)"
+                f"{label}: 있음({', '.join(PILLAR_KO.get(p, p) for p in shensha[key]['found_in'])} 기둥)"
                 for key, label in [("taohua", "도화살"), ("yeokma", "역마살"), ("hwagae", "화개살"), ("hongyeom", "홍염살")]
                 if shensha.get(key, {}).get("present")
             ]
@@ -191,7 +206,10 @@ def build_pdf(computed, report, out_path, product_name):
         ch += 1
 
     if report.get("cross_analysis"):
-        k.chapter_header(ch, report["cross_analysis"]["heading"], eyebrow="CROSS-ANALYSIS")
+        # 2026-08-23 추가 — 세 체계가 겹치는 지점을 다루는 챕터라, 개별 체계 색이 아니라
+        # "종합"을 뜻하는 골드 톤(웹사이트 --gold 계열을 인쇄용으로 짙게 조정)을 씀.
+        k.chapter_header(ch, report["cross_analysis"]["heading"], eyebrow="CROSS-ANALYSIS",
+                          accent="#a67c1e", accent2="#a67c1e")
         corr = computed["correlation"]
         if corr.get("agreement_score") is not None:
             k.pull_quote(
@@ -283,7 +301,14 @@ def build_pdf(computed, report, out_path, product_name):
 
     k.warn_box([report["disclaimer"]], header="안내")
 
-    k.build(footer_tagline="천지인운명관 — 사주ㆍ점성술ㆍ타로 독립 계산 후 교차 검증하는 통합 진단 서비스")
+    k.build(
+        footer_tagline="천지인운명관 — 사주ㆍ점성술ㆍ타로 독립 계산 후 교차 검증하는 통합 진단 서비스",
+        brand_emblem=CROSSNOTICS_EMBLEM,
+        # 2026-08-23 발견 — watermark_text 기본값이 "서비스허브"(상위 우산 브랜드)라 표지에
+        # "CHUNJIIN PERSONAL REPORT"라고 써놓고 워터마크는 다른 브랜드명이 반복되는
+        # 불일치가 있었음(시각 점검으로 발견). 크로스노틱스는 자체 브랜드명으로 오버라이드.
+        watermark_text="천지인운명관 · 무단 전재·재배포 금지",
+    )
     return out_path
 
 

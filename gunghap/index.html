@@ -13,13 +13,13 @@
 </script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>무료 궁합 계산기 — 서비스허브</title>
+<title>무료 궁합 계산기 — 천지인운명관</title>
 <meta name="description" content="두 사람의 생년월일시로 타고난 기운이 서로 어떻게 맞는지 쉬운 말로 보여주는 무료 궁합 계산기." />
-<link rel="stylesheet" href="../css/style.css" />
+<link rel="stylesheet" href="../crossnotics/css/base.css" />
 <link rel="stylesheet" href="../saju/css/saju.css" />
-<script src="../js/config.js"></script>
+<script src="../crossnotics/js/config.js"></script>
 </head>
-<body data-active="saju" data-root="../">
+<body data-active="tools" data-root="../">
 <header id="site-header" class="site-header"></header>
 
 <div class="saju-wrap">
@@ -68,8 +68,8 @@
     </div>
     <div class="upsell-card">
       <h3>더 자세한 궁합 해석이 궁금하다면?</h3>
-      <p>연애·결혼·동업 궁합까지 개인 맞춤으로 자세히 풀어드립니다.</p>
-      <button id="upsell-btn">상세 해석 신청하기</button>
+      <p>일간ㆍ일지ㆍ띠 관계까지 실제로 계산해서, 연애ㆍ결혼은 물론 동업ㆍ가족 궁합까지 관계 유형에 맞게 자세히 풀어드립니다.</p>
+      <a href="../crossnotics/index.html" id="upsell-btn">천지인운명관에서 자세히 보기</a>
     </div>
   </div>
 </div>
@@ -142,11 +142,7 @@
     document.getElementById("gunghap-result").scrollIntoView({ behavior: "smooth" });
     gtag('event', 'gunghap_calculate');
   });
-
-  document.getElementById("upsell-btn").addEventListener("click", () => {
-    contactPurchase("궁합 상세 해석 신청", "무료 궁합 계산기 결과로 상세 해석을 받고 싶습니다. 두 사람 생년월일시: ");
-  });
 </script>
-<script src="../js/common.js"></script>
+<script src="../crossnotics/js/common.js"></script>
 </body>
 </html>

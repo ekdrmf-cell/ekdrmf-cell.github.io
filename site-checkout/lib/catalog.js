@@ -1,10 +1,14 @@
 /*
- * 서비스허브 전체 상품 카탈로그 — site-checkout이 결제 금액 검증(서버에서 재확인, 클라이언트
- * 값을 절대 신뢰하지 않음)과 상품별 후처리 라우팅에 쓰는 단일 소스.
+ * 서비스허브 상품 카탈로그(전자책ㆍ서비스) — site-checkout이 결제 금액 검증(서버에서
+ * 재확인, 클라이언트 값을 절대 신뢰하지 않음)과 상품별 후처리 라우팅에 쓰는 단일 소스.
  *
  * price는 전부 이 세션에서 실제 확인한 값만 넣었다 — 확인 안 된 값을 추측해서 채우지 않는다
  * (verify-before-acting 원칙). 서비스(구글시트 자동화) 11종은 현재 가격을 이 세션에서 직접
  * 확인하지 못해 price: null로 남겨둠 — 실제 연동 전에 services.html에서 최신가를 다시 확인할 것.
+ *
+ * 2026-08-23 — 크로스노틱스(천지인운명관) 가격표는 여기서 완전히 분리됨(사용자 지시: 서비스
+ * 허브와 천지인운명관 사이의 공유 파일을 전부 분리할 것). 이제 tools/crossnotics-engine/
+ * catalog.js가 그쪽의 유일한 가격 기준 — 이 파일을 고쳐도 천지인운명관에는 영향 없음.
  */
 
 const EBOOKS = {
@@ -29,124 +33,7 @@ const SERVICES = {
   // "service-quote-generator": { name: "견적서 자동생성 템플릿", price: null, file: "quote-generator.zip" },
 };
 
-const CROSSNOTICS_TIERS = {
-  // 2026-08-21 사용자 확정(2차): "체계 개수"를 가격의 1차 기준으로 삼고, "질문 개수"를 그
-  // 안에 딸린 혜택으로 얹는 구조. 순수 질문개수제(3/6/10개=5/10/15만원)를 검토했으나,
-  // 질문당 단가가 16,667/16,667/15,000원으로 거의 평평해서 업셀 유인이 없고, 이 상품의
-  // 핵심 차별점(체계를 여러 개 겹쳐 교차검증)이 가격표에서 안 드러난다는 문제가 있어 기각.
-  // 대신 체계 개수(=계산 깊이ㆍ교차분석 유무)로 가격을 정당화하고, 질문 개수는 상위
-  // 티어일수록 더 준다: 5만원=1체계+질문3개, 10만원=2체계+교차분석+질문6개,
-  // 15만원=3체계+교차분석+질문10개+타로 스프레드 심화(3장->켈틱크로스10장).
-  //
-  // name은 손님이 보자마자 뭘 받는지 알 수 있게 내용을 그대로 풀어씀. tier 필드
-  // (mini/light/single/dual/master/premium)는 원래 내부 식별자였으나, **2026-08-23
-  // 사용자가 이 방침을 뒤집음**: "싱글ㆍ마스터ㆍ프리미엄이라고 부를 거면 사이트에도 실제
-  // 상품명으로 노출해라, 혼자만 알아듣는 말 쓰지 말라"고 명시 지시 — 그래서 label 필드
-  // (FREE/LIGHT/SINGLE/DUAL/MASTER/PREMIUM, tier 값을 대문자로만 바꾼 것)를 신설해 이제
-  // `crossnotics/index.html`의 티어 카드ㆍ비교표ㆍ`catalog_names.py`의 PDF 표지에까지
-  // 전부 고객에게 그대로 노출한다. (이전 코멘트에 "코드명을 노출하지 말라고 지적함"이라고
-  // 적혀 있었는데, 그 반대 방향으로 확정 지시가 다시 내려온 것 — 다음 세션에서 헷갈리지
-  // 않도록 이 변경 이력을 남겨둠.)
-  //
-  // 2026-08-22 추가(사용자 요청): 5만원부터 시작하면 진입장벽이 높아 저가 진입 상품 2개를
-  // 추가함(운명도감처럼 가볍고 저렴한 진입점을 여러 개 두는 방식 참고). "체계 개수" 축은
-  // 그대로 두고(둘 다 사주 1체계), 그 안에서 "깊이"(scope)로 5만원 상품과 구분되게 함 —
-  // 안 그러면 1만원짜리가 5만원짜리와 내용이 똑같아져 상위 티어를 잠식함. scope는
-  // build_report.py가 리포트 분량ㆍ어디까지 다룰지를 조절하는 데 쓰는 필드(각 값의 의미는
-  // build_report.py SYSTEM_PROMPT 주석 참고).
-  //
-  // 2026-08-22(2차) 사용자 지시로 추가 변경:
-  // (a) "오늘의 사주 미니 진단"을 무료(price: 0)로 전환 — 진입 장벽을 아예 없애는 리드
-  //     확보용 상품(운명도감의 "무료 분석 시작하기"와 같은 역할).
-  // (b) crossnotics-premium(20만원) 신설 — 운명도감의 "10년 인생 전략 설계ㆍ평생 인생
-  //     전략 설계ㆍ인생 2막 로드맵" 3개를 하나로 묶은 장기 전략 프리미엄. 새 계산 엔진은
-  //     필요 없음 — saju.js가 이미 계산해주는 대운 8구간(dae_yun)을 build_report.py가
-  //     scope: "premium"일 때 전용 섹션(long_term_strategy)으로 더 깊이 풀어 쓰는 방식.
-  //
-  // 2026-08-22(3차) 사용자 지시로 pages_note/pages_approx 재조정 — "가격대비 분량이 너무
-  // 적어 보인다"는 지적으로 목표 분량을 single 6pㆍdual 13pㆍmaster 20pㆍpremium 30p로
-  // 크게 올림. build_report.py의 SYSTEM_PROMPT를 "체계 하나당 섹션 1개"에서 "체계 하나당
-  // 3~4개 하위 섹션(총론/세부해석/실전포인트 등)" 구조로 대폭 확장하고, report_kit.py도
-  // pdf_kit.py의 미사용 컴포넌트(bar_row/stat_hero/flow_diagram/icon_steps/summary_box)를
-  // 전부 실제로 쓰도록 고쳤다.
-  //
-  // 2026-08-22(4차) 사용자 지시: "약ㆍ목표 같은 애매한 표현 쓰지 말고 정확한 페이지 수를
-  // 못박아라." pages_note를 확정 수치로 바꿈 — single 6pㆍdual 13pㆍmaster 20pㆍpremium
-  // 30p는 이제 "추정"이 아니라 **이 상품이 지켜야 할 사양(spec)**이다. 이걸 실제로
-  // 지키는 방법: LLM 출력은 본질적으로 분량이 정확히 고정되지 않으므로(스캐폴딩과 max_tokens로
-  // 방향만 유도 가능), 계획서 1번 파이프라인이 이미 전제하는 "사람이 결과물을 먼저 검증한
-  // 뒤에만 발송한다" 단계에서 **실제 생성된 PDF의 페이지 수가 이 사양에 못 미치면 재생성
-  // 하거나 사람이 보강할 것** — 이 확인은 build_report.py/report_kit.py 코드가 자동으로
-  // 강제하지 않으니, 발송 전 체크리스트에 "페이지 수가 사양과 맞는지"를 반드시 포함할 것.
-  "crossnotics-mini": {
-    name: "오늘의 사주 미니 진단",
-    label: "FREE",
-    price: 0,
-    tier: "mini",
-    scope: "mini",
-    systems: ["saju"],
-    question_limit: 0,
-    pages_note: "1페이지",
-    pages_approx: 1,
-  },
-  "crossnotics-saju-light": {
-    name: "사주 라이트 진단 (질문 1개)",
-    label: "LIGHT",
-    price: 30000,
-    tier: "light",
-    scope: "light",
-    systems: ["saju"],
-    question_limit: 1,
-    pages_note: "2페이지",
-    pages_approx: 2,
-  },
-  "crossnotics-saju-only": {
-    name: "사주 단독 진단 (질문 3개)",
-    label: "SINGLE",
-    price: 50000,
-    tier: "single",
-    scope: "full",
-    systems: ["saju"],
-    question_limit: 3,
-    pages_note: "6페이지",
-    pages_approx: 6,
-  },
-  "crossnotics-saju-astrology": {
-    name: "사주 + 별자리 교차진단 (질문 6개)",
-    label: "DUAL",
-    price: 100000,
-    tier: "dual",
-    scope: "full",
-    systems: ["saju", "astrology"],
-    question_limit: 6,
-    pages_note: "13페이지",
-    pages_approx: 13,
-  },
-  "crossnotics-full": {
-    name: "사주 + 별자리 + 타로 통합진단 (질문 10개)",
-    label: "MASTER",
-    price: 150000,
-    tier: "master",
-    scope: "full",
-    systems: ["saju", "astrology", "tarot"],
-    question_limit: 10,
-    pages_note: "20페이지",
-    pages_approx: 20,
-  },
-  "crossnotics-premium": {
-    name: "장기 인생 전략 프리미엄 (질문 12개)",
-    label: "PREMIUM",
-    price: 200000,
-    tier: "premium",
-    scope: "premium",
-    systems: ["saju", "astrology", "tarot"],
-    question_limit: 12,
-    pages_note: "30페이지",
-    pages_approx: 30,
-  },
-};
-
-const CATALOG = { ...EBOOKS, ...SERVICES, ...CROSSNOTICS_TIERS };
+const CATALOG = { ...EBOOKS, ...SERVICES };
 
 function getProduct(productCode) {
   const product = CATALOG[productCode];
@@ -158,16 +45,7 @@ function getProduct(productCode) {
 function productType(productCode) {
   if (productCode.startsWith("ebook-")) return "ebook";
   if (productCode.startsWith("service-")) return "service";
-  if (productCode.startsWith("crossnotics-")) return "crossnotics";
   throw new Error(`상품 코드 접두어로 타입을 판별할 수 없음: ${productCode}`);
 }
 
-// tools/crossnotics-engine/run.js가 여기서 question_limit을 가져다 씀 — 가격표(이 파일)를
-// 유일한 기준으로 삼아서, 질문 개수 제한이 여러 파일에 따로 적혀 어긋나는 걸 방지한다.
-function getCrossnoticsTierConfig(tier) {
-  const found = Object.values(CROSSNOTICS_TIERS).find((p) => p.tier === tier);
-  if (!found) throw new Error(`알 수 없는 크로스노틱스 티어: ${tier}`);
-  return found;
-}
-
-module.exports = { CATALOG, getProduct, productType, getCrossnoticsTierConfig };
+module.exports = { CATALOG, getProduct, productType };

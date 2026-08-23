@@ -1,7 +1,9 @@
 /*
  * 사이트 전체 검색용 데이터 — 실제 판매중/이용가능한 항목만 포함.
  * 서비스·전자책은 개별 페이지가 없어(한 페이지에 전체 나열) 카테고리
- * 페이지로 연결하고, 게임·운세 도구는 각자 페이지로 바로 연결한다.
+ * 페이지로 연결하고, 게임은 각자 페이지로 바로 연결한다.
+ * 2026-08-23: 운세 도구(사주ㆍ궁합ㆍ타로 등) 항목은 여기서 제거함 — 천지인운명관은
+ * 별개 사이트로 분리되어 서비스허브 검색에는 더 이상 노출하지 않는다.
  */
 const SEARCH_DATA = [
   // 전자책 (ebooks.html)
@@ -37,13 +39,6 @@ const SEARCH_DATA = [
   { title: "두더지 잡기", type: "게임", url: "games/whackamole/index.html" },
   { title: "카드 짝맞추기", type: "게임", url: "games/memory/index.html" },
   { title: "상식퀴즈", type: "게임", url: "games/quiz/index.html" },
-  // 운세 도구
-  { title: "무료 사주 계산기", type: "운세", url: "saju/index.html" },
-  { title: "무료 궁합 계산기", type: "운세", url: "gunghap/index.html" },
-  { title: "무료 타로 한 장 뽑기", type: "운세", url: "tarot/index.html" },
-  { title: "무료 꿈해몽 검색", type: "운세", url: "dream/index.html" },
-  { title: "혈액형 성격 테스트", type: "운세", url: "bloodtype/index.html" },
-  { title: "이름 발음오행 분석", type: "운세", url: "name/index.html" },
 ];
 
 /** 검색어와 제목이 부분적으로 겹치면 매치로 본다(초성/오타 대응 없는 단순 매칭). */

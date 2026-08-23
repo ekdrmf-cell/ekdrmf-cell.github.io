@@ -1,38 +1,18 @@
 # -*- coding: utf-8 -*-
-"""전자책 PDF 공용 빌드 키트 (전자책 3번부터 사용).
+"""천지인운명관 전용 PDF 빌드 키트.
 
-이전 두 권(gov-subsidy-guide, ebook-writing-guide)에서 검증된 원칙을 계승한다:
-- 강제 PageBreak 금지(표지 뒤 1번만 예외) — 콘텐츠 흐름만으로 자연스럽게 페이지가 나뉘게 함
-- 가운뎃점은 "·" 대신 "ㆍ"(U+318D) 사용 — HYGothic 계열 CID 폰트 가운뎃점 미지원 버그 회피용이었으나,
-  Pretendard(TTF)는 진짜 가운뎃점 "·"도 정상 렌더링된다. 다만 통일성을 위해 계속 "ㆍ"를 권장.
-- 빈칸 워크시트ㆍ자가진단 금지 원칙은 유지하되, "페이지 채우기용 필러"가 아닌 독립된 실행계획
-  챕터 안에서의 체크리스트는 허용(2026-08-01 참고 전자책 비교분석 후 재해석).
-- 유료 판매용 전자책은 AI 생성 사진ㆍ워터마크를 넣지 않는다(무료 배포용에는 필요, 2026-08-01 결정).
+2026-08-23 — 서비스허브(전자책 13종)와 공유하던 `products/_shared/pdf_kit.py`에서
+완전히 분리된 독립 사본입니다(사용자 지시: "서비스허브와 천지인운명관은 별개의 사이트이니
+연결된 모든 것을 끊을 것"). 폰트도 이 폴더 안의 `fonts/`에 따로 복사해뒀습니다 — 이제
+서비스허브 쪽 파일이 바뀌어도 이 파일은 전혀 영향받지 않고, 반대로 이 파일을 자유롭게
+고쳐도 전자책 13종에는 영향이 없습니다.
 
-2026-08-01 참고 전자책(쇼치, 69p) 비교분석 후 신설된 디자인 시스템:
-- Pretendard TTF 임베딩(Regular/Medium/SemiBold/Bold/ExtraBold/Black) — 제목에 진짜 굵은
-  대비를 줄 수 있음. reportlab CID 표준폰트(HYGothic-Medium)는 굵기가 하나뿐이라 밋밋했음.
-- 박스를 용도별로 색 구분: TIP(파랑) / WARN(주의, 주황) / NEXT(다음 챕터 예고, 로즈) /
-  SUMMARY(챕터 요약, 남색 배경). 전부 보라 하나로 통일했던 이전 방식보다 스캔하기 쉬움.
-- 챕터 끝에는 반드시 summary_box + next_chapter_box를 넣어 "그냥 끊기지 않게" 할 것.
-- 이모지는 BMP 범위(★☆⚠▶✓■ 등)만 안전하게 렌더링됨 — 💡🎯 같은 서플리멘터리 플레인
-  이모지는 Pretendard에 글리프가 없어 틀린 기호로 깨진다. 절대 쓰지 말 것.
-- ✕(U+2715)ㆍ✗(U+2717) 같은 곱셈기호형 X도 Pretendard에 글리프가 없어 깨진다
-  (2026-08-09 발견, comparison_card에서 확인) — "X"자 그대로 쓸 것.
-
-2026-08-09 디자인 리뉴얼(문서적ㆍ단조롭다는 피드백 반영):
-- 보조 강조색 ACCENT2(테라코타) 추가 — 보라 하나로만 통일됐던 단조로움을 깨는 용도.
-- 표지ㆍ파트 배너ㆍ챕터 헤더에 "고스트 넘버"(큰 반투명/연한 색 숫자) 장식 추가.
-- 표지는 평면 단색 박스 대신 캔버스에 풀블리드로 겹친 원 그라디언트풍 배경을 그림.
-- 박스류(tip/warn/next/summary/callout/site_box)에 모서리 둥글림(ROUNDEDCORNERS) 적용.
-- 신규 컴포넌트: stat_hero(큰 숫자 하나 강조), stat_row(작은 숫자 여러 개 가로 나열),
-  pull_quote(큰 인용부호 강조 인용구), comparison_card(Before/After 빨강ㆍ초록 대비 카드).
-  **Before/After 실전예시를 쓸 때는 이제 simple_table 대신 comparison_card를 우선 사용할 것.**
-
-2026-08-23 — 한때 크로스노틱스(천지인운명관)가 이 파일을 같이 썼으나, 서비스허브와
-천지인운명관을 완전히 분리하라는 사용자 지시로 크로스노틱스는 이제
-tools/crossnotics-report/pdf_kit.py라는 독립 사본을 따로 씀. 이 파일은 다시 전자책 13종
-전용으로 되돌아왔다 — 이 파일을 고쳐도 천지인운명관에는 더 이상 영향이 없다.
+분리 시점까지의 디자인 이력(서비스허브 쪽 pdf_kit.py에서 물려받은 것):
+- Pretendard TTF 임베딩, 용도별 색 구분 박스(TIP/WARN/NEXT/SUMMARY), 고스트 넘버ㆍ표지
+  그라디언트, stat_hero/pull_quote/comparison_card 등 인포그래픽 컴포넌트.
+- 2026-08-23 크로스노틱스 전용으로 추가된 것(이제 이 파일에서는 "선택적 파라미터"가 아니라
+  기본 동작): chapter_header가 체계별 색(사주=주황ㆍ별자리=보라ㆍ타로=초록)을 받을 수 있고,
+  build()가 표지에 천지인운명관 로고와 동일한 3원 겹침 엠블럼을 그릴 수 있음.
 """
 
 from pathlib import Path
@@ -81,11 +61,6 @@ TEXT_DARK = colors.HexColor("#1f2333")
 TEXT_DIM = colors.HexColor("#4d5268")
 BORDER = colors.HexColor("#d9d5f0")
 
-# 2026-08-09 디자인 리뉴얼: 보라 하나로만 통일돼 있던 게 "문서적ㆍ단조롭다"는
-# 피드백을 받아, 대비를 주는 보조 강조색(테라코타)과 고스트 넘버ㆍBefore/After
-# 카드ㆍ스탯 히어로용 팔레트를 추가함. tip/warn/next/summary는 기존 의미 유지.
-# (같은 날 2차 피드백: 배경 틴트가 너무 파스텔해서 밋밋해 보임 → 전체적으로
-# 명도를 낮추고 채도를 높여 더 짙고 선명하게 재조정함.)
 ACCENT2 = colors.HexColor("#d9501f")
 ACCENT2_DEEP = colors.HexColor("#a53c17")
 ACCENT2_SOFT = colors.HexColor("#f8cdb3")
@@ -104,7 +79,7 @@ STEP_SHADES = [ACCENT, colors.HexColor("#7457e0"), colors.HexColor("#8d6fea"),
 
 
 class PDFKit:
-    def __init__(self, out_path, title, author="서비스허브", shot_dir=None):
+    def __init__(self, out_path, title, author="천지인운명관", shot_dir=None):
         register_fonts()
         self.out_path = str(out_path)
         self.shot_dir = Path(shot_dir) if shot_dir else None
@@ -166,7 +141,6 @@ class PDFKit:
                                             textColor=colors.white),
             "summary_body": ParagraphStyle("summary_body", fontName=REG, fontSize=10.3, leading=16,
                                             textColor=colors.HexColor("#dcdcf5")),
-            # ---- 2026-08-09 디자인 리뉴얼 추가분 ----
             "chnum_badge": ParagraphStyle("chnum_badge", fontName=BLACK, fontSize=14.5, leading=17,
                                            textColor=colors.white, alignment=TA_CENTER),
             "chnum_ghost": ParagraphStyle("chnum_ghost", fontName=BLACK, fontSize=46, leading=46,
@@ -193,8 +167,6 @@ class PDFKit:
 
     # ---------- 표지 ----------
     def cover(self, kicker, title_html, subtitle, tagline=None):
-        """표지 배경(그라디언트풍 도형)은 build()의 onFirstPage에서 캔버스에 풀블리드로
-        그리므로, 여기 테이블은 배경색 없이 텍스트만 얹는다(2026-08-09 리뉴얼)."""
         accent_line = Table([[""]], colWidths=[26 * mm], rowHeights=[2.6 * mm],
                              style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), ACCENT2)]))
         cell = [accent_line, Spacer(1, 10),
@@ -234,8 +206,6 @@ class PDFKit:
 
     # ---------- 파트/챕터 헤더 ----------
     def part_page(self, label, title, desc=""):
-        """2026-08-09 리뉴얼: 파트 번호를 오른쪽에 큰 고스트 넘버로 얹고 모서리를 둥글려
-        평범한 색 배너에서 벗어나게 함."""
         num_str = "".join(ch for ch in label if ch.isdigit())
         cell = [Paragraph(label, self.styles["part_label"]), Paragraph(title, self.styles["part_title"])]
         if desc:
@@ -252,17 +222,22 @@ class PDFKit:
         self.story.append(banner)
         self.story.append(Spacer(1, 14))
 
-    def chapter_header(self, num, title, eyebrow="CHAPTER"):
-        """2026-08-09 리뉴얼: 얇은 색바 대신 컬러 배지 + 큰 고스트 넘버 + 짧은 강조선으로
-        구성해 매뉴얼 느낌의 반복 패턴에서 벗어나게 함."""
+    def chapter_header(self, num, title, eyebrow="CHAPTER", accent=None, accent2=None):
+        """accent/accent2를 넘기면 배지ㆍ강조선 색을 바꿀 수 있음 — 천지인운명관은 체계별로
+        (사주=주황ㆍ별자리=보라ㆍ타로=초록) 다른 색을 씀(report_kit.py의 SYSTEM_ACCENT 참고)."""
+        badge_color = accent or ACCENT
+        line_color = accent2 or ACCENT2
+        eyebrow_style = self.styles["eyebrow"]
+        if accent:
+            eyebrow_style = ParagraphStyle("eyebrow_c", parent=eyebrow_style, textColor=badge_color)
         badge = Table([[Paragraph(f"{num:02d}", self.styles["chnum_badge"])]],
                       colWidths=[15 * mm], rowHeights=[15 * mm])
         badge.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), ACCENT),
+            ("BACKGROUND", (0, 0), (-1, -1), badge_color),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ROUNDEDCORNERS", [5, 5, 5, 5]),
         ]))
-        head = [Paragraph(eyebrow, self.styles["eyebrow"]), Paragraph(title, self.styles["chapter_title"])]
+        head = [Paragraph(eyebrow, eyebrow_style), Paragraph(title, self.styles["chapter_title"])]
         ghost = Paragraph(f"{num:02d}", self.styles["chnum_ghost"])
         t = Table([[badge, head, ghost]], colWidths=[19 * mm, 120 * mm, 27 * mm])
         t.setStyle(TableStyle([
@@ -270,7 +245,7 @@ class PDFKit:
             ("LEFTPADDING", (1, 0), (1, 0), 10),
         ]))
         self.story.append(t)
-        self.story.append(HRFlowable(width="22%", thickness=2.2, color=ACCENT2, spaceBefore=8, spaceAfter=12, hAlign="LEFT"))
+        self.story.append(HRFlowable(width="22%", thickness=2.2, color=line_color, spaceBefore=8, spaceAfter=12, hAlign="LEFT"))
 
     # ---------- 색상별 박스 ----------
     def _colored_box(self, header, items, bg, bar, icon):
@@ -296,7 +271,6 @@ class PDFKit:
         self._colored_box(header, items, WARN_BG, WARN_BAR, "⚠")
 
     def callout_box(self, title_text, items, numbered=False):
-        """범용 보라색 박스(참고 자료ㆍ목록형 콘텐츠용, 기존 방식 유지)."""
         rows = [[Paragraph(f"<b>{title_text}</b>", ParagraphStyle(
             "boxhead", fontName=BOLD, fontSize=11, leading=15, textColor=colors.white))]]
         for i, item in enumerate(items, 1):
@@ -360,10 +334,8 @@ class PDFKit:
         self.story.append(t)
         self.story.append(Spacer(1, 9))
 
-    # ---------- 2026-08-09 리뉴얼 추가 컴포넌트 ----------
+    # ---------- 인포그래픽 컴포넌트 ----------
     def stat_hero(self, number, label, sublabel=None):
-        """큰 숫자 하나로 데이터를 강조하는 인포그래픽형 카드. 법정기한ㆍ리뷰수ㆍ
-        피해구제 건수처럼 "이 숫자 하나가 핵심"인 실측 데이터에 쓸 것."""
         cell = [Paragraph(number, self.styles["stat_num"]), Paragraph(label, self.styles["stat_label"])]
         if sublabel:
             cell.append(Paragraph(sublabel, self.styles["stat_sub"]))
@@ -378,7 +350,6 @@ class PDFKit:
         self.story.append(Spacer(1, 12))
 
     def stat_row(self, stats):
-        """stats: [(number, label), ...] 2~4개. 작은 숫자 여러 개를 가로로 나열할 때."""
         n = len(stats)
         w = 164 / n
         cells = []
@@ -398,8 +369,6 @@ class PDFKit:
         self.story.append(Spacer(1, 12))
 
     def pull_quote(self, text, attribution=None):
-        """굵은 인용부호를 곁들인 강조 인용구. 법 조문 원문ㆍ실제 응대 대사ㆍ핵심 한 문장을
-        본문 사이에서 잡지 기사처럼 도드라지게 보여줄 때 쓸 것(기존 quote()보다 강한 강조)."""
         cell = [Paragraph("“", self.styles["pull_mark"]), Paragraph(text, self.styles["pull_text"])]
         if attribution:
             cell.append(Paragraph(attribution, self.styles["pull_attr"]))
@@ -414,8 +383,6 @@ class PDFKit:
         self.story.append(Spacer(1, 12))
 
     def comparison_card(self, bad_label, bad_text, good_label, good_text):
-        """Before/After(나쁜 예ㆍ좋은 예) 실전 대비 카드. 지금까지 simple_table이나 평문으로
-        처리하던 Before/After 실전예시를 빨강/초록 카드로 시각화해 한눈에 대비되게 함."""
         def _panel(label, text, bg, bar, mark):
             rows = [[Paragraph(f"{mark}  {label}", ParagraphStyle(
                 "cmph", fontName=BOLD, fontSize=10, leading=14, textColor=bar))],
@@ -438,7 +405,6 @@ class PDFKit:
 
     # ---------- 도식 ----------
     def icon_steps(self, steps):
-        """steps: [(label, desc), ...] 최대 5~6개 권장"""
         cells = []
         for i, (label, desc) in enumerate(steps):
             circ = Table([[Paragraph(str(i + 1), self.styles["step_num"])]], colWidths=[10 * mm], rowHeights=[10 * mm])
@@ -467,7 +433,6 @@ class PDFKit:
         self.story.append(Spacer(1, 10))
 
     def star_table(self, header3, rows):
-        """rows: [(label, desc, stars(1-5)), ...]"""
         data = [[Paragraph(h, self.styles["table_head"]) for h in header3]]
         for label, desc, stars in rows:
             star_str = "★" * stars + "☆" * (5 - stars)
@@ -534,16 +499,13 @@ class PDFKit:
         self.story.append(Paragraph(text, self.styles[style]))
 
     # ---------- 빌드 ----------
-    def build(self, footer_tagline=None, watermark_text="서비스허브 · 무단 전재·재배포 금지"):
+    def build(self, footer_tagline=None, watermark_text="천지인운명관 · 무단 전재·재배포 금지", brand_emblem=None):
         if footer_tagline:
             self.story.append(Spacer(1, 20))
             self.story.append(HRFlowable(width="100%", thickness=0.7, color=BORDER, spaceAfter=10))
             self.story.append(Paragraph(footer_tagline, self.styles["small"]))
 
         def draw_watermark(canvas, dark_bg=False):
-            """구매 후 재배포를 막기 위한 저작권 표시용 옅은 대각선 반복 워터마크.
-            눈에 거슬리지 않을 정도로만 보이되, 스크린샷ㆍ캡처로 재유포될 때는
-            남아있도록 본문 위에 얹는다(밝은 배경=짙은 회색/어두운 배경=흰색, 알파 매우 낮음)."""
             canvas.saveState()
             canvas.setFont(BOLD, 12.5)
             canvas.setFillColor(colors.white if dark_bg else colors.HexColor("#000000"))
@@ -560,8 +522,6 @@ class PDFKit:
             canvas.restoreState()
 
         def draw_cover_art(canvas):
-            """표지 전체를 풀블리드로 채우는 배경(2026-08-09 리뉴얼). 평면 단색 박스 대신
-            겹쳐진 반투명 원으로 깊이감을 주고, 하단에 보조색 강조선을 둔다."""
             w, h = A4
             canvas.saveState()
             canvas.setFillColor(colors.HexColor("#15132a"))
@@ -587,8 +547,32 @@ class PDFKit:
             canvas.rect(0, 26, w, 3.2, stroke=0, fill=1)
             canvas.restoreState()
 
+        def draw_brand_emblem(canvas):
+            """brand_emblem=(color1,color2,color3)이 주어졌을 때만 호출됨 — 표지 오른쪽 위에
+            원 3개가 겹친 작은 엠블럼을 그린다(천지인운명관 웹 로고 마크와 동일한 구성)."""
+            w, h = A4
+            cx, cy, r = w - 30 * mm, h - 26 * mm, 8 * mm
+            canvas.saveState()
+            positions = [(cx, cy + r * 0.55), (cx - r * 0.62, cy - r * 0.42), (cx + r * 0.62, cy - r * 0.42)]
+            for (px, py), hexcolor in zip(positions, brand_emblem):
+                canvas.setFillColor(colors.HexColor(hexcolor))
+                try:
+                    canvas.setFillAlpha(0.85)
+                except AttributeError:
+                    pass
+                canvas.circle(px, py, r, stroke=0, fill=1)
+            try:
+                canvas.setFillAlpha(1)
+            except AttributeError:
+                pass
+            canvas.setFillColor(colors.white)
+            canvas.circle(cx, cy, r * 0.32, stroke=0, fill=1)
+            canvas.restoreState()
+
         def on_cover(canvas, doc_):
             draw_cover_art(canvas)
+            if brand_emblem:
+                draw_brand_emblem(canvas)
             if watermark_text:
                 draw_watermark(canvas, dark_bg=True)
 

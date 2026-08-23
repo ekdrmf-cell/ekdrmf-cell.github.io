@@ -13,11 +13,11 @@
 </script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>혈액형 성격 테스트 — 서비스허브</title>
+<title>혈액형 성격 테스트 — 천지인운명관</title>
 <meta name="description" content="A형·B형·O형·AB형 혈액형별 성격 특징을 바로 확인해보세요." />
-<link rel="stylesheet" href="../css/style.css" />
+<link rel="stylesheet" href="../crossnotics/css/base.css" />
 <link rel="stylesheet" href="../saju/css/saju.css" />
-<script src="../js/config.js"></script>
+<script src="../crossnotics/js/config.js"></script>
 <style>
   .blood-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .blood-btn {
@@ -27,7 +27,7 @@
   .blood-btn:hover { border-color: var(--accent); }
 </style>
 </head>
-<body data-active="saju" data-root="../">
+<body data-active="tools" data-root="../">
 <header id="site-header" class="site-header"></header>
 
 <div class="saju-wrap">
@@ -45,7 +45,15 @@
     <div class="oheng-card tarot-result-card">
       <h2 id="r-title"></h2>
       <p class="oheng-summary" id="r-text"></p>
-      <div class="oheng-summary" style="margin-top:10px;"><b>잘 맞는 상대:</b> <span id="r-match"></span></div>
+      <div class="oheng-summary" style="margin-top:10px;"><b>💕 연애 스타일:</b> <span id="r-love"></span></div>
+      <div class="oheng-summary" style="margin-top:10px;"><b>💼 직장 스타일:</b> <span id="r-work"></span></div>
+      <div class="oheng-summary" style="margin-top:10px;"><b>😮‍💨 스트레스 대처법:</b> <span id="r-stress"></span></div>
+      <div class="oheng-summary" style="margin-top:14px;"><b>혈액형별 궁합</b><div id="r-match"></div></div>
+    </div>
+    <div class="upsell-card">
+      <h3>혈액형 말고 진짜 사주로 보고 싶다면?</h3>
+      <p>사주ㆍ별자리ㆍ타로를 실제로 계산해서 성향ㆍ궁합까지 훨씬 깊게 확인할 수 있어요.</p>
+      <a href="../crossnotics/index.html" id="upsell-btn">천지인운명관에서 자세히 보기</a>
     </div>
   </div>
 </div>
@@ -53,11 +61,42 @@
 <footer id="site-footer" class="site-footer"></footer>
 
 <script>
+  // 2026-08-23 확장 — "총망라" 방향에 맞춰 연애ㆍ직장ㆍ스트레스 대처법과, 최고 궁합 한
+  // 줄이 아니라 4개 혈액형 전부와의 관계를 담은 전체 궁합표를 추가함(일본 혈액형 성격론은
+  // 학문적 근거가 약하다는 게 정설이라 "전통적으로 통용되는 대중문화"라는 톤은 유지).
   const BLOOD_INFO = {
-    A: { title: "A형", text: "신중하고 꼼꼼해서 맡은 일을 끝까지 책임지고 해내는 타입이에요. 주변을 잘 배려하지만 스스로에게는 엄격해서 스트레스를 속으로 쌓아두는 경향이 있어요.", match: "O형 — 시원시원한 O형이 A형의 신중함을 든든하게 받쳐줘요." },
-    B: { title: "B형", text: "자유롭고 개성이 뚜렷해서 하고 싶은 걸 확실히 밀고 나가는 타입이에요. 마이페이스라 눈치는 덜 보지만, 그만큼 창의적이고 매력적인 아이디어가 많이 나와요.", match: "AB형 — 예측불허인 B형을 AB형의 유연함이 잘 받아줘요." },
-    O: { title: "O형", text: "목표지향적이고 리더십이 강한 타입이에요. 사람들을 잘 이끌고 추진력이 있지만, 승부욕이 강해서 지는 걸 유난히 싫어하는 편이에요.", match: "A형 — O형의 추진력과 A형의 꼼꼼함이 서로 잘 보완돼요." },
-    AB: { title: "AB형", text: "이성적이면서도 감성적인 양면을 다 가진 타입이에요. 상황 판단이 빠르고 다재다능하지만, 속마음을 잘 안 드러내서 종잡을 수 없다는 말을 듣기도 해요.", match: "B형 — 자유로운 영혼끼리 서로의 개성을 인정해주는 조합이에요." },
+    A: {
+      title: "A형",
+      text: "신중하고 꼼꼼해서 맡은 일을 끝까지 책임지고 해내는 타입이에요. 주변을 잘 배려하지만 스스로에게는 엄격해서 스트레스를 속으로 쌓아두는 경향이 있어요.",
+      love: "천천히 신뢰를 쌓아가는 연애를 선호해요. 상대방의 작은 변화도 세심하게 알아채지만, 먼저 마음을 표현하는 데는 시간이 걸리는 편이에요.",
+      work: "맡은 일은 끝까지 책임지고 마무리하는 스타일이라 신뢰받는 팀원이 돼요. 다만 완벽하게 하려다 보니 혼자 일을 떠안는 경우가 많아요.",
+      stress: "스트레스를 겉으로 잘 안 드러내고 혼자 삭이는 편이에요. 규칙적인 루틴이나 정리정돈으로 마음을 다스리면 도움이 돼요.",
+      match: { A: "비슷한 신중함끼리 안정적이지만, 서로 눈치만 보다 진도가 안 나갈 수 있어요.", B: "B형의 자유분방함이 A형에게 새로운 자극이 되지만, 페이스 차이로 답답할 수 있어요.", O: "O형의 시원시원함이 A형의 신중함을 든든하게 받쳐주는 조합이에요.", AB: "AB형의 독특한 매력에 끌리지만, 속마음을 알기 어려워 애태울 수 있어요." },
+    },
+    B: {
+      title: "B형",
+      text: "자유롭고 개성이 뚜렷해서 하고 싶은 걸 확실히 밀고 나가는 타입이에요. 마이페이스라 눈치는 덜 보지만, 그만큼 창의적이고 매력적인 아이디어가 많이 나와요.",
+      love: "직진형 연애 스타일이에요. 좋아하면 적극적으로 표현하지만, 상대방에게 맞추기보다는 자기 방식을 고수하려는 경향이 있어요.",
+      work: "틀에 얽매이지 않는 아이디어로 새로운 돌파구를 찾는 데 강해요. 다만 반복적이고 세세한 업무는 금방 지루해하는 편이에요.",
+      stress: "스트레스가 쌓이면 훌쩍 떠나거나 새로운 취미에 몰두하며 환기하는 편이에요. 억지로 참기보다 바로바로 풀어내는 게 잘 맞아요.",
+      match: { A: "A형의 꼼꼼함이 B형의 즉흥성을 잘 잡아주는 조합이에요.", B: "서로의 자유로움을 이해해주지만, 둘 다 고집이 세서 부딪힐 때는 크게 부딪혀요.", O: "O형의 추진력과 B형의 창의력이 만나면 시너지가 크지만, 주도권 다툼이 생길 수 있어요.", AB: "예측불허인 B형을 AB형의 유연함이 잘 받아주는 조합이에요." },
+    },
+    O: {
+      title: "O형",
+      text: "목표지향적이고 리더십이 강한 타입이에요. 사람들을 잘 이끌고 추진력이 있지만, 승부욕이 강해서 지는 걸 유난히 싫어하는 편이에요.",
+      love: "적극적이고 화끈한 연애 스타일이에요. 좋아하는 사람에게는 아낌없이 표현하고 챙기지만, 자기 뜻대로 관계를 이끌고 싶어 하는 편이에요.",
+      work: "목표를 정하면 밀어붙이는 추진력이 강해서 리더 역할에 잘 어울려요. 다만 결과 중심적이라 과정의 디테일을 놓칠 때가 있어요.",
+      stress: "스트레스를 운동이나 활동적인 걸로 몸을 움직이며 푸는 편이에요. 사람들과 어울리며 에너지를 발산하면 금방 회복돼요.",
+      match: { A: "O형의 추진력과 A형의 꼼꼼함이 서로 잘 보완되는 조합이에요.", B: "B형의 창의력과 O형의 실행력이 만나면 잘 굴러가지만, 둘 다 고집이 있어 주도권 다툼이 생길 수 있어요.", O: "같은 승부욕끼리 화끈하게 잘 통하지만, 둘 다 지는 걸 싫어해서 자존심 싸움이 될 수 있어요.", AB: "O형의 직진과 AB형의 신중함이 처음엔 안 맞아 보여도, 시간이 지나면 서로를 보완해줘요." },
+    },
+    AB: {
+      title: "AB형",
+      text: "이성적이면서도 감성적인 양면을 다 가진 타입이에요. 상황 판단이 빠르고 다재다능하지만, 속마음을 잘 안 드러내서 종잡을 수 없다는 말을 듣기도 해요.",
+      love: "겉으로는 쿨해 보이지만 속으로는 섬세하게 상대를 챙기는 스타일이에요. 감정을 드러내는 데 신중해서 상대방이 마음을 알아채기까지 시간이 걸려요.",
+      work: "상황 판단이 빠르고 다양한 역할을 능숙하게 소화하는 다재다능한 타입이에요. 다만 여러 관점이 한꺼번에 보여서 결정을 미루는 경우가 있어요.",
+      stress: "혼자만의 시간과 논리적으로 상황을 정리하는 걸로 스트레스를 다스리는 편이에요. 억지로 위로받기보다 스스로 정리할 시간이 필요해요.",
+      match: { A: "A형이 AB형의 신중한 매력에 끌려 천천히 다가오는 조합이에요.", B: "자유로운 영혼끼리 서로의 개성을 인정해주는 조합이에요.", O: "O형의 직진과 AB형의 신중함이 처음엔 안 맞아 보여도 서로를 보완해줘요.", AB: "서로를 너무 잘 이해해서 편하지만, 둘 다 속마음을 안 드러내면 관계가 겉돌 수 있어요." },
+    },
   };
 
   document.querySelectorAll(".blood-btn").forEach((btn) => {
@@ -65,7 +104,11 @@
       const info = BLOOD_INFO[btn.dataset.type];
       document.getElementById("r-title").textContent = info.title;
       document.getElementById("r-text").textContent = info.text;
-      document.getElementById("r-match").textContent = info.match;
+      document.getElementById("r-love").textContent = info.love;
+      document.getElementById("r-work").textContent = info.work;
+      document.getElementById("r-stress").textContent = info.stress;
+      document.getElementById("r-match").innerHTML = ["A", "B", "O", "AB"]
+        .map((t) => `<div style="margin-top:6px;"><b>${t}형</b> — ${info.match[t]}</div>`).join("");
       const resultEl = document.getElementById("blood-result");
       resultEl.style.display = "block";
       resultEl.scrollIntoView({ behavior: "smooth" });
@@ -73,6 +116,6 @@
     });
   });
 </script>
-<script src="../js/common.js"></script>
+<script src="../crossnotics/js/common.js"></script>
 </body>
 </html>

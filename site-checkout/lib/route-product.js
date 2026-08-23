@@ -1,23 +1,14 @@
 /*
  * 상품 코드별 후처리 라우팅. 웹훅에서 결제 금액 검증까지 끝난 뒤 이 함수가 호출된다.
  *
- * 아키텍처 메모(중요, 다음 세션이 헷갈리지 않도록 기록):
- * - 이 파일은 Vercel Node.js 서버리스 함수 안에서 실행된다. Node 런타임에서는 로컬 Python을
- *   그냥 spawn할 수 없다(Vercel Node 함수엔 Python 인터프리터가 없음) — 그래서 크로스노틱스의
- *   "계산(Node) → LLM합성+PDF(Python)" 2단계 파이프라인 중 Node 부분은 여기서 바로 돌리고,
- *   Python 부분은 같은 Vercel 프로젝트 안의 별도 Python 런타임 함수(`api/generate-report.py`,
- *   Vercel이 파일 확장자로 런타임을 자동 인식함)를 내부 HTTP 호출로 실행한다.
- * - `api/generate-report.py`는 아직 없음 — 계획서 3ㆍ4단계(LLM 프롬프트 연동, report_kit.py)가
- *   끝나야 만들 수 있음. 지금은 그 지점까지 명확하게 연결해두고 TODO로 표시한다.
+ * 2026-08-23 — 크로스노틱스(천지인운명관) 전용 후처리(fulfillCrossnotics)는 여기서
+ * 제거됐다(사용자 지시: 서비스허브와 천지인운명관 사이의 공유 파일을 전부 분리할 것).
+ * 이 site-checkout은 이제 서비스허브(전자책ㆍ서비스)만 다루는 결제 백엔드다 — 애초에
+ * 카드결제 자동화 자체가 아직 배포 전(계좌이체 수동 확인 방식 사용 중)이라 지금 당장
+ * 영향받는 실사용은 없다. 천지인운명관이 카드결제 자동화가 필요해지면, 이 파일을 공유하지
+ * 말고 별도의 독립된 체크아웃을 새로 만들 것.
  */
-const path = require("path");
-const { execFile } = require("child_process");
-const { promisify } = require("util");
-const execFileAsync = promisify(execFile);
-
 const { sendDeliveryEmail } = require("./deliver-email");
-
-const ENGINE_DIR = path.resolve(__dirname, "../../tools/crossnotics-engine");
 
 async function fulfillEbookOrService(product, order) {
   // TODO(계획서 9번 미해결 항목): 기존 전자책ㆍ서비스 파일을 Vercel 함수에서 접근 가능한 곳에
@@ -30,52 +21,11 @@ async function fulfillEbookOrService(product, order) {
   );
 }
 
-async function fulfillCrossnotics(product, order) {
-  // 1) Node 계산 엔진 실행 — 이건 지금 당장 실행 가능(1단계 완료됨)
-  const intake = {
-    tier: product.tier,
-    systems_included: product.systems,
-    customer: order.customer, // 결제 시 입력폼에서 받은 생년월일시 등 (webhook.js에서 채움)
-  };
-  // Vercel 함수는 파일시스템이 읽기전용이지만 os.tmpdir()(=/tmp)만은 쓰기 가능함.
-  // os.tmpdir()을 쓰는 이유: 하드코딩된 "/tmp"는 로컬 Windows 개발환경에서 안 맞고(실제로
-  // 이 세션에서 ENOENT로 확인됨), os.tmpdir()은 Windows/Vercel(Linux) 둘 다에서 알아서
-  // 올바른 임시폴더로 해석돼 로컬 테스트와 배포 환경 코드가 같아짐.
-  const os = require("os");
-  const fs = require("fs");
-  const tmpIntake = path.join(os.tmpdir(), `intake-${order.paymentId}.json`);
-  const tmpComputed = path.join(os.tmpdir(), `computed-${order.paymentId}.json`);
-  fs.writeFileSync(tmpIntake, JSON.stringify(intake));
-  await execFileAsync("node", [path.join(ENGINE_DIR, "run.js"), tmpIntake, tmpComputed]);
-  const computed = JSON.parse(fs.readFileSync(tmpComputed, "utf8"));
-
-  // 2) Python 리포트 생성(LLM 합성 + PDF)
-  // tools/crossnotics-report/build_report.py(LLM 합성)ㆍreport_kit.py(PDF)는 완성ㆍ검증됨
-  // (목업 데이터로 실제 PDF 생성 확인 완료). 다만 이 route-product.js는 Vercel Node 함수 안에서
-  // 돌아서 Python을 직접 spawn할 수 없다 — 같은 Vercel 프로젝트의 Python 런타임 함수
-  // (`api/generate-report.py`)로 HTTP 위임해야 하는데 그 브리지 파일이 아직 없다.
-  // TODO: api/generate-report.py 작성 후 아래 fetch 활성화. 그 함수 안에서는
-  // build_report.py의 call_llm()과 report_kit.py의 build_pdf()를 그대로 import해서 쓰면 됨
-  // (ANTHROPIC_API_KEY 없이는 실제 호출 테스트 불가 — 계획서 8번, 사용자 액션 대기 중).
-  // const reportRes = await fetch(`${process.env.SITE_CHECKOUT_BASE_URL}/api/generate-report`, {
-  //   method: "POST", body: JSON.stringify(computed), headers: { "Content-Type": "application/json" },
-  // });
-  // const { pdfBase64, filename } = await reportRes.json();
-  throw new Error(
-    "NOT_IMPLEMENTED: computed.json까지는 정상 생성됨(아래 로그 참고). LLM 합성ㆍPDF 코드 " +
-    "자체는 완성됐지만(tools/crossnotics-report/) 이 Node 함수에서 Python을 직접 실행 못해 " +
-    "api/generate-report.py 브리지가 아직 필요함.\n" +
-    `computed.json 요약: dominant_axis=${computed.correlation.dominant_axis}, ` +
-    `agreement_score=${computed.correlation.agreement_score}`
-  );
-}
-
 /**
  * @param {object} product - catalog.js의 상품 정보
  * @param {object} order - {paymentId, customer, email}
  */
 async function routeProduct(product, type, order) {
-  if (type === "crossnotics") return fulfillCrossnotics(product, order);
   return fulfillEbookOrService(product, order);
 }
 
