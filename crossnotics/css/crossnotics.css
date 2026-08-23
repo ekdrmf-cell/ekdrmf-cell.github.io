@@ -8,8 +8,9 @@
 :root {
   --bg: #0a0814;
   --bg-elevated: #14101f;
-  --bg-card: #171325;
-  --bg-card-hover: #1e1930;
+  --bg-card: rgba(23, 19, 37, 0.6);
+  --bg-card-hover: rgba(30, 25, 48, 0.72);
+  --card-blur: blur(22px);
   --border: rgba(230, 220, 255, 0.14);
   --border-soft: rgba(230, 220, 255, 0.08);
   --text: #f4f1fb;
@@ -30,18 +31,87 @@
   --gold-line: rgba(220, 185, 114, 0.35);
 }
 
+/* "점집이 아니라 비밀공간" 요청(2026-08-23) 반영 — 카드형 UI가 시장통 전단지처럼
+   보이지 않도록 세 가지를 더함: ①미세한 노이즈 질감(순수 플랫 그라디언트는 화면처럼
+   보임, 얇은 그레인이 있어야 종이ㆍ인쇄물 같은 무게감이 생김) ②비네트(가장자리를
+   어둡게 눌러 시선을 중앙으로 모으는 것 — "방 안에 들어온" 느낌) ③카드마다
+   backdrop-filter 블러를 얹은 유리질감(글래스모피즘) — 아래 카드류 셀렉터들이
+   var(--bg-card)를 반투명으로 쓰면서 이 블러를 상속받음. */
 body {
+  position: relative;
   background:
+    radial-gradient(140% 120% at 50% 0%, transparent 55%, rgba(0, 0, 0, 0.4) 100%),
     radial-gradient(1200px 620px at 14% -10%, rgba(166, 138, 255, 0.16), transparent 60%),
     radial-gradient(1000px 560px at 90% 4%, rgba(47, 215, 163, 0.10), transparent 55%),
     radial-gradient(1100px 760px at 50% 105%, rgba(255, 145, 102, 0.08), transparent 60%),
     var(--bg);
 }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--gold-soft);
+  color: var(--text);
+}
+
+/* 얇은 금색 스크롤바 — 기본 회색 스크롤바 하나로도 "완성도 낮은 페이지" 인상을 준다 */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--gold-line); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
 /* 공용 헤더 배경(style.css는 밝은 반투명 흰색)만 이 페이지용으로 덮어씀 */
 #cn-header.site-header {
-  background: rgba(10, 8, 20, 0.72);
+  background: rgba(10, 8, 20, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-soft);
+}
+
+/* 섹션 사이 장식 구분선 — 여백만으로 나누던 걸 "다음 장으로 넘어간다"는 의례적
+   전환으로 바꿔서, 카드 뭉치가 아니라 순서 있는 이야기처럼 읽히게 함(2026-08-23). */
+.cn-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 780px;
+  margin: 48px auto;
+  padding: 0 20px;
+}
+.cn-divider::before,
+.cn-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-line), transparent);
+}
+.cn-divider span {
+  font-size: 13px;
+  color: var(--gold);
+  opacity: 0.85;
+}
+
+/* 스크롤 시 은은하게 떠오르는 등장 애니메이션 — "벨벳 커튼이 걷히듯" 천천히 드러나는
+   느낌(2026-08-23, GUI 리서치 반영: 미세한 인터랙션이 럭셔리 사이트의 핵심 요소). */
+.cn-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cn-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cn-reveal { opacity: 1; transform: none; transition: none; }
 }
 
 #cn-header .nav-links {
@@ -97,6 +167,37 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* 히어로 아래 신뢰 배지 — 가짜 후기 대신, 이미 사실인 정보(계산 기반ㆍ발송 소요ㆍ무료 진입)를
+   3초 안에 스캔되게 노출(2026-08-23 추가). */
+.cn-trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.cn-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+.cn-trust-item::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+}
+
 .cn-values {
   margin: 12px 0 40px;
 }
@@ -148,6 +249,8 @@ body {
 
 .cn-philosophy {
   background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--border);
   border-left: 3px solid var(--gold-line);
   border-radius: var(--radius);
@@ -170,15 +273,17 @@ body {
 }
 .cn-tier-card {
   background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 24px 22px;
   cursor: pointer;
-  transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s, background 0.18s;
+  transition: border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: left;
   box-shadow: var(--shadow-card);
 }
-.cn-tier-card:hover { transform: translateY(-3px); border-color: var(--gold-line); }
+.cn-tier-card:hover { transform: translateY(-4px); border-color: var(--gold-line); }
 .cn-tier-card.selected {
   border-color: var(--gold);
   background: linear-gradient(160deg, var(--gold-soft), rgba(166, 138, 255, 0.08));
@@ -250,6 +355,7 @@ body {
   color: var(--text-faint);
   font-weight: 600;
 }
+.cn-pages-label::before { content: "✦ "; color: var(--gold); }
 
 .cn-pages-footnote {
   font-size: 12.5px;
@@ -257,9 +363,12 @@ body {
   margin: -22px 0 40px;
   line-height: 1.7;
 }
+.cn-pages-footnote::before { content: "✦ "; color: var(--gold); }
 
 .cn-form {
   background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 30px 28px;
@@ -317,6 +426,7 @@ body {
   color: var(--text-faint);
   line-height: 1.9;
 }
+.cn-disclaimer b { color: var(--text-dim); }
 
 /* ---- 리포트 미리보기 (실제 계산 필드를 그대로 쓴 예시 — 결제 전 신뢰 확보용) ---- */
 .cn-preview {
@@ -344,6 +454,8 @@ body {
 }
 .cn-preview-card {
   background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--border);
   border-top: 3px solid var(--sys-color, var(--accent));
   border-radius: var(--radius);
@@ -413,12 +525,15 @@ body {
 .cn-match {
   margin-top: 16px;
   background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 22px 24px;
   box-shadow: var(--shadow-card);
 }
 .cn-match-title { font-size: 14.5px; font-weight: 800; margin-bottom: 12px; color: var(--text); }
+.cn-match-title::before { content: "✦ "; color: var(--gold); }
 .cn-match-bar {
   height: 12px;
   border-radius: 999px;
@@ -456,6 +571,7 @@ body {
   color: var(--text);
   margin-bottom: 12px;
 }
+.cn-premium-preview-title::before { content: "✦ "; color: var(--gold); }
 
 .cn-preview-example-tag {
   display: inline-block;
@@ -467,6 +583,59 @@ body {
   padding: 3px 12px;
   margin-bottom: 16px;
   font-weight: 600;
+}
+
+/* 리포트 예시를 다 본 직후 이탈하지 않도록 중간 CTA(2026-08-23 추가) — 폼까지
+   스크롤하지 않아도 여기서 바로 신청 지점(#cn-form)으로 이동 가능하게 함. */
+.cn-mid-cta {
+  display: block;
+  text-align: center;
+  margin-top: 24px;
+  padding: 15px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--gold) 0%, #c99a4e 55%, var(--accent) 130%);
+  color: #16111f;
+  font-weight: 800;
+  font-size: 15.5px;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  box-shadow: 0 14px 34px -14px rgba(220, 185, 114, 0.5);
+  transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cn-mid-cta:hover { filter: brightness(1.06); transform: translateY(-2px); }
+
+/* FAQ — 폼 직전에 배치해 마지막 망설임을 없앰(2026-08-23 추가) */
+.cn-faq {
+  margin: 8px 0 36px;
+}
+.cn-faq-title {
+  font-family: "Noto Serif KR", "Pretendard Variable", serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin: 0 0 16px;
+  letter-spacing: -0.01em;
+}
+.cn-faq-item {
+  background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  box-shadow: var(--shadow-card);
+}
+.cn-faq-item + .cn-faq-item { margin-top: 10px; }
+.cn-faq-q {
+  font-weight: 700;
+  font-size: 15.5px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.cn-faq-q::before { content: "Q. "; color: var(--gold); }
+.cn-faq-a {
+  font-size: 14.5px;
+  color: var(--text-dim);
+  line-height: 1.85;
 }
 
 /* 공용 결제 안내 모달(js/config.js가 style.css의 .modal을 재사용)도 이 페이지에서만
