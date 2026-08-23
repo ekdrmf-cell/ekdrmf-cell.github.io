@@ -330,6 +330,28 @@
   // 비워두면(빈 문자열) 예전처럼 mailto로 폴백해서 지금 당장은 그대로 작동합니다.
   const CN_MAIL_ENDPOINT = "https://script.google.com/macros/s/AKfycbw0VJQfxzSXHcngNFlICpDI_07AxAYWbUc_Mk_p1QIMDQ2hoYODtkMUz4FtmJQVJ_34PQ/exec";
 
+  // 질문칸 placeholder — 예전엔 전부 "예: 올해 이직운이 궁금해요"로 똑같았는데(2026-08-23
+  // 사용자 지적: "사람들은 막상 자신이 뭘 궁금해하는지 모를 수도 있다"), tools/
+  // crossnotics-report/knowledge/question_taxonomy.md에서 direct(계산 근거로 확실하게
+  // 답변 가능)로 판정된 유형만 골라 순서대로 채움 — 앞쪽 6개는 사주만으로도 답 가능한
+  // 것들이라 LIGHT/SINGLE/DUAL 손님에게도 안전하고, 뒤쪽은 점성술ㆍ타로가 포함된
+  // MASTER/PREMIUM 손님에게만 노출되는 구간이라 그 티어에 실제로 있는 체계로만 채움.
+  // 질문칸 개수(n)만큼 이 배열을 순서대로(부족하면 처음부터 반복) 나눠 쓴다.
+  const CN_QUESTION_EXAMPLES = [
+    "제 연애운은 전반적으로 어떤 편인가요?",
+    "저는 도화살이나 홍염살이 있는 편인가요?",
+    "지금 이직하기 좋은 타이밍인가요?",
+    "결혼은 몇 살쯤이 좋을까요?",
+    "재물운이 가장 좋아지는 시기는 언제인가요?",
+    "저한테 부족한 오행을 채워주는 색깔ㆍ방향이 있나요?",
+    "제 사주에 있는 정관ㆍ식신 같은 십신은 무슨 뜻인가요?",
+    "저랑 잘 맞는 띠가 있을까요?",
+    "제 태양자리ㆍ달자리는 어떤 의미가 있나요?",
+    "뽑힌 타로 카드가 지금 상황에 대해 뭘 말해주나요?",
+    "이 어스펙트(합ㆍ사각 등)는 저에게 어떤 의미인가요?",
+    "저와 궁합이 잘 맞는 오행ㆍ띠 유형이 있을까요?",
+  ];
+
   const CN_MAX_PAGES = 30;
   const CN_TIERS = [
     {
@@ -461,7 +483,8 @@
     }
     let html = `<label>궁금한 점 (선택, 최대 ${n}개)</label>`;
     for (let i = 0; i < n; i++) {
-      html += `<div class="cn-question-item"><textarea class="cn-q" placeholder="예: 올해 이직운이 궁금해요" rows="1"></textarea></div>`;
+      const ph = CN_QUESTION_EXAMPLES[i % CN_QUESTION_EXAMPLES.length];
+      html += `<div class="cn-question-item"><textarea class="cn-q" placeholder="예: ${ph}" rows="1"></textarea></div>`;
     }
     questionsEl.innerHTML = html;
   }
