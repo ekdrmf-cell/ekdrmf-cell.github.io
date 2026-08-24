@@ -17,6 +17,7 @@ const { computeTarot } = require("./tarot.js");
 const { computeCorrelation } = require("./correlate.js");
 const { computeGunghap } = require("./gunghap.js");
 const { computeSynastry } = require("./synastry.js");
+const { computeBehaviorProfile } = require("./behavior.js");
 // 2026-08-23: 서비스허브의 site-checkout/lib/catalog.js에서 분리된 이 폴더의 로컬 가격표
 const { getCrossnoticsTierConfig } = require("./catalog.js");
 
@@ -145,6 +146,14 @@ function main() {
       result.partner_astrology = partnerAstrology;
       result.astrology_synastry = computeSynastry(result.astrology, partnerAstrology);
     }
+  }
+
+  // 2026-08-24 추가 — 행동DNA(behavior.js). PREMIUM 전용, 손님이 신청 폼에서 실제로
+  // 답한 15문항(customer.behavior_answers)이 있을 때만 계산한다 — 사주 궁합이
+  // partner 정보 유무로 계산 여부를 가르는 것과 같은 패턴. 답변이 없으면 조용히
+  // 건너뛴다(이 축을 안 물어본 티어에서 에러가 나면 안 되므로).
+  if (systems.includes("behavior") && intake.customer.behavior_answers) {
+    result.behavior = computeBehaviorProfile(intake.customer.behavior_answers);
   }
 
   if (systems.includes("tarot")) {

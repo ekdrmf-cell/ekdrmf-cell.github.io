@@ -20,6 +20,9 @@ const cases = [
   // 2026-08-23 추가 — 점성술 시너스트리(synastry.js) 스모크 테스트. partner에 위경도까지
   // 있으면 computed.json에 astrology_synastry 필드가 채워지는지 확인한다.
   { intake: "sample-intake-synastry.json", out: "out-synastry.json" },
+  // 2026-08-24 추가 — 행동DNA 엔진(behavior.js) 스모크 테스트. behavior_answers가
+  // 있으면 computed.json에 behavior 필드(축 5개)가 채워지는지 확인한다.
+  { intake: "sample-intake-behavior.json", out: "out-behavior.json" },
 ];
 
 let allOk = true;

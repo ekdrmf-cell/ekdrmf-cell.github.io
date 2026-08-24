@@ -71,7 +71,7 @@ const CROSSNOTICS_TIERS = {
     price: 200000,
     tier: "premium",
     scope: "premium",
-    systems: ["saju", "astrology", "tarot"],
+    systems: ["saju", "astrology", "tarot", "behavior"],
     question_limit: 12,
     pages_note: "30페이지",
     pages_approx: 30,
