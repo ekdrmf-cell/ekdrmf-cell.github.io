@@ -673,7 +673,13 @@ def check_hallucination(report, known_terms, valid_years):
     # 이 폰트가 지원 안 하는 문자는 종류를 가리지 않고 전부 걸린다.
     unsupported = sorted({ch for ch in all_text if not _is_glyph_supported(ch)})
     if unsupported:
-        print(f"⚠ 경고: 리포트 본문에 PDF 폰트(Pretendard)가 지원하지 않는 문자가 발견됨: {''.join(unsupported)} — 빈칸/네모 기호로 깨집니다(7번 규칙 위반 가능성). 발송 전 반드시 확인할 것.")
+        # 2026-08-24 문구 수정 — 아래 sanitize_report()가 이 글자들을 저장 전에 실제로
+        # 전부 제거하므로, 최종 PDF에는 절대 나타나지 않는다(방금 이 파일로 직접 검증함:
+        # report.json·PDF 텍스트 추출 둘 다 클린). 그런데도 예전 문구("발송 전 반드시
+        # 확인할 것")가 마치 최종 산출물이 아직 깨져 있는 것처럼 읽혀서, 이미 자동으로
+        # 고쳐진 걸 보고도 "또 안 고쳤나" 오해를 부를 수 있었음 — 그래서 "이미 자동
+        # 제거됨"이라고 명확히 밝히는 쪽으로 문구만 바꿈(로직은 그대로).
+        print(f"ℹ 참고: LLM이 PDF 폰트가 못 그리는 문자를 시도함: {''.join(unsupported)} — 이미 자동으로 제거되어 최종 PDF에는 나타나지 않습니다. (7번 규칙을 얼마나 자주 어기는지 추적하는 용도, 조치 불필요)")
     else:
         print("✓ 본문의 모든 문자가 PDF 폰트에서 정상 렌더링됨")
 
