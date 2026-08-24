@@ -166,7 +166,7 @@ function computeCorrelation({ saju, astrology, tarot }) {
     pairwise_similarity: pairs,
     systems_agreeing: uniqueAgreeing,
     complementary_points: complementaryPoints,
-    mapping_note: "오행→4원소, 타로카드→4원소 매핑은 이 프로젝트의 v1 상응표(파일 상단 주석 참고) — 절대 정설이 아님을 리포트 톤에도 반영할 것.",
+    mapping_note: "오행→4원소, 타로카드→4원소 매핑은 이 서비스가 채택한 하나의 상응표(파일 상단 주석 참고)이며, 절대적 정설이 아님을 리포트 톤에도 반영할 것.",
   };
 }
 
