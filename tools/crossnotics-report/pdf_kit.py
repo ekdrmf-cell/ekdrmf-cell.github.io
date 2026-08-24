@@ -38,6 +38,14 @@ REG, MED, SB, BOLD, XB, BLACK = (
     "Pretendard", "Pretendard-Medium", "Pretendard-SemiBold",
     "Pretendard-Bold", "Pretendard-ExtraBold", "Pretendard-Black",
 )
+# 2026-08-24 추가 — 사용자가 준 디자인 가이드 1번 원칙: "본문은 세리프, 제목은 산세리프
+# 두 가지만 써서 위계를 명확히 하라." 가이드가 예시로 든 KoPub바탕체는 "프로그램에
+# 내장(임베딩)해서 쓰려면 문화체육관광부ㆍ한국출판인회의의 별도 사전승인이 필요"하다는
+# 조건이 있어(공유마당 라이선스 확인, 2026-08-24) 승인 없이 그냥 쓸 수 없었음 — 대신
+# 처음부터 소프트웨어 내장을 허용하는 SIL Open Font License인 Noto Serif KR(구글 폰트)로
+# 대체함. 변수 폰트(NotoSerifKR[wght].ttf)를 fonttools로 Regular(wght=400) 고정 폭 인스턴스로
+# 뽑아 저장한 파일 — ReportLab은 가변 폰트를 안정적으로 지원하지 않아 고정 인스턴스가 필요.
+SERIF = "NotoSerifKR"
 
 _FONTS_REGISTERED = False
 
@@ -139,6 +147,7 @@ def register_fonts():
     pdfmetrics.registerFont(TTFont(BOLD, str(FONT_DIR / "Pretendard-Bold.ttf")))
     pdfmetrics.registerFont(TTFont(XB, str(FONT_DIR / "Pretendard-ExtraBold.ttf")))
     pdfmetrics.registerFont(TTFont(BLACK, str(FONT_DIR / "Pretendard-Black.ttf")))
+    pdfmetrics.registerFont(TTFont(SERIF, str(FONT_DIR / "NotoSerifKR-Regular.ttf")))
     _FONTS_REGISTERED = True
 
 
@@ -201,7 +210,10 @@ class PDFKit:
                                   textColor=ACCENT_DEEP, spaceBefore=10, spaceAfter=10),
             "h2": ParagraphStyle("h2", fontName=BOLD, fontSize=13, leading=19,
                                   textColor=TEXT_DARK, spaceBefore=14, spaceAfter=7),
-            "body": ParagraphStyle("body", fontName=REG, fontSize=11.8, leading=20,
+            # 2026-08-24 — 디자인 가이드 1번 원칙("본문은 세리프, 제목/포인트는 산세리프
+            # 두 가지만") 반영. 본문(body)ㆍ박스 안 설명글(box_body)만 세리프로 바꾸고,
+            # 제목ㆍ배지ㆍ강조 인용구는 계속 Pretendard(산세리프)로 남겨 위계를 유지함.
+            "body": ParagraphStyle("body", fontName=SERIF, fontSize=11.8, leading=20,
                                     textColor=TEXT_DARK, spaceAfter=11, alignment=TA_LEFT),
             "quote": ParagraphStyle("quote", fontName=MED, fontSize=12, leading=19,
                                      textColor=ACCENT_DEEP, alignment=TA_LEFT, spaceBefore=4, spaceAfter=10,
@@ -218,7 +230,7 @@ class PDFKit:
                                           textColor=TEXT_DARK),
             "table_head": ParagraphStyle("table_head", fontName=BOLD, fontSize=10, leading=14.5,
                                           textColor=colors.white),
-            "box_body": ParagraphStyle("box_body", fontName=REG, fontSize=10.5, leading=16.5,
+            "box_body": ParagraphStyle("box_body", fontName=SERIF, fontSize=10.5, leading=16.5,
                                         textColor=TEXT_DARK),
             "step_num": ParagraphStyle("step_num", fontName=BLACK, fontSize=14, leading=17,
                                         textColor=colors.white, alignment=TA_CENTER),
