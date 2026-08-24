@@ -216,12 +216,15 @@ class PDFKit:
         self.story = []
         self._chapter_counter = 0
         self.styles = {
-            "cover_kicker": ParagraphStyle("cover_kicker", fontName=BOLD, fontSize=11.5, leading=16,
-                                            textColor=colors.HexColor("#c9bdf7"), alignment=TA_LEFT),
-            "cover_title": ParagraphStyle("cover_title", fontName=BLACK, fontSize=30, leading=37,
-                                           textColor=colors.white, alignment=TA_LEFT),
-            "cover_sub": ParagraphStyle("cover_sub", fontName=SB, fontSize=13, leading=19,
-                                         textColor=colors.HexColor("#e3daf9"), alignment=TA_LEFT),
+            # 2026-08-24 — 사용자 지시: "표지 폰트는 본문의 폰트와 일치시키고 텍스트 전부
+            # 황금색으로." 본문(body/box_body)이 쓰는 세리프(SERIF=NotoSerifKR)로 통일하고,
+            # 색도 하나(GOLD)로 맞춤 — 크기 차이만으로 킥커/제목/부제 위계를 표현.
+            "cover_kicker": ParagraphStyle("cover_kicker", fontName=SERIF, fontSize=11.5, leading=16,
+                                            textColor=GOLD, alignment=TA_LEFT),
+            "cover_title": ParagraphStyle("cover_title", fontName=SERIF, fontSize=30, leading=37,
+                                           textColor=GOLD, alignment=TA_LEFT),
+            "cover_sub": ParagraphStyle("cover_sub", fontName=SERIF, fontSize=13, leading=19,
+                                         textColor=GOLD, alignment=TA_LEFT),
             "part_label": ParagraphStyle("part_label", fontName=BOLD, fontSize=11, leading=15,
                                           textColor=colors.HexColor("#e3daf9"), spaceAfter=3),
             "part_title": ParagraphStyle("part_title", fontName=BLACK, fontSize=20, leading=26,
@@ -824,13 +827,8 @@ class PDFKit:
             canvas.radialGradient(w * 0.98, h * 0.96, 85 * mm, [teal_bloom, COVER_BASE], [0, 1], extend=False)
             canvas.radialGradient(w * 0.5, h * 0.06, 150 * mm, [gold_bloom, COVER_BASE], [0, 1], extend=False)
             canvas.restoreState()
-
-            canvas.saveState()
-            bar_path = canvas.beginPath()
-            bar_path.rect(0, 26, w, 3.4)
-            canvas.clipPath(bar_path, stroke=0, fill=0)
-            canvas.linearGradient(0, 26, w, 26, [GOLD, GOLD_DEEP, SITE_PURPLE], [0, 0.55, 1.0])
-            canvas.restoreState()
+            # 2026-08-24 — 하단 gold→보라 그라디언트 바 삭제(사용자: "저게 뭔지 모르겠다,
+            # 없애라" — 설명 없이 화면 아래를 가로지르는 띠라 의미가 안 읽혔음).
 
         def draw_logo(canvas):
             """logo_path가 주어졌을 때만 호출 — 사용자가 실제로 제공한 로고 이미지
