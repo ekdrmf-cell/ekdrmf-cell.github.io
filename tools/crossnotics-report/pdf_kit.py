@@ -15,7 +15,9 @@
   build()가 표지에 천지인운명관 로고와 동일한 3원 겹침 엠블럼을 그릴 수 있음.
 """
 
+import re
 from pathlib import Path
+from xml.sax.saxutils import escape as _xml_escape
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
@@ -38,6 +40,93 @@ REG, MED, SB, BOLD, XB, BLACK = (
 )
 
 _FONTS_REGISTERED = False
+
+_BOLD_MARK_RE = re.compile(r"\*\*(.+?)\*\*")
+_PAREN_LEADING_SEP_RE = re.compile(r"\(\s*[,ㆍ·]+\s*")
+_PAREN_TRAILING_SEP_RE = re.compile(r"[\s,ㆍ·]+\)")
+_PAREN_EMPTY_RE = re.compile(r"\(\s*[,ㆍ·]*\s*\)")
+_FONT_CMAP_CACHE = None
+
+
+def _font_cmap():
+    """PDF 본문 폰트(Pretendard-Regular)가 실제로 그릴 수 있는 유니코드 집합. 2026-08-24
+    추가 — build_report.py가 이미 report.json 저장 전에 같은 검사로 걸러내지만, 이 파일은
+    report_kit.py를 통해 독립적으로도 실행될 수 있어(예: 예전에 만들어둔 report.json을
+    다시 PDF로 뽑는 경우) 렌더링 직전에도 한 번 더 막아야 "완벽하게" 안전하다(사용자 지시:
+    폰트가 못 그리는 글자가 최종 PDF에 나갈 방법 자체를 없앨 것)."""
+    global _FONT_CMAP_CACHE
+    if _FONT_CMAP_CACHE is None:
+        from fontTools.ttLib import TTFont as _TTFont
+        _FONT_CMAP_CACHE = set(_TTFont(str(FONT_DIR / "Pretendard-Regular.ttf")).getBestCmap().keys())
+    return _FONT_CMAP_CACHE
+
+
+def _strip_unsupported(text):
+    cmap = _font_cmap()
+    cleaned = "".join(ch for ch in text if ch.isspace() or ord(ch) < 0x20 or ord(ch) in cmap)
+    cleaned = _PAREN_LEADING_SEP_RE.sub("(", cleaned)
+    cleaned = _PAREN_TRAILING_SEP_RE.sub(")", cleaned)
+    cleaned = _PAREN_EMPTY_RE.sub("", cleaned)
+    return re.sub(r" {2,}", " ", cleaned)
+
+
+def _md(text, accent_hex="#5a3fd6", max_bold=2):
+    """2026-08-24 추가 — 가독성 개선(사용자 피드백: "3페이지는 그냥 글자로만 가득 차있다,
+    중요한 단어에 밑줄이나 색·굵기 변형이 있어야 한다"). LLM이 강조하고 싶은 부분을
+    **이렇게** 표시하면(build_report.py SYSTEM_PROMPT에서 이 문법만 쓰도록 지시), 굵게 +
+    강조색으로 렌더링한다. ReportLab의 Paragraph는 자체적으로 간단한 XML을 해석하므로,
+    LLM이 실수로 <, >, & 같은 문자를 그대로 쓰면(수식·비교 표현 등에서 나올 수 있음) PDF
+    빌드가 깨지거나 태그로 오인식될 수 있다 — 그래서 원문을 먼저 XML 이스케이프한 뒤에만
+    **마크를 <b><font color=...> 태그로 치환한다(이스케이프 후에도 별표 문자는 그대로
+    남으므로 순서가 안전함).
+
+    2026-08-24(2차) — 실사용 리포트에서 한 문단에 강조가 5~8곳씩 붙어 오히려 아무것도
+    안 튀는 문제를 실제로 확인함(사용자 지적: "이러면 눈에 안 들어온다"). 프롬프트에서
+    "1~3곳만"이라고 지시해도 안 지켜지는 걸 이미 여러 번 확인했으므로(한자 문제와 같은
+    패턴), 여기서 문단(chunk)당 강조 개수를 max_bold로 강제 제한한다 — 넘치는 건 그냥
+    일반 텍스트로 남긴다(경고만 하고 넘어가지 않고 실제로 결과를 보장함)."""
+    safe = _strip_unsupported(text or "")
+    escaped = _xml_escape(safe)
+    count = 0
+
+    def _sub(m):
+        nonlocal count
+        count += 1
+        if count > max_bold:
+            return m.group(1)
+        return f'<b><font color="{accent_hex}">{m.group(1)}</font></b>'
+
+    return _BOLD_MARK_RE.sub(_sub, escaped)
+
+
+_SENTENCE_END_RE = re.compile(r"(?<=[다요])\. ")
+
+
+def _split_paragraphs(text, max_chunk_chars=420):
+    """2026-08-24 추가 — 실사용 리포트에서 한 섹션 본문이 20줄 넘게 줄바꿈 하나 없이
+    이어지는 "글자 벽"이 실제로 나온 걸 확인함(사용자 지적). LLM이 문단 사이에 빈 줄
+    (\\n\\n)을 넣도록 프롬프트에서도 지시하지만(5-A번), 그것만 믿지 않고(같은 이유로
+    한자 문제를 두 번 겪음) 렌더러가 항상 적당한 길이로 문단을 나누도록 보장한다:
+    1) 원문에 이미 빈 줄이 있으면 그걸 우선 따르고,
+    2) 그렇게 나눈 덩어리가 여전히 max_chunk_chars보다 길면, 그 덩어리의 중간 지점에서
+       가장 가까운 문장 끝("~다. "/"~요. ")을 찾아 추가로 쪼갠다.
+    문장 경계를 못 찾으면(예: 문장부호가 특이한 경우) 억지로 자르지 않고 그대로 둔다 —
+    잘못된 지점에서 자르는 것보다는 긴 문단 하나가 낫다."""
+    raw_chunks = [c.strip() for c in re.split(r"\n\s*\n", text or "") if c.strip()]
+    result = []
+    for chunk in raw_chunks:
+        if len(chunk) <= max_chunk_chars:
+            result.append(chunk)
+            continue
+        sentence_ends = [m.end() for m in _SENTENCE_END_RE.finditer(chunk)]
+        if not sentence_ends:
+            result.append(chunk)
+            continue
+        mid = len(chunk) / 2
+        split_at = min(sentence_ends, key=lambda i: abs(i - mid))
+        result.append(chunk[:split_at].strip())
+        result.append(chunk[split_at:].strip())
+    return result or [text or ""]
 
 
 def register_fonts():
@@ -189,17 +278,21 @@ class PDFKit:
 
     # ---------- 기본 텍스트 ----------
     def h1(self, text):
-        self.story.append(Paragraph(text, self.styles["h1"]))
+        self.story.append(Paragraph(_xml_escape(_strip_unsupported(text)), self.styles["h1"]))
         self.story.append(HRFlowable(width="100%", thickness=0.8, color=BORDER, spaceAfter=10))
 
     def h2(self, text):
-        self.story.append(Paragraph(text, self.styles["h2"]))
+        self.story.append(Paragraph(_xml_escape(_strip_unsupported(text)), self.styles["h2"]))
 
     def body(self, text):
-        self.story.append(Paragraph(text, self.styles["body"]))
+        chunks = _split_paragraphs(text)
+        for i, chunk in enumerate(chunks):
+            self.story.append(Paragraph(_md(chunk), self.styles["body"]))
+            if i < len(chunks) - 1:
+                self.story.append(Spacer(1, 8))
 
     def quote(self, text):
-        self.story.append(Paragraph(text, self.styles["quote"]))
+        self.story.append(Paragraph(_md(text), self.styles["quote"]))
 
     def spacer(self, h=8):
         self.story.append(Spacer(1, h))
@@ -237,7 +330,7 @@ class PDFKit:
             ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ROUNDEDCORNERS", [5, 5, 5, 5]),
         ]))
-        head = [Paragraph(eyebrow, eyebrow_style), Paragraph(title, self.styles["chapter_title"])]
+        head = [Paragraph(eyebrow, eyebrow_style), Paragraph(_xml_escape(_strip_unsupported(title)), self.styles["chapter_title"])]
         ghost = Paragraph(f"{num:02d}", self.styles["chnum_ghost"])
         t = Table([[badge, head, ghost]], colWidths=[19 * mm, 120 * mm, 27 * mm])
         t.setStyle(TableStyle([
@@ -248,34 +341,58 @@ class PDFKit:
         self.story.append(HRFlowable(width="22%", thickness=2.2, color=line_color, spaceBefore=8, spaceAfter=12, hAlign="LEFT"))
 
     # ---------- 색상별 박스 ----------
-    def _colored_box(self, header, items, bg, bar, icon):
-        rows = [[Paragraph(f"{icon} {header}", ParagraphStyle(
-            "bh", fontName=BOLD, fontSize=10.3, leading=14, textColor=bar))]]
+    def _colored_box(self, header, items, bg, bar, icon, number=None):
+        """2026-08-24 리디자인 — 경쟁사(운명도감) 디자인 벤치마킹(사용자 지시: 내용은
+        가져오지 않고 레이아웃만 참고). 예전엔 "1. 제목"처럼 번호가 텍스트로 붙어있었는데,
+        번호를 흰 글자의 색칠된 원형 배지로 분리해서 더 고급스럽게 보이도록 함."""
+        if number is not None:
+            badge = Table([[Paragraph(str(number), ParagraphStyle(
+                "badge_num", fontName=XB, fontSize=11, leading=13, textColor=colors.white,
+                alignment=TA_CENTER))]], colWidths=[8 * mm], rowHeights=[8 * mm])
+            badge.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), bar),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+            ]))
+            head = Table([[badge, Paragraph(header, ParagraphStyle(
+                "bh", fontName=BOLD, fontSize=10.8, leading=14, textColor=TEXT_DARK))]],
+                colWidths=[10 * mm, 154 * mm])
+            head.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            rows = [[head]]
+        else:
+            rows = [[Paragraph(f"{icon} {header}", ParagraphStyle(
+                "bh", fontName=BOLD, fontSize=10.3, leading=14, textColor=bar))]]
         for it in items:
-            rows.append([Paragraph("• " + it, self.styles["box_body"])])
+            rows.append([Paragraph("• " + _md(it), self.styles["box_body"])])
         t = Table(rows, colWidths=[164 * mm])
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), bg),
             ("LINEBEFORE", (0, 0), (0, -1), 3, bar),
             ("LEFTPADDING", (0, 0), (-1, -1), 14), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
-            ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-            ("ROUNDEDCORNERS", [7, 7, 7, 7]),
+            ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ("BOTTOMPADDING", (0, 0), (0, 0), 6),
+            ("BOX", (0, 0), (-1, -1), 0.6, bar),
+            ("ROUNDEDCORNERS", [9, 9, 9, 9]),
         ]))
         self.story.append(t)
-        self.story.append(Spacer(1, 11))
+        self.story.append(Spacer(1, 12))
 
-    def tip_box(self, items, header="TIP"):
-        self._colored_box(header, items, TIP_BG, TIP_BAR, "✓")
+    def tip_box(self, items, header="TIP", number=None):
+        self._colored_box(header, items, TIP_BG, TIP_BAR, "✓", number=number)
 
-    def warn_box(self, items, header="주의"):
-        self._colored_box(header, items, WARN_BG, WARN_BAR, "⚠")
+    def warn_box(self, items, header="주의", number=None):
+        self._colored_box(header, items, WARN_BG, WARN_BAR, "⚠", number=number)
 
     def callout_box(self, title_text, items, numbered=False):
         rows = [[Paragraph(f"<b>{title_text}</b>", ParagraphStyle(
             "boxhead", fontName=BOLD, fontSize=11, leading=15, textColor=colors.white))]]
         for i, item in enumerate(items, 1):
             prefix = f"{i}. " if numbered else "ㆍ  "
-            rows.append([Paragraph(prefix + item, self.styles["box_body"])])
+            rows.append([Paragraph(prefix + _md(item), self.styles["box_body"])])
         t = Table(rows, colWidths=[166 * mm])
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
@@ -308,7 +425,7 @@ class PDFKit:
     def summary_box(self, title, items):
         rows = [[Paragraph("■ " + title, self.styles["summary_head"])]]
         for i, it in enumerate(items, 1):
-            rows.append([Paragraph(f"{i}. " + it, self.styles["summary_body"])])
+            rows.append([Paragraph(f"{i}. " + _md(it), self.styles["summary_body"])])
         t = Table(rows, colWidths=[164 * mm])
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), SUMMARY_BG),
@@ -368,10 +485,46 @@ class PDFKit:
         self.story.append(row)
         self.story.append(Spacer(1, 12))
 
+    def four_pillars(self, items):
+        """2026-08-24 신설 — 경쟁사(운명도감) 실제 리포트 디자인을 참고해 추가(사용자 지시:
+        "내용 말고 디자인을 보라" — 그쪽의 근거 없는 통계·확정적 예언 문구는 가져오지 않고,
+        네 기둥을 카드로 시각화하는 레이아웃만 차용함). 지금까지는 사주 네 기둥(년ㆍ월ㆍ일ㆍ
+        시주)이 본문 산문 속에서만 언급되고 한눈에 보이는 표가 전혀 없었다 — 리포트를 열자마자
+        "이 사람의 사주"를 시각적으로 각인시키는 element가 빠져 있던 것.
+        @param items: [{"label": "년주", "text": "갑술", "sub": "목·토", "color": Color}, ...]
+        """
+        n = len(items)
+        w = 164 / n
+        cells = []
+        for it in items:
+            color = it.get("color") or ACCENT
+            cell_style = ParagraphStyle("fp_text", fontName=XB, fontSize=22, leading=26,
+                                         textColor=color, alignment=TA_CENTER)
+            label_style = ParagraphStyle("fp_label", fontName=BOLD, fontSize=9, leading=13,
+                                          textColor=TEXT_DIM, alignment=TA_CENTER)
+            sub_style = ParagraphStyle("fp_sub", fontName=REG, fontSize=8.5, leading=12,
+                                        textColor=TEXT_DIM, alignment=TA_CENTER)
+            col = [Paragraph(it["label"], label_style), Spacer(1, 3),
+                   Paragraph(it["text"], cell_style)]
+            if it.get("sub"):
+                col += [Spacer(1, 2), Paragraph(it["sub"], sub_style)]
+            cells.append(col)
+        row = Table([cells], colWidths=[w * mm] * n)
+        row.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#faf9fc")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 14), ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+            ("BOX", (0, 0), (-1, -1), 0.8, BORDER),
+            ("LINEAFTER", (0, 0), (-2, -1), 0.7, BORDER),
+            ("ROUNDEDCORNERS", [10, 10, 10, 10]),
+        ]))
+        self.story.append(row)
+        self.story.append(Spacer(1, 12))
+
     def pull_quote(self, text, attribution=None):
-        cell = [Paragraph("“", self.styles["pull_mark"]), Paragraph(text, self.styles["pull_text"])]
+        cell = [Paragraph("“", self.styles["pull_mark"]), Paragraph(_md(text), self.styles["pull_text"])]
         if attribution:
-            cell.append(Paragraph(attribution, self.styles["pull_attr"]))
+            cell.append(Paragraph(_xml_escape(_strip_unsupported(attribution)), self.styles["pull_attr"]))
         t = Table([[cell]], colWidths=[164 * mm])
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), ACCENT_SOFT),
@@ -465,15 +618,42 @@ class PDFKit:
         self.story.append(Spacer(1, 12))
 
     def bar_row(self, label, value, max_value, color, unit="", label_w=42):
-        bar_width_mm = max(2, (value / max_value) * (150 - label_w - 24))
-        bar = Table([[""]], colWidths=[bar_width_mm * mm], rowHeights=[6 * mm])
-        bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), color)]))
-        row = Table([[Paragraph(label, self.styles["table_cell"]), bar,
-                      Paragraph(f"{value}{unit}", self.styles["table_cell"])]],
-                    colWidths=[label_w * mm, (150 - label_w - 24) * mm, 24 * mm])
+        """2026-08-24 리디자인 — 예전엔 빈 여백 위에 색칠된 사각형 하나만 떠 있어서 "허접해
+        보인다"는 지적을 받음(사용자 피드백). 실제 값 비율이 얼마인지 한눈에 안 보이는 게
+        문제였음 — 항상 전체 길이를 채우는 옅은 회색 트랙을 깔고, 그 위에 실제 값만큼만
+        진한 색으로 채워서 "게이지"처럼 보이게 바꿈. 둥근 모서리로 완성도를 높임.
+
+        2026-08-24(2차) — "1개(12%)"처럼 개수와 퍼센트를 같이 보여줬는데, 사용자 지적:
+        "갯수로 뭘 세는거지? 퍼센트로 충분하지 않나? 쓸데없는 걸 없애는 것도 퀄리티다."
+        원본 개수(value/unit)는 막대 길이 계산에는 계속 쓰지만, 화면에는 퍼센트만 보여준다
+        (정보가 많다고 고급스러운 게 아니라, 필요 없는 숫자를 빼는 것도 디자인이라는 지적을
+        그대로 반영)."""
+        track_w = 150 - label_w - 30
+        pct = value / max_value if max_value else 0
+        fill_w = max(2, pct * track_w)
+        empty_w = max(0.01, track_w - fill_w)
+
+        fill_cell = Table([[""]], colWidths=[fill_w * mm], rowHeights=[7 * mm])
+        fill_cell.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), color),
+            ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+        ]))
+        empty_cell = Table([[""]], colWidths=[empty_w * mm], rowHeights=[7 * mm])
+        empty_cell.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#eef0f5")),
+        ]))
+        gauge = Table([[fill_cell, empty_cell]], colWidths=[fill_w * mm, empty_w * mm])
+        gauge.setStyle(TableStyle([
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+
+        value_para = Paragraph(f'<b>{round(pct * 100)}%</b>', self.styles["table_cell"])
+        row = Table([[Paragraph(f"<b>{label}</b>", self.styles["table_cell"]), gauge, value_para]],
+                    colWidths=[label_w * mm, track_w * mm, 30 * mm])
         row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
         self.story.append(row)
-        self.story.append(Spacer(1, 3))
+        self.story.append(Spacer(1, 5))
 
     # ---------- 스크린샷 ----------
     def screenshot(self, filename, caption_text):
@@ -569,16 +749,43 @@ class PDFKit:
             canvas.circle(cx, cy, r * 0.32, stroke=0, fill=1)
             canvas.restoreState()
 
+        def draw_page_frame(canvas, dark_bg=False):
+            """2026-08-24 신설 — 경쟁사(운명도감) 디자인 벤치마킹(사용자 지시: 내용은
+            가져오지 않고 레이아웃만 참고). 페이지마다 여백에 둥근 테두리를 그려 "증서ㆍ
+            고급 인쇄물" 같은 느낌을 준다 — 본문 여백(22~24mm)보다 안쪽(9mm)에 그려서
+            텍스트와 절대 겹치지 않음."""
+            canvas.saveState()
+            margin = 9 * mm
+            w, h = A4
+            canvas.setStrokeColor(colors.HexColor("#4a4468") if dark_bg else BORDER)
+            canvas.setLineWidth(1.1)
+            canvas.roundRect(margin, margin, w - 2 * margin, h - 2 * margin, 9, stroke=1, fill=0)
+            canvas.restoreState()
+
         def on_cover(canvas, doc_):
             draw_cover_art(canvas)
             if brand_emblem:
                 draw_brand_emblem(canvas)
             if watermark_text:
                 draw_watermark(canvas, dark_bg=True)
+            draw_page_frame(canvas, dark_bg=True)
+
+        def draw_page_wash(canvas):
+            """2026-08-24 신설 — 사용자가 준 디자인 가이드("premium_pdf_workflow_guide.pdf")
+            2번 원칙: "순백색ㆍ순흑색 조합은 문서의 품격을 떨어뜨린다ㆍ저채도 미색 배경을
+            써라." 순백색 배경 대신 아주 옅은 미색(따뜻한 아이보리)으로 전체 깔아, 눈의
+            피로를 줄이고 고급 인쇄물 같은 질감을 준다(기존 보라/주황 브랜드 컬러는 그대로
+            유지 — 배경 톤만 조정, 브랜드 정체성은 바꾸지 않음)."""
+            canvas.saveState()
+            canvas.setFillColor(colors.HexColor("#fdfbf5"))
+            canvas.rect(0, 0, A4[0], A4[1], stroke=0, fill=1)
+            canvas.restoreState()
 
         def add_page_number(canvas, doc_):
+            draw_page_wash(canvas)
             if watermark_text:
                 draw_watermark(canvas, dark_bg=False)
+            draw_page_frame(canvas)
             canvas.saveState()
             canvas.setFont(REG, 9)
             canvas.setFillColor(TEXT_DIM)

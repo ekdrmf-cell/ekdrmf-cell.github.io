@@ -84,9 +84,19 @@ def _element_bars(k, astrology):
         k.bar_row(e, counts.get(e, 0), max_v, ELEMENT_COLOR[e], unit="개")
 
 
-def _render_section(k, ch, sec, computed):
+def _render_section(k, ch, sec, computed, show_receipt):
     """system_sections 항목 하나 — key_insight(pull_quote)ㆍ원본 계산값ㆍtakeaways(summary_box)까지
-    전부 반영해서 한 섹션을 여러 시각 요소로 풍부하게 채운다."""
+    전부 반영해서 한 섹션을 여러 시각 요소로 풍부하게 채운다.
+
+    2026-08-24 수정 — 사용자가 실제 PDF에서 발견한 버그: SINGLE 이상 티어는 사주 한
+    체계를 system_sections 여러 개(예: "네 기둥 총론"/"오행 균형"/"대운 흐름"/"실전
+    포인트")로 나눠 쓰는데(build_report.py 8번 규칙), 예전 코드는 그 사주 섹션마다
+    매번 똑같은 오행 막대그래프를 다시 그렸다 — "종합 지표" 페이지에서 이미 완전한
+    형태로 한 번 보여준 것과 완전히 동일한 차트가 문서 안에 여러 번 반복되고, 심지어
+    페이지 경계에서 어색하게 잘리는 경우까지 있었다(FREE 티어 실사용 테스트에서 실제
+    확인). 오행/4원소 분포는 "종합 지표"에 이미 있으므로 여기서는 완전히 제거하고,
+    타로 "뽑힌 카드" 목록만(다른 곳에 안 나오는 정보라 유지) 그 체계의 **첫 섹션에서
+    한 번만** 보여준다(show_receipt=False인 두 번째 이후 섹션에서는 생략)."""
     sys_color = SYSTEM_ACCENT.get(sec["system"])
     k.chapter_header(ch, sec["heading"], eyebrow=SYSTEM_LABEL.get(sec["system"], sec["system"].upper()),
                       accent=sys_color, accent2=sys_color)
@@ -94,12 +104,7 @@ def _render_section(k, ch, sec, computed):
         k.pull_quote(sec["key_insight"])
     k.body(sec["body"])
 
-    # 실제 계산값을 숫자ㆍ막대로도 보여줌(LLM 문장 + 원본 데이터 병기 = 신뢰도 확보)
-    if sec["system"] == "saju" and computed.get("saju"):
-        _oheng_bars(k, computed["saju"])
-    elif sec["system"] == "astrology" and computed.get("astrology"):
-        _element_bars(k, computed["astrology"])
-    elif sec["system"] == "tarot" and computed.get("tarot"):
+    if show_receipt and sec["system"] == "tarot" and computed.get("tarot"):
         cards = [f"{d['position']}: {d['card_name']}({d['orientation']})" for d in computed["tarot"]["draws"]]
         k.callout_box("뽑힌 카드", cards)
 
@@ -142,6 +147,36 @@ def build_pdf(computed, report, out_path, product_name):
 
     k.h1("들어가며")
     k.body(report["intro"])
+
+    # ---- 사주 네 기둥 카드 — 2026-08-24 신설(경쟁사 디자인 벤치마킹, 위 build_pdf 주석
+    # 참고). saju가 있으면 리포트 도입부에서 바로 이 손님의 네 기둥을 시각적으로 보여준다.
+    # 전부 computed.json 실측값이라 환각 위험 없음. 한자(甲戌 등)는 폰트가 못 그리므로
+    # 한글 표기(갑술)만 씀.
+    # 2026-08-24(2차) — 사용자 지적: "년주는 뭐고 월주는 뭐야, 기둥이 무슨 뜻인지 애초에
+    # 설명했어야 하지 않나." "년주"ㆍ"월주"ㆍ"기둥" 같은 말이 리포트 전체에서 계속 쓰이는데
+    # 정작 그 뜻을 한 번도 설명한 적이 없었음(개별 신살 이름은 풀이해주면서 정작 이 리포트의
+    # 가장 기본이 되는 틀인 "기둥"은 빠뜨림) — 이 카드가 나오는 바로 이 자리, 리포트에서
+    # "기둥"이라는 말이 처음 등장하는 지점에서 한 번 짧게 짚어준다.
+    _customer_name = computed["customer"].get("name", "고객")
+    _pillars = (computed.get("saju") or {}).get("pillars")
+    if _pillars:
+        k.body(
+            "사주는 태어난 연도ㆍ월ㆍ일ㆍ시, 이 네 시점 각각을 **'기둥'**이라고 부릅니다. "
+            "그래서 태어난 해는 **년주**, 달은 **월주**, 날은 **일주**, 시간은 **시주**라고 하고, "
+            f"이 네 기둥을 합쳐 흔히 말하는 **'사주팔자'**가 됩니다. 아래는 {_customer_name}님의 네 기둥입니다."
+        )
+        _pillar_items = []
+        for _key, _label in [("year", "년주"), ("month", "월주"), ("day", "일주"), ("hour", "시주")]:
+            _p = _pillars.get(_key)
+            if not _p:
+                continue
+            _pillar_items.append({
+                "label": _label, "text": _p["ganzhi_ko"],
+                "sub": f"{_p['gan_oheng']}·{_p['zhi_oheng']}",
+                "color": OHENG_COLOR.get(_p["gan_oheng"]),
+            })
+        if _pillar_items:
+            k.four_pillars(_pillar_items)
 
     # ---- 종합 지표 — computed.json 실측값만 사용(LLM 개입 없음, 환각 위험 0) ----
     saju = computed.get("saju")
@@ -188,21 +223,38 @@ def build_pdf(computed, report, out_path, product_name):
         if shensha:
             # shensha.js가 주는 found_in은 "year"/"month"/"day"/"hour" 영문 키라 그대로 PDF에
             # 노출하면 안 됨(2026-08-23 시각 점검에서 발견) — 한글 기둥 명칭으로 옮겨서 표기.
+            # 2026-08-24 수정 — 사용자 피드백("신살이니 화개살이니 뭐니 그게 뭔지 설명이
+            # 없다"): shensha[key]["meaning"]에 뜻풀이가 이미 계산되어 있었는데 여기서 안 쓰고
+            # "있음" 한 마디만 보여주고 있었다. 용어가 처음 등장하는 바로 이 자리에서 뜻까지
+            # 함께 굵게 강조해 보여준다(**마크는 pdf_kit.py의 _md()가 굵게+강조색으로 렌더).
             PILLAR_KO = {"year": "년주", "month": "월주", "day": "일주", "hour": "시주"}
             present_items = [
-                f"{label}: 있음({', '.join(PILLAR_KO.get(p, p) for p in shensha[key]['found_in'])} 기둥)"
+                f"**{label}**: {', '.join(PILLAR_KO.get(p, p) for p in shensha[key]['found_in'])} 기둥에 있음 — "
+                f"{shensha[key].get('meaning', '')}"
                 for key, label in [("taohua", "도화살"), ("yeokma", "역마살"), ("hwagae", "화개살"), ("hongyeom", "홍염살")]
                 if shensha.get(key, {}).get("present")
             ]
             if present_items:
                 k.h2("신살")
+                # 2026-08-24 추가 — 사용자 지적: "신살 뜻이 뭔지 나는 아직도 모르겠다"
+                # (개별 화개살ㆍ홍염살 뜻은 풀어줬지만, 정작 "신살"이라는 상위 분류 자체를
+                # 한 번도 설명한 적이 없었음 — 위 "기둥" 설명 누락과 같은 유형의 실수).
+                k.body(
+                    "**신살**은 사주에서 유독 눈에 띄는 특징에 붙는 이름입니다. 이름 때문에 "
+                    "무섭게 들릴 수 있지만 나쁘다는 뜻이 아니라, 그 사람만의 두드러진 기질이나 "
+                    f"매력을 가리키는 표현에 가깝습니다. {_customer_name}님의 사주에서 발견된 "
+                    "신살은 다음과 같습니다."
+                )
                 k.callout_box("이 손님 사주에 있는 신살", present_items)
         k.spacer(10)
 
     # ---- 체계별 섹션(key_insight/takeaways까지 전부 반영) ----
     ch = 1
+    seen_systems = set()
     for sec in report["system_sections"]:
-        _render_section(k, ch, sec, computed)
+        show_receipt = sec["system"] not in seen_systems
+        seen_systems.add(sec["system"])
+        _render_section(k, ch, sec, computed, show_receipt)
         ch += 1
 
     if report.get("cross_analysis"):
@@ -225,13 +277,13 @@ def build_pdf(computed, report, out_path, product_name):
     if report.get("opportunities"):
         k.chapter_header(ch, "포착할 기회", eyebrow="OPPORTUNITIES")
         for i, opp in enumerate(report["opportunities"], 1):
-            k.tip_box([opp["body"]], header=f"{i}. {opp['title']}")
+            k.tip_box([opp["body"]], header=opp["title"], number=i)
         ch += 1
 
     if report.get("risks"):
         k.chapter_header(ch, "예측 리스크 & 대비책", eyebrow="RISK FORECAST")
         for i, risk in enumerate(report["risks"], 1):
-            k.warn_box([risk["body"]], header=f"{i}. {risk['title']}")
+            k.warn_box([risk["body"]], header=risk["title"], number=i)
         ch += 1
 
     if report.get("action_plan") and report["action_plan"].get("steps"):
@@ -299,10 +351,20 @@ def build_pdf(computed, report, out_path, product_name):
     k.h1("마치며")
     k.body(report["closing"])
 
-    k.warn_box([report["disclaimer"]], header="안내")
+    # 2026-08-24 제거 — 사용자 명확한 지시: "고객에게 전달될 파일 안에는 절대 상품에 따른
+    # 내용 이외의 내용이 포함되지 않도록 해." 법적 안내 문구(정보 제공 목적ㆍ전문가 상담
+    # 권고 등)는 PDF 안에 넣지 않고, 사이트 하단(문의ㆍ개인정보처리방침 옆)으로 옮긴다 —
+    # report["disclaimer"] 필드 자체를 스키마에서 제거함(build_report.py REPORT_SCHEMA
+    # 참고, LLM에게 더 이상 생성을 요청하지 않음).
 
+    # 2026-08-24 수정 — 사용자 지시: "마지막 부분은 천지인운명관까지는 좋은데 내용이
+    # 별로야. 고객명, 상품명에 따른 진단입니다. 정도로 해줘." 회사 소개 문구 대신 이
+    # 리포트가 누구를 위한 무엇인지만 짧게 밝힘. product_name은 이미 "천지인운명관 FREE —
+    # 오늘의 사주 미니 진단"처럼 브랜드명이 앞에 붙어있으므로, 그 뒷부분(상품 설명)만 뽑아
+    # "고객명님을 위한 상품설명입니다" 형태로 만든다(브랜드명 중복 방지).
+    _tier_desc = product_name.split(" — ", 1)[-1]
     k.build(
-        footer_tagline="천지인운명관 — 사주ㆍ점성술ㆍ타로 독립 계산 후 교차 검증하는 통합 진단 서비스",
+        footer_tagline=f"{_customer_name}님을 위한 {_tier_desc}입니다.",
         brand_emblem=CROSSNOTICS_EMBLEM,
         # 2026-08-23 발견 — watermark_text 기본값이 "서비스허브"(상위 우산 브랜드)라 표지에
         # "CHUNJIIN PERSONAL REPORT"라고 써놓고 워터마크는 다른 브랜드명이 반복되는

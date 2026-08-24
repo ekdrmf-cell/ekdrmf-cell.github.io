@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>천지인운명관 — 주문 처리 프로그램</title>
+<style>
+  :root {
+    --bg: #121014; --panel: #1b1820; --panel-2: #24202a; --border: #35303d;
+    --text: #ece7e0; --text-dim: #9a93a3; --accent: #d99a3c; --accent-2: #5CB3A2;
+    --danger: #e2604f; --ok: #5CB3A2;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+         margin: 0; padding: 32px 20px 80px; line-height: 1.6; }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--text-dim); font-size: 13px; margin: 0 0 28px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+           padding: 20px 22px; margin-bottom: 20px; }
+  .panel h2 { font-size: 15px; margin: 0 0 14px; color: var(--accent); }
+  textarea { width: 100%; min-height: 180px; background: var(--panel-2); color: var(--text);
+             border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 13px;
+             font-family: 'Consolas', monospace; resize: vertical; }
+  button { background: var(--accent); color: #1b1408; border: none; border-radius: 6px;
+           padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.danger-cta { background: var(--danger); color: #fff; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .error { color: var(--danger); font-size: 13px; margin-top: 10px; white-space: pre-wrap; }
+  .hidden { display: none !important; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 12px;
+           font-weight: 700; background: var(--accent); color: #1b1408; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 13.5px; margin: 14px 0; }
+  .kv div:nth-child(odd) { color: var(--text-dim); }
+  .qlist { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; }
+  .status-pass { color: var(--ok); font-weight: 700; }
+  .status-review { color: var(--danger); font-weight: 700; }
+  .loglines { background: #0c0a0f; border: 1px solid var(--border); border-radius: 6px; padding: 10px;
+              font-family: 'Consolas', monospace; font-size: 11.5px; color: #a89fbf; max-height: 220px;
+              overflow-y: auto; white-space: pre-wrap; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-dim); font-weight: 600; font-size: 11.5px; text-transform: uppercase; }
+  a { color: var(--accent-2); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border);
+             border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
+             vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cost-note { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>천지인운명관 — 주문 처리 프로그램</h1>
+  <p class="sub">3~7단계(intake 확인 → 계산 → 리포트 생성 → PDF → 발송 전 검증) 자동 처리.
+    입금 확인(2단계)과 고객 발송(8단계)은 이 화면 밖에서 직접 진행하세요.</p>
+
+  <div class="panel" id="panel-input">
+    <h2>1. 주문 이메일 붙여넣기</h2>
+    <textarea id="raw-input" placeholder="ekdrmf@gmail.com으로 온 신청 이메일 본문 전체를 여기에 붙여넣으세요 (제목 아래 내용 전부, 맨 아래 JSON 블록까지 포함)."></textarea>
+    <div class="row">
+      <button id="btn-parse">주문 확인</button>
+    </div>
+    <div class="error hidden" id="parse-error"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-preview">
+    <h2>2. 주문 확인됨 — 발송 전 API 호출 여부 결정</h2>
+    <div><span class="badge" id="preview-tier"></span></div>
+    <div class="kv" id="preview-kv"></div>
+    <div id="preview-questions"></div>
+    <div id="preview-partner"></div>
+    <p class="cost-note" id="cost-note"></p>
+    <div class="row">
+      <button id="btn-generate">리포트 생성 시작 (실제 API 비용 발생)</button>
+      <button class="secondary" id="btn-cancel">취소하고 다시 붙여넣기</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panel-progress">
+    <h2><span class="spinner"></span>처리 중 — 계산 엔진 → 리포트 생성 → PDF 변환</h2>
+    <p class="sub" style="margin:0;">보통 30초~2분 정도 걸립니다. 창을 닫지 마세요.</p>
+  </div>
+
+  <div class="panel hidden" id="panel-result"></div>
+
+  <div class="panel">
+    <h2>지난 주문 내역</h2>
+    <div id="orders-table"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let currentIntake = null, currentReplyEmail = null;
+
+async function loadOrders() {
+  const res = await fetch("/api/orders");
+  const data = await res.json();
+  const orders = data.orders || [];
+  if (!orders.length) {
+    $("orders-table").innerHTML = '<p class="sub" style="margin:0;">아직 처리한 주문이 없습니다.</p>';
+    return;
+  }
+  let html = "<table><tr><th>생성시각</th><th>고객</th><th>티어</th><th>페이지</th><th>비용</th><th>PDF</th></tr>";
+  for (const o of orders) {
+    const cost = o.cost ? `약 ${o.cost.krw_approx.toLocaleString()}원` : "-";
+    const warn = ((o.warnings && o.warnings.length) || o.page_status === "REVIEW") ? " ⚠" : "";
+    html += `<tr><td>${(o.generated_at || "").replace("T", " ").slice(0, 16)}</td>
+      <td>${o.customer_name || "-"}</td><td>${o.tier || "-"}</td>
+      <td>${o.page_count || "-"}${warn}</td><td>${cost}</td>
+      <td><a href="/api/pdf/${o.order_id}" target="_blank">열기</a></td></tr>`;
+  }
+  html += "</table>";
+  $("orders-table").innerHTML = html;
+}
+
+$("btn-parse").onclick = async () => {
+  $("parse-error").classList.add("hidden");
+  const raw = $("raw-input").value;
+  const res = await fetch("/api/parse", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    $("parse-error").textContent = data.error;
+    $("parse-error").classList.remove("hidden");
+    return;
+  }
+  currentIntake = data.intake;
+  currentReplyEmail = data.reply_email;
+  renderPreview(data.preview);
+  $("panel-preview").classList.remove("hidden");
+  $("panel-result").classList.add("hidden");
+};
+
+function renderPreview(p) {
+  $("preview-tier").textContent = `${p.tier_name}${p.tier_price != null ? " · " + p.tier_price.toLocaleString() + "원" : ""}`;
+  const birth = p.birth;
+  const birthStr = `${birth.year}-${String(birth.month).padStart(2,"0")}-${String(birth.day).padStart(2,"0")} (${birth.calendar}) / ` +
+    (birth.unknown_time ? "시간 모름" : `${birth.hour}시`);
+  $("preview-kv").innerHTML = `
+    <div>이름</div><div>${p.customer_name || "-"}</div>
+    <div>성별</div><div>${p.gender}</div>
+    <div>생년월일시</div><div>${birthStr}</div>
+    <div>회신 이메일</div><div>${p.reply_email || "(이메일 파싱 실패 — 확인 필요)"}</div>
+    <div>질문 개수</div><div>${p.questions.length} / 최대 ${p.question_limit ?? "-"}</div>
+  `;
+  $("preview-questions").innerHTML = p.questions.length
+    ? "<b>질문:</b><ul class='qlist'>" + p.questions.map(q => `<li>${escapeHtml(q)}</li>`).join("") + "</ul>"
+    : "";
+  $("preview-partner").innerHTML = p.has_partner
+    ? `<p class="sub">궁합 상대방 정보 있음 (${p.partner_relationship}${p.has_synastry ? ", 점성술 시너스트리 포함" : ""})</p>`
+    : "";
+  $("cost-note").textContent = "다음 단계(리포트 생성)에서 Anthropic API가 실제로 호출되어 비용이 발생합니다. " +
+    "SINGLE/MASTER는 실측 원가(각 33~50원/150~250원)가 있지만, 다른 티어는 추정치이거나 미실측입니다 — " +
+    "생성 후 이 화면에 실제 비용이 표시됩니다.";
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div"); d.textContent = s; return d.innerHTML;
+}
+
+$("btn-cancel").onclick = () => {
+  $("panel-preview").classList.add("hidden");
+  currentIntake = null;
+};
+
+$("btn-generate").onclick = async () => {
+  $("panel-preview").classList.add("hidden");
+  $("panel-progress").classList.remove("hidden");
+  const res = await fetch("/api/generate", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ intake: currentIntake, reply_email: currentReplyEmail }),
+  });
+  const data = await res.json();
+  $("panel-progress").classList.add("hidden");
+  if (!data.ok) {
+    $("panel-result").classList.remove("hidden");
+    $("panel-result").innerHTML = `<h2 class="status-review">생성 실패</h2><div class="error">${escapeHtml(data.error)}</div>`;
+    return;
+  }
+  renderResult(data.result);
+  loadOrders();
+};
+
+function renderResult(r) {
+  const pagesStatus = r.page_status === "PASS" ? "status-pass" : "status-review";
+  const pagesLabel = r.expected_pages
+    ? `${r.page_count}페이지 (약속: ${r.expected_pages}페이지)${r.page_status === "REVIEW" ? " ⚠ 약속치와 크게 다름" : ""}`
+    : `${r.page_count}페이지 (이 티어의 약속 페이지 수를 확인 못함)`;
+  const warnHtml = r.warnings.length
+    ? `<p class="status-review">⚠ 경고 ${r.warnings.length}건</p><div class="loglines">${escapeHtml(r.warnings.join("\n"))}</div>`
+    : `<p class="status-pass">✓ 경고 없음</p>`;
+  const nonDirectHtml = r.questions_non_direct.length
+    ? `<p class="status-review">⚠ 질문 ${r.questions_total}건 중 ${r.questions_non_direct.length}건이 direct 아님 — 아래 답변이 위장 없이 자연스러운지 PDF에서 직접 확인하세요:</p>
+       <ul class="qlist">${r.questions_non_direct.map(q => `<li>${escapeHtml(q.question)} → <b>${q.answerability}</b> (${escapeHtml(q.reason || "")})</li>`).join("")}</ul>`
+    : `<p class="status-pass">✓ 질문 ${r.questions_total}건 전부 direct로 답변됨</p>`;
+  const costHtml = r.cost
+    ? `입력 ${r.cost.input_tokens.toLocaleString()} / 출력 ${r.cost.output_tokens.toLocaleString()} 토큰 → 약 $${r.cost.usd} (약 ${r.cost.krw_approx.toLocaleString()}원, 환율 추정치)`
+    : "비용 정보를 파싱하지 못했습니다 — 처리 로그를 확인하세요.";
+
+  $("panel-result").classList.remove("hidden");
+  $("panel-result").innerHTML = `
+    <h2>3. 생성 완료 — 발송 전 아래 REVIEW 항목만 확인하세요</h2>
+    <div class="kv">
+      <div>고객</div><div>${r.customer_name}</div>
+      <div>티어</div><div>${r.tier}</div>
+      <div>회신 이메일</div><div>${r.reply_email || "-"}</div>
+      <div class="${pagesStatus}">페이지 수</div><div>${pagesLabel}</div>
+      <div>실측 비용</div><div>${costHtml}</div>
+    </div>
+    ${warnHtml}
+    ${nonDirectHtml}
+    <div class="row" style="margin-top:14px;">
+      <button onclick="window.open('/api/pdf/${r.order_id}', '_blank')">PDF 열기</button>
+      <button class="secondary" onclick="openFolder('${r.order_id}')">폴더 열기</button>
+      <button class="secondary" onclick="location.reload()">새 주문 처리</button>
+    </div>
+    <p class="sub" style="margin-top:14px;">남은 일(8단계): 회신 이메일(${r.reply_email || "?"})로 위 PDF를 첨부해 직접 발송하세요.</p>
+  `;
+}
+
+async function openFolder(orderId) {
+  await fetch(`/api/open-folder/${orderId}`, { method: "POST" });
+}
+
+loadOrders();
+</script>
+</body>
+</html>

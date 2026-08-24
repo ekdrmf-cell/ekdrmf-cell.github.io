@@ -23,6 +23,7 @@ from pathlib import Path
 
 import anthropic
 from dotenv import load_dotenv
+from fontTools.ttLib import TTFont
 
 # Windows 콘솔 기본 인코딩(cp949)은 ✓ㆍ⚠ 같은 유니코드 기호를 못 담아 print()가 죽는다
 # (실제로 여기서 첫 실행 때 API 호출은 성공했는데 이 로그 출력 단계에서 죽어서 파일 저장 전에
@@ -88,12 +89,44 @@ SYSTEM_PROMPT = """당신은 천지인운명관(사주ㆍ서양점성술ㆍ타�
      생애 전체를 보는 관점(long_term_strategy, premium 전용)에서는 그 사람의 삶을 하나의
      이야기로 꿰어보는 수준의 통찰을 쓰세요 — 여러 체계가 동시에 가리키는 것을 발견했을
      때의 "아, 그래서 그랬구나" 하는 느낌을 만드는 게 이 상품의 핵심 가치입니다.
+5-A. **말투와 형식 — 2026-08-24 추가(실제 발송된 리포트를 보고 사용자가 지적함: "데이터를
+   그대로 복사 붙여넣기 한 느낌이다, AI 느낌이 강하게 나면 손님이 두 번 다시 안 찾아온다").**
+   - **어조**: 딱딱한 보고서체가 아니라, 믿을 수 있는 명리학자가 손님과 직접 마주 앉아
+     브리핑하듯 정중하면서도 친근하게 쓰세요. "~로 나타납니다", "~로 파악됩니다" 같은
+     사무적 어미만 기계적으로 반복하지 말고, 가끔 "정리하자면", "쉽게 말씀드리면", "여기서
+     흥미로운 건" 같은 대화체 연결어로 리듬을 주세요. 반말이나 과한 애교체는 쓰지 말고
+     정중한 해요체/합니다체를 기본으로 하되, 말투에 온기를 담으세요.
+   - **전문용어는 등장하는 그 자리에서 바로 풀어주세요.** 십신ㆍ12운성ㆍ신살(도화살ㆍ역마살ㆍ
+     화개살ㆍ홍염살) 같은 한자 기반 명리학 용어를 쓸 때, 그 섹션에서 처음 등장하는 순간
+     짧은 괄호나 쉼표로 뜻을 바로 풀어주세요(예: "화개살(혼자만의 시간에 몰두할 때 오히려
+     집중력이 살아나는 기운)이 일주에 자리하고 있습니다" — "화개살이 있습니다"라고만
+     쓰고 넘어가면 안 됩니다). computed.json의 correspondence/shensha 필드에 이미 그
+     용어의 meaning이 계산되어 있으면 그 뜻풀이를 자연스럽게 녹여 쓰세요(1번 규칙과 동일한
+     원칙으로, 이 뜻풀이도 주어진 값만 쓰고 지어내지 마세요).
+     **바로 이 괄호 안에 한자를 쓰고 싶은 충동이 가장 강하게 들 것입니다 — 절대 참으세요.**
+     "임진(壬辰)"ㆍ"화개살(華蓋殺)"처럼 간지ㆍ신살 이름 옆에 한자를 병기하는 건 명리학
+     콘텐츠에서 아주 흔한 관습이라 자기도 모르게 손이 갈 수 있는데, 이 서비스에서는 그
+     괄호 안에 **오직 순우리말 뜻풀이만** 들어가야 합니다(한자 자체도, 한자+한글 혼용도
+     전부 금지 — 7번 규칙 참고, PDF 폰트가 한자를 못 그려서 빈칸으로 깨집니다). 문장을 다
+     쓴 뒤 제출하기 전에, 방금 쓴 괄호들 안에 한글이 아닌 글자가 섞이지 않았는지 스스로
+     한 번 더 확인하세요.
+   - **강조 표시**: 각 문단에서 정말 중요한 부분(방금 설명한 용어의 핵심 뜻, 또는 그 문단의
+     결론 문장) 1~3곳을 `**이렇게**` 두 개의 별표로 감싸 강조하세요 — PDF에서 자동으로
+     굵게+강조색으로 렌더링됩니다. 문장 전체를 통째로 감싸거나 문단마다 남발하지 말고, 정말
+     눈에 띄어야 할 짧은 구절에만 쓰세요. 이 문법(`**텍스트**`) 외의 다른 마크다운(#, -, [],
+     등)은 절대 쓰지 마세요 — PDF 렌더러가 그 문법을 지원하지 않아 별표가 그대로 노출됩니다.
 6. 업셀은 자연스럽게(예: "다른 체계와 교차하면 더 정확해집니다") 하되 강매 톤은 쓰지
    마세요 — 지금 이 리포트만으로도 완결된 답이어야 합니다.
 7. 한자(漢字)나 그 외 한글이 아닌 문자를 절대 쓰지 마세요 — 예를 들어 "신금(辛金)"처럼
    괄호 안에 한자를 병기하지 마세요. PDF 폰트(Pretendard)가 한자 글리프를 지원하지 않아
    빈칸으로 깨집니다(실제로 확인된 버그). computed.json의 간지ㆍ오행ㆍ십신 값은 이미
    전부 한글로 번역되어 있으니("신", "겁재" 등) 그 한글 표기만 그대로 쓰세요.
+   **5-A번의 "용어를 괄호로 풀어주라"는 지시와 절대 혼동하지 마세요** — 그 괄호 안에는
+   "壬辰"ㆍ"華蓋殺"같은 한자가 아니라 **순우리말 뜻풀이**("혼자만의 시간에 몰두할 때
+   오히려 집중력이 살아나는 기운"처럼)만 들어가야 합니다. 간지ㆍ신살 이름 자체를 강조하고
+   싶으면 한글 이름에 **볼드마크**만 씌우고(예: "**화개살**(혼자만의...)"), 그 옆에 한자를
+   병기하려는 충동을 절대 따르지 마세요 — 이 규칙은 이 문서에서 가장 자주 어겨진 규칙이니
+   특히 주의하세요.
 8. **scope별 분량ㆍ깊이 기준 — 반드시 이 구조를 따르세요(2026-08-22 대폭 확장, 이전
    버전보다 훨씬 깊게 써야 함).** "체계별로 한 섹션씩" 몰아 쓰지 말고, 아래처럼 하나의
    체계를 여러 개의 system_sections 항목(각각 다른 heading)으로 쪼개서 쓰세요 — 이렇게
@@ -442,9 +475,8 @@ REPORT_SCHEMA = {
                 },
             },
             "closing": {"type": "string"},
-            "disclaimer": {"type": "string"},
         },
-        "required": ["intro", "system_sections", "question_answers", "long_term_strategy", "closing", "disclaimer"],
+        "required": ["intro", "system_sections", "question_answers", "long_term_strategy", "closing"],
     },
 }
 
@@ -529,6 +561,64 @@ def collect_valid_years(computed):
     return years
 
 
+_PDF_FONT_CMAP = None
+
+
+def _pdf_font_cmap():
+    """PDF에 실제로 쓰이는 Pretendard-Regular.ttf의 글리프 테이블(cmap)을 읽어, 이 폰트가
+    그릴 수 있는 유니코드 코드포인트 집합을 반환한다(최초 호출 때만 파일을 읽고 캐시함).
+    Pretendard 6종 굵기는 전부 같은 글자 집합을 공유하므로 Regular 하나만 확인하면 된다."""
+    global _PDF_FONT_CMAP
+    if _PDF_FONT_CMAP is None:
+        font_path = HERE / "fonts" / "Pretendard-Regular.ttf"
+        _PDF_FONT_CMAP = set(TTFont(str(font_path)).getBestCmap().keys())
+    return _PDF_FONT_CMAP
+
+
+def _is_glyph_supported(ch):
+    # 공백ㆍ줄바꿈 등 제어문자는 애초에 그려지는 글자가 아니므로 항상 통과.
+    if ch.isspace() or ord(ch) < 0x20:
+        return True
+    return ord(ch) in _pdf_font_cmap()
+
+
+_PAREN_LEADING_SEP_RE = re.compile(r"\(\s*[,ㆍ·]+\s*")
+_PAREN_TRAILING_SEP_RE = re.compile(r"[\s,ㆍ·]+\)")
+_PAREN_EMPTY_RE = re.compile(r"\(\s*[,ㆍ·]*\s*\)")
+
+
+def _strip_unsupported_glyphs(text):
+    """2026-08-24 추가 — 사용자 지시: "경고만 하지 말고, 폰트가 완벽하게 그릴 수 있는
+    글자만 쓰도록 만들어라. 한자는 빼버려라." check_hallucination()의 경고는 사람이 보고
+    다시 생성 버튼을 눌러야만 고쳐지는데, 그러면 같은 문제가 계속 재발할 여지가 남는다.
+    대신 여기서 폰트가 못 그리는 글자를 실제로 제거해서, 그 문제 자체가 최종 산출물에
+    나갈 수 없게 만든다. 한자만 쏙 빠지면 "화개살(壬辰)" → "화개살()"처럼 빈 괄호나
+    "임진(壬辰, 물의 기운)" → "임진(, 물의 기운)"처럼 군더더기 구두점이 남을 수 있어
+    그것도 같이 정리한다."""
+    if not text:
+        return text
+    cleaned = "".join(ch for ch in text if _is_glyph_supported(ch))
+    cleaned = _PAREN_LEADING_SEP_RE.sub("(", cleaned)
+    cleaned = _PAREN_TRAILING_SEP_RE.sub(")", cleaned)
+    cleaned = _PAREN_EMPTY_RE.sub("", cleaned)
+    cleaned = re.sub(r" {2,}", " ", cleaned)
+    return cleaned
+
+
+def sanitize_report(obj):
+    """report(dict) 전체를 재귀적으로 훑어 모든 문자열 값에서 PDF 폰트가 못 그리는 글자를
+    제거한다. intro/body/heading처럼 필드를 하나하나 골라 처리하면 스키마에 필드가 추가될
+    때마다 또 빠뜨릴 위험이 있으므로(실제로 이번에 그렇게 놓쳤었음), 구조를 가리지 않고
+    모든 문자열을 훑는 일반적인 방식을 쓴다."""
+    if isinstance(obj, str):
+        return _strip_unsupported_glyphs(obj)
+    if isinstance(obj, list):
+        return [sanitize_report(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: sanitize_report(v) for k, v in obj.items()}
+    return obj
+
+
 def check_hallucination(report, known_terms, valid_years):
     """리포트 본문에서 핵심 용어를 뽑아 known_terms/valid_years와 대조 — 발송을 막지는
     않고 경고만 남긴다."""
@@ -562,6 +652,21 @@ def check_hallucination(report, known_terms, valid_years):
         print("⚠ 경고: 리포트 본문(LLM 작성분)에 '%' 문자가 발견됨 — 근거 없는 통계를 지어냈을 가능성이 매우 높음(운명도감에서 실제로 봤던 문제 패턴). 발송 전 반드시 확인할 것.")
     else:
         print("✓ 본문에 %(근거 없는 통계 지어내기 신호) 없음")
+
+    # 2026-08-24 추가 — 7번 규칙("한자 절대 쓰지 말 것")이 실제로 여러 번 어겨진 걸 눈으로
+    # 확인함(壬辰ㆍ華蓋殺 등, PDF에서 폰트가 없는 글자칸(tofu box)으로 깨짐). 처음엔 "한자
+    # 범위(U+4E00–U+9FFF)만 스캔"으로 좁게 고쳤는데, 사용자가 "문제를 발견했으면 같은
+    # 실수가 다시는 반복되지 않도록 원인 자체를 제거하라"고 지적함 — 한자는 이 폰트가 못
+    # 그리는 여러 문자 종류 중 하나일 뿐이고, 다음엔 다른 미지원 기호(예: 이모지, 다른
+    # 언어 문자)가 나올 수도 있다. 그래서 "한자인지"를 묻는 대신 "이 폰트가 실제로 그릴 수
+    # 있는 글자인지"를 Pretendard TTF의 cmap(글리프 테이블)에서 직접 조회하는 방식으로
+    # 바꿨다 — 원인(폰트가 못 그리는 모든 글자)을 통째로 막는 구조라, 한자든 다른 무엇이든
+    # 이 폰트가 지원 안 하는 문자는 종류를 가리지 않고 전부 걸린다.
+    unsupported = sorted({ch for ch in all_text if not _is_glyph_supported(ch)})
+    if unsupported:
+        print(f"⚠ 경고: 리포트 본문에 PDF 폰트(Pretendard)가 지원하지 않는 문자가 발견됨: {''.join(unsupported)} — 빈칸/네모 기호로 깨집니다(7번 규칙 위반 가능성). 발송 전 반드시 확인할 것.")
+    else:
+        print("✓ 본문의 모든 문자가 PDF 폰트에서 정상 렌더링됨")
 
     # 간지(2글자 한글, 예: "경오"), 별자리("~자리"로 끝남), 원소(단일 한글자+조사) 패턴만
     # 가볍게 검사 — 완벽한 NLP가 아니라 "발송 전 훑어볼 신호"로만 쓴다(설계 문서 참고).
@@ -655,7 +760,15 @@ def main():
 
     known_terms = collect_known_terms(computed)
     valid_years = collect_valid_years(computed)
-    check_hallucination(report, known_terms, valid_years)
+    check_hallucination(report, known_terms, valid_years)  # 원본 그대로 측정 — 얼마나 자주 규칙을 어기는지 계속 눈으로 볼 것
+
+    # 2026-08-24 추가 — 위 경고는 "얼마나 자주 어겼는지" 계속 지켜보기 위한 것일 뿐,
+    # 실제로 저장ㆍ발송되는 리포트에는 폰트가 못 그리는 글자가 아예 없어야 한다(사용자
+    # 지시: "완벽하게 생성할 수 있는 폰트만 사용하도록, 한자는 빼버려"). 경고 후 사람이
+    # 다시 눌러야만 고쳐지는 구조를 없애고, 여기서 실제로 제거해 최종 산출물은 항상
+    # 안전하게 만든다.
+    report = sanitize_report(report)
+
     log_question_answerability(report, computed)
 
     out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else computed_path.with_suffix(".report.json")
