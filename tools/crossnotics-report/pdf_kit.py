@@ -137,6 +137,20 @@ def _split_paragraphs(text, max_chunk_chars=420):
     return result or [text or ""]
 
 
+def extract_subheadings(text):
+    """2026-08-24 추가 — body() 안의 "## 소제목" 줄만 뽑아낸다. mini_toc()가 이 목록으로
+    챕터 맨 위에 "이 챕터에서 다루는 것" 칩을 만드는 데 쓴다(사용자 요청: "글만 있기보다
+    이해를 돕는 도구를 여러 개 써달라" — 이미 파싱하는 소제목 데이터를 챕터 미리보기로도
+    재사용하는 것이라 새 환각 위험은 없음)."""
+    heads = []
+    for chunk in _split_paragraphs(text):
+        stripped = chunk.strip()
+        if stripped.startswith("## "):
+            first_line = stripped.partition("\n")[0]
+            heads.append(first_line[3:].strip())
+    return heads
+
+
 def register_fonts():
     global _FONTS_REGISTERED
     if _FONTS_REGISTERED:
@@ -210,6 +224,12 @@ class PDFKit:
                                   textColor=ACCENT_DEEP, spaceBefore=10, spaceAfter=10),
             "h2": ParagraphStyle("h2", fontName=BOLD, fontSize=13, leading=19,
                                   textColor=TEXT_DARK, spaceBefore=14, spaceAfter=7),
+            # 2026-08-24 신설 — 사용자 지적: "가독성이 여전히 떨어진다, h구조를 써보는 게
+            # 어떨까." 지금까지는 챕터 제목(chapter_header) 하나 아래에 긴 본문이 소제목
+            # 없이 쭉 이어졌음 — 본문 안에서도 소주제가 바뀔 때마다 짚어줄 소제목 스타일을
+            # 추가함(body()가 "## 소제목" 마크를 인식해서 이 스타일로 렌더링, 아래 참고).
+            "h3": ParagraphStyle("h3", fontName=BOLD, fontSize=12.5, leading=17,
+                                  textColor=ACCENT, spaceBefore=14, spaceAfter=4),
             # 2026-08-24 — 디자인 가이드 1번 원칙("본문은 세리프, 제목/포인트는 산세리프
             # 두 가지만") 반영. 본문(body)ㆍ박스 안 설명글(box_body)만 세리프로 바꾸고,
             # 제목ㆍ배지ㆍ강조 인용구는 계속 Pretendard(산세리프)로 남겨 위계를 유지함.
@@ -297,14 +317,52 @@ class PDFKit:
         self.story.append(Paragraph(_xml_escape(_strip_unsupported(text)), self.styles["h2"]))
 
     def body(self, text):
+        """2026-08-24 — "## 소제목" 마크로 시작하는 문단은 본문이 아니라 소제목(h3)으로
+        렌더링한다(SYSTEM_PROMPT 5-A번에서 LLM에게 이 문법을 쓰도록 지시 — "h구조를
+        써달라"는 사용자 요청 반영). LLM이 "## 소제목" 뒤에 빈 줄을 안 두고 바로 본문을
+        이어 쓸 가능성에 대비해(지금까지 프롬프트 지시가 100% 지켜진 적이 없었다 —
+        한자ㆍ강조 개수와 같은 패턴), 첫 줄만 소제목으로 떼어내고 나머지는 별도 본문
+        문단으로 렌더링한다 — 통째로 긴 문단이 전부 굵은 소제목 스타일로 나가는 사고를
+        막기 위함."""
         chunks = _split_paragraphs(text)
         for i, chunk in enumerate(chunks):
-            self.story.append(Paragraph(_md(chunk), self.styles["body"]))
+            stripped = chunk.strip()
+            if stripped.startswith("## "):
+                first_line, _, rest = stripped.partition("\n")
+                self.story.append(Paragraph(_xml_escape(_strip_unsupported(first_line[3:].strip())), self.styles["h3"]))
+                rest = rest.strip()
+                if rest:
+                    self.story.append(Spacer(1, 2))
+                    self.story.append(Paragraph(_md(rest), self.styles["body"]))
+            else:
+                self.story.append(Paragraph(_md(chunk), self.styles["body"]))
             if i < len(chunks) - 1:
                 self.story.append(Spacer(1, 8))
 
     def quote(self, text):
         self.story.append(Paragraph(_md(text), self.styles["quote"]))
+
+    def mini_toc(self, labels, color=None):
+        """2026-08-24 신설 — 챕터 맨 위에 "이 챕터에서 다루는 것"을 짧게 미리 보여주는
+        칩 목록(사용자 요청: "글만 있기보다 이해를 돕는 도구를 여러 개 써달라"). body()가
+        인식하는 "## 소제목"을 그대로 재사용해서 만들므로 새 데이터ㆍ환각 위험이 없다."""
+        if not labels:
+            return
+        col = color or ACCENT
+        text = " · ".join(_xml_escape(_strip_unsupported(lb)) for lb in labels)
+        cell = [Paragraph("이 챕터에서 다루는 것", ParagraphStyle(
+            "toc_label", fontName=BOLD, fontSize=8.5, leading=11, textColor=col)),
+            Paragraph(f"<b>{text}</b>", ParagraphStyle(
+                "toc_chips", fontName=BOLD, fontSize=10, leading=15, textColor=TEXT_DARK))]
+        t = Table([[cell]], colWidths=[164 * mm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f5f3fb")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 13), ("RIGHTPADDING", (0, 0), (-1, -1), 13),
+            ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("ROUNDEDCORNERS", [8, 8, 8, 8]),
+        ]))
+        self.story.append(t)
+        self.story.append(Spacer(1, 10))
 
     def spacer(self, h=8):
         self.story.append(Spacer(1, h))

@@ -45,7 +45,7 @@ from reportlab.lib import colors
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from pdf_kit import PDFKit  # noqa: E402  — 2026-08-23: 서비스허브 공유 파일에서 분리된 이 폴더의 로컬 사본
+from pdf_kit import PDFKit, extract_subheadings  # noqa: E402  — 2026-08-23: 서비스허브 공유 파일에서 분리된 이 폴더의 로컬 사본
 
 SYSTEM_LABEL = {"saju": "사주", "astrology": "서양 점성술", "tarot": "타로"}
 
@@ -102,6 +102,9 @@ def _render_section(k, ch, sec, computed, show_receipt):
                       accent=sys_color, accent2=sys_color)
     if sec.get("key_insight"):
         k.pull_quote(sec["key_insight"])
+    # 2026-08-24 추가 — body() 안의 "## 소제목"을 그대로 재사용해 챕터 맨 위에 미니 목차
+    # 칩을 보여준다(사용자 요청: 글만 있지 않고 이해를 돕는 도구를 더 써달라).
+    k.mini_toc(extract_subheadings(sec["body"]), color=sys_color)
     k.body(sec["body"])
 
     if show_receipt and sec["system"] == "tarot" and computed.get("tarot"):
