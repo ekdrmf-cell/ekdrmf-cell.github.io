@@ -149,14 +149,7 @@ body::before {
 
 #cn-header .logo-mark,
 #cn-footer .logo-mark {
-  background: var(--bg-card);
-  border: 1.5px solid var(--border);
-  box-shadow: none;
-}
-#cn-header .logo-mark svg,
-#cn-footer .logo-mark svg {
-  width: 20px;
-  height: 20px;
+  border: 1.5px solid var(--gold-line);
 }
 
 .cn-tagline {

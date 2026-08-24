@@ -43,12 +43,7 @@
   <div class="wrap">
     <a class="brand" href="#top">
       <span class="logo-mark">
-        <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <circle cx="18" cy="12" r="10" fill="#e8562f" fill-opacity="0.82" />
-          <circle cx="12.5" cy="21.5" r="10" fill="#6d4aff" fill-opacity="0.82" />
-          <circle cx="23.5" cy="21.5" r="10" fill="#0a7d5e" fill-opacity="0.82" />
-          <circle cx="18" cy="18.3" r="3.2" fill="#ffffff" />
-        </svg>
+        <img src="apple-touch-icon.png" alt="천지인운명관" />
       </span>
       천지인운명관
     </a>
@@ -286,8 +281,8 @@
 
     <div class="cn-disclaimer">
       신청 후 안내되는 계좌로 입금하시면, 확인 후 순서대로 리포트를 이메일로 보내드립니다(영업일 기준
-      1~2일 소요). <b>리포트는 신청 시 입력한 생년월일시로 즉시 계산이 시작되는 맞춤 제작물이라
-      환불되지 않습니다.</b> 천지인운명관은 사주ㆍ점성술ㆍ타로의 전통 상징 체계를 정보 제공 목적으로
+      1~2일 소요). 리포트는 신청 시 입력한 생년월일시로 즉시 계산이 시작되는 <b>맞춤 제작물</b>이라
+      환불되지 않습니다. 천지인운명관은 사주ㆍ점성술ㆍ타로의 전통 상징 체계를 정보 제공 목적으로
       해석한 것이며, 의료ㆍ법률ㆍ재무 등 전문 자문을 대체하지 않습니다. 만 14세 미만은 보호자 동의
       없이 신청할 수 없습니다.
     </div>
@@ -298,12 +293,7 @@
   <div class="wrap footer-inner">
     <a class="brand" href="#top">
       <span class="logo-mark">
-        <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <circle cx="18" cy="12" r="10" fill="#e8562f" fill-opacity="0.82" />
-          <circle cx="12.5" cy="21.5" r="10" fill="#6d4aff" fill-opacity="0.82" />
-          <circle cx="23.5" cy="21.5" r="10" fill="#0a7d5e" fill-opacity="0.82" />
-          <circle cx="18" cy="18.3" r="3.2" fill="#ffffff" />
-        </svg>
+        <img src="apple-touch-icon.png" alt="천지인운명관" />
       </span>
       천지인운명관
     </a>
@@ -706,7 +696,8 @@
       partnerSummaryLine +
       `전달받을 이메일: ${email}\n\n` +
       `질문:\n${questions.length ? questions.map((q, i) => `${i + 1}. ${q}`).join("\n") : "(없음)"}\n\n` +
-      `---\n운영자 메모: 아래 JSON을 그대로 intake.json으로 저장해 node run.js로 실행하면 됩니다.\n` +
+      `---\n운영자 메모: 이 이메일 전체(맨 위 [천지인운명관...]부터 아래 JSON 끝까지)를 그대로 복사해서\n` +
+      `주문 처리 프로그램의 "주문 이메일 붙여넣기" 칸에 붙여넣고 "주문 확인"을 누르세요.\n` +
       JSON.stringify(intakeJson);
 
     gtag("event", "crossnotics_apply", { tier: tier.tierKey });

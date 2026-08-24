@@ -14,14 +14,7 @@
     { href: `${root}crossnotics/index.html#cn-form`, key: "apply", label: "신청하기" },
   ];
 
-  const logoSvg = `
-    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="18" cy="12" r="10" fill="#e8562f" fill-opacity="0.82" />
-      <circle cx="12.5" cy="21.5" r="10" fill="#6d4aff" fill-opacity="0.82" />
-      <circle cx="23.5" cy="21.5" r="10" fill="#0a7d5e" fill-opacity="0.82" />
-      <circle cx="18" cy="18.3" r="3.2" fill="#ffffff" />
-    </svg>
-  `;
+  const logoSvg = `<img src="${root}crossnotics/apple-touch-icon.png" alt="천지인운명관" />`;
 
   const headerEl = document.getElementById("site-header");
   if (headerEl) {
@@ -53,8 +46,8 @@
         </a>
         <div class="tagline">사주ㆍ서양점성술ㆍ타로 — 독립 계산 후 교차 검증하는 개인 맞춤 진단</div>
         <div style="display:flex; gap:16px;">
-          <a class="footer-link" href="javascript:void(0)" onclick="contactMail('천지인운명관 문의', '안녕하세요, 천지인운명관 관련 문의드립니다.\\n\\n')">문의</a>
-          <a class="footer-link" href="${root}privacy.html">개인정보처리방침</a>
+          <a class="footer-link" href="${root}crossnotics/privacy.html">개인정보처리방침</a>
+          <a class="footer-link" href="${root}crossnotics/terms.html">이용안내</a>
         </div>
       </div>
     `;
@@ -91,7 +84,7 @@
         ${FAQ_BOT_ITEMS.map((item, i) => `<button class="faq-bot-q" data-i="${i}">${item.q}</button>`).join("")}
       </div>
       <div class="faq-bot-answer" id="faq-bot-answer" style="display:none;"></div>
-      <button class="faq-bot-contact" id="faq-bot-contact">그 외 문의하기 →</button>
+      <a class="faq-bot-contact" id="faq-bot-contact" href="${root}crossnotics/index.html#cn-form">천지인운명관에서 더 알아보기 →</a>
     </div>
   `;
   document.body.appendChild(botPanel);
@@ -109,10 +102,5 @@
       answerEl.textContent = item.a;
       answerEl.style.display = "block";
     });
-  });
-  document.getElementById("faq-bot-contact").addEventListener("click", () => {
-    if (typeof contactMail === "function") {
-      contactMail("천지인운명관 문의", "안녕하세요, 문의드립니다.\n\n");
-    }
   });
 })();
