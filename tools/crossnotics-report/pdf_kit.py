@@ -11,8 +11,10 @@
 - Pretendard TTF 임베딩, 용도별 색 구분 박스(TIP/WARN/NEXT/SUMMARY), 고스트 넘버ㆍ표지
   그라디언트, stat_hero/pull_quote/comparison_card 등 인포그래픽 컴포넌트.
 - 2026-08-23 크로스노틱스 전용으로 추가된 것(이제 이 파일에서는 "선택적 파라미터"가 아니라
-  기본 동작): chapter_header가 체계별 색(사주=주황ㆍ별자리=보라ㆍ타로=초록)을 받을 수 있고,
-  build()가 표지에 천지인운명관 로고와 동일한 3원 겹침 엠블럼을 그릴 수 있음.
+  기본 동작): chapter_header가 체계별 색(사주=주황ㆍ별자리=보라ㆍ타로=초록)을 받을 수 있음.
+- 2026-08-24 — 표지는 사용자가 실제로 제공한 로고 이미지(assets/logo.png)를 그대로 쓰고,
+  배경은 crossnotics.css와 같은 팔레트(gold/보라/초록)의 번짐 그라디언트, 본문 테두리는
+  금색, 본문 배경엔 로고를 아주 옅게 워터마크로 깔아 사이트와 톤을 맞춤.
 """
 
 import re
@@ -176,6 +178,16 @@ BORDER = colors.HexColor("#d9d5f0")
 ACCENT2 = colors.HexColor("#d9501f")
 ACCENT2_DEEP = colors.HexColor("#a53c17")
 ACCENT2_SOFT = colors.HexColor("#f8cdb3")
+
+# 2026-08-24 추가 — 사용자 지시: "사이트 색상을 보고 표지도 비슷하게, 그라데이션(번지는
+# 느낌)이 고급스러워 보인다." crossnotics.css의 실제 변수값을 그대로 가져옴(--gold,
+# --accent, --accent-2 / 프리미엄 버튼 그라디언트 linear-gradient(135deg, gold, #c99a4e,
+# accent)) — 사이트와 PDF가 같은 팔레트를 쓰게 함.
+GOLD = colors.HexColor("#dcb972")
+GOLD_DEEP = colors.HexColor("#c99a4e")
+SITE_PURPLE = colors.HexColor("#a68aff")
+SITE_TEAL = colors.HexColor("#2fd7a3")
+COVER_BASE = colors.HexColor("#100e1c")
 GHOST_ON_ACCENT = colors.HexColor("#8574e2")   # 보라 배경 위 고스트 넘버(파트 배너)
 GHOST_ON_WHITE = colors.HexColor("#d7c9f5")    # 흰 배경 위 고스트 넘버(챕터 헤더)
 
@@ -749,7 +761,7 @@ class PDFKit:
         self.story.append(Paragraph(text, self.styles[style]))
 
     # ---------- 빌드 ----------
-    def build(self, footer_tagline=None, watermark_text="천지인운명관 · 무단 전재·재배포 금지", brand_emblem=None):
+    def build(self, footer_tagline=None, watermark_text="천지인운명관 · 무단 전재·재배포 금지", logo_path=None):
         if footer_tagline:
             self.story.append(Spacer(1, 20))
             self.story.append(HRFlowable(width="100%", thickness=0.7, color=BORDER, spaceAfter=10))
@@ -772,70 +784,93 @@ class PDFKit:
             canvas.restoreState()
 
         def draw_cover_art(canvas):
+            """2026-08-24 재작성 — 사용자 지적: "코너에 흩어진 색깔 원 장식이 전형적인
+            템플릿 느낌을 준다, 서비스허브 같아 보인다." 근거 없이 3원 겹침 마크를
+            "브랜드 정체성"이라고 단정했던 것도 사용자가 직접 정정함(실제로 준 자료는
+            로고 이미지였음). 그래서 장식용 원들은 전부 빼고, 짙은 남색 배경 + 진짜
+            로고 이미지 하나만 남긴다 — 뭘 상징하는지 불분명한 장식보다, 실제 브랜드
+            자산 하나가 훨씬 고급스럽고 확실하다는 판단.
+
+            2026-08-24 추가 수정 — 사용자 지시: "사이트 색상을 보고 표지도 비슷하게
+            만들자, 그라데이션(번지는 느낌)이 고급스러워 보인다." crossnotics.css가
+            배경 전체에 까는 옅은 radial-gradient 번짐(보라·초록·주황)과 프리미엄
+            버튼의 gold→accent 그라디언트를 PDF 캔버스 네이티브 셰이딩
+            (canvas.radialGradient/linearGradient, PDF axial/radial shading 연산자)
+            으로 재현함. extend=False로 그려서 반경 밖은 그대로 배경색이 비치게 해
+            CSS의 'transparent' 스톱과 같은 효과를 냄.
+
+            2026-08-24 재조정 — 첫 시도는 SITE_PURPLE/SITE_TEAL/GOLD 원색을 중심점에
+            그대로 써서 반원이 진한 색 덩어리로 보였음(PDF 셰이딩은 CSS처럼 중심에서부터
+            알파를 낮게 시작하지 못함 — 알파 대신 배경색과 미리 섞은(mix) 색을 씀).
+            사이트 CSS도 실제로는 rgba(...,0.10~0.16) 수준의 아주 옅은 색이라 원색이
+            아님 — 그 비율(10~26%)만큼 COVER_BASE와 섞어 옅은 '번짐'만 남김."""
             w, h = A4
+
+            def _mix(base, tint, t):
+                r = int(base[0] + (tint[0] - base[0]) * t)
+                g = int(base[1] + (tint[1] - base[1]) * t)
+                b = int(base[2] + (tint[2] - base[2]) * t)
+                return colors.Color(r / 255, g / 255, b / 255)
+
+            base_rgb = (0x10, 0x0e, 0x1c)
+            purple_bloom = _mix(base_rgb, (0xa6, 0x8a, 0xff), 0.18)
+            teal_bloom = _mix(base_rgb, (0x2f, 0xd7, 0xa3), 0.12)
+            gold_bloom = _mix(base_rgb, (0xdc, 0xb9, 0x72), 0.26)
+
             canvas.saveState()
-            canvas.setFillColor(colors.HexColor("#15132a"))
+            canvas.setFillColor(COVER_BASE)
             canvas.rect(0, 0, w, h, stroke=0, fill=1)
-            layers = [
-                (w * 0.95, h * 0.97, 128, ACCENT_DEEP, 0.78),
-                (w * 0.86, h * 0.86, 92, ACCENT, 0.58),
-                (w * 0.06, h * 0.05, 96, ACCENT2, 0.68),
-                (w * 0.18, h * 0.14, 46, ACCENT2, 0.4),
-            ]
-            for cx, cy, r, col, alpha in layers:
-                canvas.setFillColor(col)
-                try:
-                    canvas.setFillAlpha(alpha)
-                except AttributeError:
-                    pass
-                canvas.circle(cx, cy, r, stroke=0, fill=1)
-            try:
-                canvas.setFillAlpha(1)
-            except AttributeError:
-                pass
-            canvas.setFillColor(ACCENT2)
-            canvas.rect(0, 26, w, 3.2, stroke=0, fill=1)
+            canvas.radialGradient(w * 0.08, h * 1.0, 120 * mm, [purple_bloom, COVER_BASE], [0, 1], extend=False)
+            canvas.radialGradient(w * 0.98, h * 0.96, 85 * mm, [teal_bloom, COVER_BASE], [0, 1], extend=False)
+            canvas.radialGradient(w * 0.5, h * 0.06, 150 * mm, [gold_bloom, COVER_BASE], [0, 1], extend=False)
             canvas.restoreState()
 
-        def draw_brand_emblem(canvas):
-            """brand_emblem=(color1,color2,color3)이 주어졌을 때만 호출됨 — 표지 오른쪽 위에
-            원 3개가 겹친 작은 엠블럼을 그린다(천지인운명관 웹 로고 마크와 동일한 구성)."""
-            w, h = A4
-            cx, cy, r = w - 30 * mm, h - 26 * mm, 8 * mm
             canvas.saveState()
-            positions = [(cx, cy + r * 0.55), (cx - r * 0.62, cy - r * 0.42), (cx + r * 0.62, cy - r * 0.42)]
-            for (px, py), hexcolor in zip(positions, brand_emblem):
-                canvas.setFillColor(colors.HexColor(hexcolor))
-                try:
-                    canvas.setFillAlpha(0.85)
-                except AttributeError:
-                    pass
-                canvas.circle(px, py, r, stroke=0, fill=1)
-            try:
-                canvas.setFillAlpha(1)
-            except AttributeError:
-                pass
-            canvas.setFillColor(colors.white)
-            canvas.circle(cx, cy, r * 0.32, stroke=0, fill=1)
+            bar_path = canvas.beginPath()
+            bar_path.rect(0, 26, w, 3.4)
+            canvas.clipPath(bar_path, stroke=0, fill=0)
+            canvas.linearGradient(0, 26, w, 26, [GOLD, GOLD_DEEP, SITE_PURPLE], [0, 0.55, 1.0])
+            canvas.restoreState()
+
+        def draw_logo(canvas):
+            """logo_path가 주어졌을 때만 호출 — 사용자가 실제로 제공한 로고 이미지
+            (짙은 남색+금색 원형 문장, crossnotics/apple-touch-icon.png와 동일 자산)를
+            표지 하단에 원형 그대로 그린다. PNG 자체가 원형 바깥이 투명이라 별도
+            마스킹 없이 배경과 자연스럽게 어우러짐."""
+            w, h = A4
+            size = 62 * mm
+            x = (w - size) / 2
+            y = 42 * mm
+            canvas.saveState()
+            canvas.drawImage(logo_path, x, y, width=size, height=size, mask="auto")
             canvas.restoreState()
 
         def draw_page_frame(canvas, dark_bg=False):
             """2026-08-24 신설 — 경쟁사(운명도감) 디자인 벤치마킹(사용자 지시: 내용은
             가져오지 않고 레이아웃만 참고). 페이지마다 여백에 둥근 테두리를 그려 "증서ㆍ
             고급 인쇄물" 같은 느낌을 준다 — 본문 여백(22~24mm)보다 안쪽(9mm)에 그려서
-            텍스트와 절대 겹치지 않음."""
+            텍스트와 절대 겹치지 않음.
+
+            2026-08-24 수정 — 사용자 지시: "본문 테두리는 황금색으로." 사이트 CSS의
+            --gold-line(rgba(220,185,114,0.35))과 같은 저채도 반투명 금색을 그대로
+            씀 — 진하게 칠하면 본문 텍스트보다 시선을 끌어 가독성을 해치므로 알파를
+            낮게 유지."""
             canvas.saveState()
             margin = 9 * mm
             w, h = A4
-            canvas.setStrokeColor(colors.HexColor("#4a4468") if dark_bg else BORDER)
+            canvas.setStrokeColor(GOLD)
+            try:
+                canvas.setStrokeAlpha(0.55 if dark_bg else 0.4)
+            except AttributeError:
+                pass
             canvas.setLineWidth(1.1)
             canvas.roundRect(margin, margin, w - 2 * margin, h - 2 * margin, 9, stroke=1, fill=0)
             canvas.restoreState()
 
         def on_cover(canvas, doc_):
             draw_cover_art(canvas)
-            if brand_emblem:
-                draw_brand_emblem(canvas)
+            if logo_path:
+                draw_logo(canvas)
             if watermark_text:
                 draw_watermark(canvas, dark_bg=True)
             draw_page_frame(canvas, dark_bg=True)
@@ -851,8 +886,33 @@ class PDFKit:
             canvas.rect(0, 0, A4[0], A4[1], stroke=0, fill=1)
             canvas.restoreState()
 
+        def draw_logo_watermark(canvas):
+            """2026-08-24 신설 — 사용자 지시: "본문에 우리 로고를 투명하게 해서
+            워터마크처럼 중간중간에 넣어, 단 가독성이 떨어지지 않게." 기존 텍스트
+            워터마크(draw_watermark)처럼 촘촘한 격자로 깔면 로고는 글자보다 시각적
+            밀도가 높아 본문과 겹쳐 읽기 힘들어짐 — 그래서 페이지 3곳에만, 아주 낮은
+            불투명도로 크게 배치(문자 그대로 "중간중간에"). 텍스트 워터마크(저작권
+            문구)는 그대로 유지하고 로고는 그 위에 얹는 방식."""
+            if not logo_path:
+                return
+            w, h = A4
+            size = 100 * mm
+            canvas.saveState()
+            try:
+                canvas.setFillAlpha(0.045)
+            except AttributeError:
+                pass
+            for x, y in (
+                (w - size * 0.5, h - size * 0.55),
+                (-size * 0.4, h * 0.30),
+                (w * 0.55, -size * 0.42),
+            ):
+                canvas.drawImage(logo_path, x, y, width=size, height=size, mask="auto")
+            canvas.restoreState()
+
         def add_page_number(canvas, doc_):
             draw_page_wash(canvas)
+            draw_logo_watermark(canvas)
             if watermark_text:
                 draw_watermark(canvas, dark_bg=False)
             draw_page_frame(canvas)

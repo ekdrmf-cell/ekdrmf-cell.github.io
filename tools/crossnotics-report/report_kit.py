@@ -49,12 +49,16 @@ from pdf_kit import PDFKit, extract_subheadings  # noqa: E402  — 2026-08-23: �
 
 SYSTEM_LABEL = {"saju": "사주", "astrology": "서양 점성술", "tarot": "타로"}
 
-# 2026-08-23 추가 — PDF 퀄리티 개선(사용자 요청: "PDF를 더 고급스럽게"). 웹사이트 로고 마크의
-# 원 3개 색(index.html <svg class="logo-mark"> 그대로)을 PDF 챕터 배지ㆍ표지 엠블럼에도 써서
-# 웹ㆍPDF 브랜드를 통일한다. pdf_kit.py는 그대로 두고(다른 전자책 영향 없음) chapter_header()/
-# build()에 새로 생긴 선택적 accent/brand_emblem 파라미터만 여기서 사용.
+# 2026-08-23 추가 — PDF 퀄리티 개선. 웹사이트에서 사주=주황ㆍ점성술=보라ㆍ타로=초록으로
+# 구분해 쓰는 색을 PDF 챕터 배지에도 그대로 써서 체계별 구분을 웹과 통일한다
+# (chapter_header()의 accent/accent2 파라미터로 전달).
 SYSTEM_ACCENT = {"saju": "#e8562f", "astrology": "#6d4aff", "tarot": "#0a7d5e"}
-CROSSNOTICS_EMBLEM = (SYSTEM_ACCENT["saju"], SYSTEM_ACCENT["astrology"], SYSTEM_ACCENT["tarot"])
+
+# 2026-08-24 수정 — "3원 겹침이 브랜드 정체성"이라는 건 사용자가 정한 적 없는 임의 가정이었음
+# (사용자가 직접 정정: "내가 그렇게 정한 적이 없어"). 실제로 사용자가 제공한 자산은 로고
+# 이미지(crossnotics/apple-touch-icon.png — 짙은 남색+금색 원형 문장)이므로, 표지에는
+# 그 이미지를 그대로 쓴다.
+LOGO_PATH = str(Path(__file__).resolve().parent / "assets" / "logo.png")
 
 # 오행ㆍ4원소 막대색 — pdf_kit.py의 ACCENT 계열과 어울리되 항목별로 구분되게 직접 지정.
 OHENG_COLOR = {
@@ -134,11 +138,14 @@ def build_pdf(computed, report, out_path, product_name):
     k.styles["body"].leading = 21.5
     k.styles["h2"].spaceBefore = 16
 
+    # 2026-08-24 수정 — 마지막 페이지 태그라인만 고치고 표지 태그라인은 놓쳤던 걸
+    # 사용자가 지적함("이거 아까 말한대로 고쳐"). 회사 소개 문구 삭제 — subtitle에
+    # 이미 "{고객명}님을 위한 개인 맞춤 진단"이 있어 중복이라, 아예 빼고 여백으로 둠
+    # (cover()의 tagline은 선택 인자라 안 넘기면 자동으로 여백 처리됨).
     k.cover(
         kicker="CHUNJIIN PERSONAL REPORT",
         title_html=product_name,
         subtitle=f"{computed['customer'].get('name', '고객님')}님을 위한 개인 맞춤 진단",
-        tagline="사주ㆍ점성술ㆍ타로 — 독립 계산 후 교차 검증한 결과만 담았습니다",
     )
 
     # ---- 목차 미리보기(scope full/premium만 채워짐) ----
@@ -368,7 +375,7 @@ def build_pdf(computed, report, out_path, product_name):
     _tier_desc = product_name.split(" — ", 1)[-1]
     k.build(
         footer_tagline=f"{_customer_name}님을 위한 {_tier_desc}입니다.",
-        brand_emblem=CROSSNOTICS_EMBLEM,
+        logo_path=LOGO_PATH,
         # 2026-08-23 발견 — watermark_text 기본값이 "서비스허브"(상위 우산 브랜드)라 표지에
         # "CHUNJIIN PERSONAL REPORT"라고 써놓고 워터마크는 다른 브랜드명이 반복되는
         # 불일치가 있었음(시각 점검으로 발견). 크로스노틱스는 자체 브랜드명으로 오버라이드.
