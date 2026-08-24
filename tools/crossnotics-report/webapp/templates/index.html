@@ -58,8 +58,12 @@
     입금 확인(2단계)과 고객 발송(8단계)은 이 화면 밖에서 직접 진행하세요.</p>
 
   <div class="panel" id="panel-input">
-    <h2>1. 주문 이메일 붙여넣기</h2>
-    <textarea id="raw-input" placeholder="ekdrmf@gmail.com으로 온 신청 이메일 본문 전체를 여기에 붙여넣으세요 (제목 아래 내용 전부, 맨 아래 JSON 블록까지 포함)."></textarea>
+    <h2>1. 주문 이메일 가져오기</h2>
+    <div class="row">
+      <button id="btn-fetch" class="secondary">📥 주문 가져오기 (Gmail에서 자동으로)</button>
+    </div>
+    <p class="sub" id="fetch-status" style="margin: 8px 0 0;"></p>
+    <textarea id="raw-input" placeholder="위 버튼으로 자동으로 가져오거나, ekdrmf@gmail.com으로 온 신청 이메일 본문 전체를 여기에 직접 붙여넣으세요 (제목 아래 내용 전부, 맨 아래 JSON 블록까지 포함)."></textarea>
     <div class="row">
       <button id="btn-parse">주문 확인</button>
     </div>
@@ -116,6 +120,26 @@ async function loadOrders() {
   html += "</table>";
   $("orders-table").innerHTML = html;
 }
+
+$("btn-fetch").onclick = async () => {
+  $("fetch-status").textContent = "Gmail에서 새 주문 이메일을 확인하는 중...";
+  $("btn-fetch").disabled = true;
+  try {
+    const res = await fetch("/api/fetch-order", { method: "POST" });
+    const data = await res.json();
+    if (!data.ok) {
+      $("fetch-status").textContent = data.error || "가져올 주문이 없습니다.";
+      return;
+    }
+    $("raw-input").value = data.raw;
+    $("fetch-status").textContent = `가져왔습니다: "${data.subject || ""}" (${data.date || ""})`;
+    $("btn-parse").click();
+  } catch (e) {
+    $("fetch-status").textContent = "가져오기 실패: " + e;
+  } finally {
+    $("btn-fetch").disabled = false;
+  }
+};
 
 $("btn-parse").onclick = async () => {
   $("parse-error").classList.add("hidden");

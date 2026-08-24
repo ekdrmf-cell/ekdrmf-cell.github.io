@@ -24,6 +24,19 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/fetch-order", methods=["POST"])
+def api_fetch_order():
+    try:
+        found = pipeline.fetch_latest_order_email()
+    except pipeline.PipelineError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"예상치 못한 오류: {e}"}), 500
+    if not found:
+        return jsonify({"ok": False, "error": "새로 가져올 주문 이메일이 없습니다."})
+    return jsonify({"ok": True, **found})
+
+
 @app.route("/api/parse", methods=["POST"])
 def api_parse():
     raw = (request.json or {}).get("raw", "")

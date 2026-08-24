@@ -9,17 +9,29 @@ order_fulfillment_checklist.md의 3~7단계(intake.json 만들기 ~ 발송 전 �
 가격 계산은 Sonnet 4.5($3/100만 입력토큰ㆍ$15/100만 출력토큰, claude-api 스킬로
 2026-08-23 확인) 기준이며, 환율은 화면에 "약"으로만 표기하는 참고용 추정치다.
 """
+import email
+import imaplib
 import json
+import os
 import re
 import subprocess
 import sys
 from datetime import datetime, timezone
+from email.header import decode_header
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 HERE = Path(__file__).resolve().parent
 REPORT_DIR = HERE.parent
 ENGINE_DIR = REPORT_DIR.parent / "crossnotics-engine"
 ORDERS_DIR = REPORT_DIR / "orders"
+
+load_dotenv(REPORT_DIR / ".env")
+GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
+ORDER_SUBJECT_MARKER = "천지인운명관"
+FETCHED_IDS_PATH = HERE / "fetched_email_ids.json"
 
 INPUT_PRICE_PER_M = 3.00
 OUTPUT_PRICE_PER_M = 15.00
@@ -87,6 +99,105 @@ def extract_intake_json(raw_text):
 def extract_reply_email(raw_text):
     m = re.search(r"전달받을 이메일:\s*(\S+@\S+)", raw_text)
     return m.group(1) if m else None
+
+
+def _load_fetched_ids():
+    if not FETCHED_IDS_PATH.exists():
+        return set()
+    try:
+        return set(json.loads(FETCHED_IDS_PATH.read_text(encoding="utf-8")))
+    except json.JSONDecodeError:
+        return set()
+
+
+def _save_fetched_ids(ids):
+    FETCHED_IDS_PATH.write_text(json.dumps(sorted(ids), ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _decode_subject(raw_subject):
+    if not raw_subject:
+        return ""
+    decoded = ""
+    for text, enc in decode_header(raw_subject):
+        decoded += text.decode(enc or "utf-8", errors="replace") if isinstance(text, bytes) else text
+    return decoded
+
+
+def _extract_body_text(msg):
+    """text/plain 파트를 우선 찾고, 없으면 text/html에서 태그만 벗겨낸다."""
+    if msg.is_multipart():
+        html_fallback = None
+        for part in msg.walk():
+            disp = str(part.get("Content-Disposition") or "")
+            if "attachment" in disp:
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            if part.get_content_type() == "text/plain":
+                payload = part.get_payload(decode=True)
+                if payload:
+                    return payload.decode(charset, errors="replace")
+            elif part.get_content_type() == "text/html" and html_fallback is None:
+                payload = part.get_payload(decode=True)
+                if payload:
+                    html_fallback = payload.decode(charset, errors="replace")
+        return re.sub(r"<[^>]+>", "", html_fallback) if html_fallback else ""
+    charset = msg.get_content_charset() or "utf-8"
+    payload = msg.get_payload(decode=True)
+    return payload.decode(charset, errors="replace") if payload else ""
+
+
+def fetch_latest_order_email():
+    """Gmail 받은편지함에서 아직 안 가져온 가장 최근 '천지인운명관' 주문 이메일을 찾아
+    본문을 반환한다. 이미 가져온 적 있는 이메일(Message-ID 기준, fetched_email_ids.json에
+    기록)은 건너뛴다. 새 이메일이 없으면 None을 반환한다."""
+    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+        raise PipelineError(
+            "Gmail 연동 정보가 없습니다 — tools/crossnotics-report/.env 파일에 GMAIL_ADDRESS와 "
+            "GMAIL_APP_PASSWORD(구글 계정 2단계 인증 설정의 '앱 비밀번호')를 채워주세요."
+        )
+
+    fetched_ids = _load_fetched_ids()
+
+    try:
+        imap = imaplib.IMAP4_SSL("imap.gmail.com")
+        imap.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+    except imaplib.IMAP4.error as e:
+        raise PipelineError(f"Gmail 로그인 실패: {e} (앱 비밀번호가 맞는지 확인해주세요)")
+
+    try:
+        imap.select("INBOX", readonly=True)
+        status, data = imap.search(None, "SUBJECT", f'"{ORDER_SUBJECT_MARKER}"')
+        if status != "OK":
+            raise PipelineError("Gmail 검색에 실패했습니다.")
+        msg_ids = data[0].split()
+
+        for msg_id in reversed(msg_ids):  # 최신 이메일부터
+            status, hdr_data = imap.fetch(msg_id, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+            header_block = hdr_data[0][1].decode("utf-8", errors="replace") if status == "OK" and hdr_data and hdr_data[0] else ""
+            m = re.search(r"Message-ID:\s*(<[^>]+>)", header_block, re.IGNORECASE)
+            message_key = m.group(1) if m else msg_id.decode()
+            if message_key in fetched_ids:
+                continue
+
+            status, msg_data = imap.fetch(msg_id, "(RFC822)")
+            if status != "OK" or not msg_data or not msg_data[0]:
+                continue
+            msg = email.message_from_bytes(msg_data[0][1])
+            body = _extract_body_text(msg)
+            if not body.strip():
+                continue
+
+            fetched_ids.add(message_key)
+            _save_fetched_ids(fetched_ids)
+            return {
+                "subject": _decode_subject(msg.get("Subject")),
+                "date": msg.get("Date"),
+                "raw": body,
+            }
+
+        return None
+    finally:
+        imap.logout()
 
 
 def summarize_intake(intake, catalog, reply_email=None):
