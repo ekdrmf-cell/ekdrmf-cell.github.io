@@ -610,25 +610,6 @@ body::before {
   font-weight: 600;
 }
 
-/* 리포트 예시를 다 본 직후 이탈하지 않도록 중간 CTA(2026-08-23 추가) — 폼까지
-   스크롤하지 않아도 여기서 바로 신청 지점(#cn-form)으로 이동 가능하게 함. */
-.cn-mid-cta {
-  display: block;
-  text-align: center;
-  margin-top: 24px;
-  padding: 15px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--gold) 0%, #c99a4e 55%, var(--accent) 130%);
-  color: #16111f;
-  font-weight: 800;
-  font-size: 15.5px;
-  letter-spacing: -0.01em;
-  text-decoration: none;
-  box-shadow: 0 14px 34px -14px rgba(220, 185, 114, 0.5);
-  transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.cn-mid-cta:hover { filter: brightness(1.06); transform: translateY(-2px); }
-
 /* FAQ — 폼 직전에 배치해 마지막 망설임을 없앰(2026-08-23 추가) */
 .cn-faq {
   margin: 8px 0 36px;
