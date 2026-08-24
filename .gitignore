@@ -8,6 +8,7 @@ tools/crossnotics-report/orders/
 tools/crossnotics-report/logs/
 tools/crossnotics-report/.env
 tools/crossnotics-report/webapp/server.log
+tools/crossnotics-report/webapp/fetched_email_ids.json
 tools/crossnotics-engine/.env
 tools/crossnotics-engine/node_modules/
 tools/crossnotics-engine/test/out-*.json

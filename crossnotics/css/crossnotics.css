@@ -160,6 +160,29 @@ body::before {
   letter-spacing: -0.01em;
 }
 
+/* 2026-08-24 추가 — 사용자가 직접 쓴 랜딩 문구 6개를 섹션마다 배치. 전체를 금색으로
+   칠하면 태그라인(.cn-tagline)과 위계가 같아져 화면이 산만해지므로, 문장은 세리프체
+   이탤릭으로 차분하게 두고 그 안의 핵심 단어만 .cn-gold로 강조한다. */
+.cn-slogan-line {
+  font-family: "Noto Serif KR", "Pretendard Variable", serif;
+  font-style: italic;
+  font-size: 1.06rem;
+  color: var(--text-dim);
+  line-height: 1.85;
+  margin: 10px 0 0;
+}
+.cn-gold {
+  color: var(--gold);
+  font-style: normal;
+  font-weight: 700;
+}
+.cn-slogan-close {
+  text-align: center;
+  max-width: 560px;
+  margin: 0 auto 28px;
+  font-size: 1.15rem;
+}
+
 /* 히어로 아래 신뢰 배지 — 가짜 후기 대신, 이미 사실인 정보(계산 기반ㆍ발송 소요ㆍ무료 진입)를
    3초 안에 스캔되게 노출(2026-08-23 추가). */
 .cn-trust-strip {
@@ -320,43 +343,6 @@ body::before {
 .cn-tier-spec .spec-val { color: var(--text-dim); font-weight: 600; text-align: right; }
 .cn-tier-spec.has .spec-val { color: var(--gold); font-weight: 800; }
 .cn-tier-spec.no .spec-val { color: var(--text-faint); font-weight: 500; }
-
-/* 가격대별 분량(페이지 수) 막대 — "가격이 오를수록 얼마나 더 깊어지는지"를 글자보다
-   먼저 눈으로 느끼게 하는 용도(2026-08-22 사용자 요청: "감각적으로 알 수 있게"). */
-.cn-pages-row {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-soft);
-}
-.cn-pages-bar {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-soft);
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.cn-pages-bar span {
-  display: block;
-  height: 100%;
-  min-width: 6%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), var(--gold));
-}
-.cn-pages-label {
-  font-size: 13.5px;
-  color: var(--text-faint);
-  font-weight: 600;
-}
-.cn-pages-label::before { content: "✦ "; color: var(--gold); }
-
-.cn-pages-footnote {
-  font-size: 12.5px;
-  color: var(--text-faint);
-  margin: -22px 0 40px;
-  line-height: 1.7;
-}
-.cn-pages-footnote::before { content: "✦ "; color: var(--gold); }
 
 .cn-form {
   background: var(--bg-card);
