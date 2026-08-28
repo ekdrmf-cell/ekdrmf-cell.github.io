@@ -336,6 +336,12 @@ def build_pdf(computed, report, out_path, product_name):
         if lts.get("second_act"):
             k.h1(lts["second_act"]["heading"])
             k.body(lts["second_act"]["body"])
+        # 2026-08-24 추가 — 행동DNA(behavior.js). computed.json에 behavior 필드가 있을
+        # 때만(=PREMIUM에서 실제로 15문항에 답했을 때만) LLM이 이 키를 채우므로, 존재
+        # 여부만으로 렌더 조건을 걸면 충분하다(다른 long_term_strategy 하위 섹션과 동일한 패턴).
+        if lts.get("behavior_dna"):
+            k.h1(lts["behavior_dna"]["heading"])
+            k.body(lts["behavior_dna"]["body"])
         ch += 1
 
     # ---- 질문 답변 — 2026-08-23 재설계: 질문마다 answerability(direct/redirected/

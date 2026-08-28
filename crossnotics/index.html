@@ -276,6 +276,11 @@
         </div>
       </div>
 
+      <div id="cn-behavior-field" style="display:none;">
+        <p class="cn-behavior-intro">이 15개 문항에 대한 답변은 손님의 10년 로드맵을 구성하는 실제 데이터로 반영됩니다. 답변이 실제 판단과 다를 경우, 로드맵 역시 손님의 실제 모습과 다르게 산출됩니다.</p>
+        <div id="cn-behavior-questions"></div>
+      </div>
+
       <div id="cn-questions"></div>
 
       <button type="submit" class="cn-submit" id="cn-submit-btn">신청하기 (입금 안내로 이동)</button>
@@ -378,7 +383,7 @@
     },
     {
       code: "crossnotics-premium", tierKey: "premium", label: "PREMIUM", name: "장기 인생 전략 프리미엄", price: 200000,
-      systems: ["saju", "astrology", "tarot"], systemLabels: ["사주", "별자리", "타로"], questionLimit: 12,
+      systems: ["saju", "astrology", "tarot", "behavior"], systemLabels: ["사주", "별자리", "타로"], questionLimit: 12,
       daeYunRange: "전체 8구간 + 10년 로드맵", hasOppRisk: true, hasActionPlan: true, hasLongTerm: true,
       features: ["마스터 티어 전체 내용 포함(사주 궁합ㆍ두 사람의 별자리 궁합 챕터 포함)", "10년 단위 운세 흐름 8구간의 10년 로드맵 전체", "평생 설계 + 인생 2막 전략", "질문 12개까지"],
     },
@@ -395,6 +400,43 @@
     { name: "수원", lat: 37.2636, lng: 127.0286 },
     { name: "창원", lat: 35.2281, lng: 128.6811 },
     { name: "제주", lat: 33.4996, lng: 126.5312 },
+  ];
+
+  // 2026-08-24 추가 — 행동DNA(behavior.js) 15문항. 반드시 tools/crossnotics-engine/
+  // behavior.js의 BEHAVIOR_QUESTIONS와 축 순서ㆍ보기 순서ㆍ의미가 정확히 일치해야 한다
+  // (여기서 만든 답변 배열이 그대로 그 파일의 채점 함수 입력이 됨) — 그쪽을 고치면
+  // 여기도 반드시 같이 고칠 것.
+  const CN_BEHAVIOR_QUESTIONS = [
+    { situation: "친한 사람이 갚을 가능성이 낮다는 걸 알면서도 100만원을 빌려달라고 한다.",
+      options: [["A","빌려준다"],["B","일부만 빌려준다"],["C","거절한다"],["D","이유를 듣고 결정한다"]] },
+    { situation: "몇 달간 준비한 프로젝트가 막판에 예산 문제로 취소될 위기다. 성공 확률은 낮지만 며칠 밤을 새우면 살릴 수도 있다.",
+      options: [["A","끝까지 매달린다"],["B","되는 데까지만 해본다"],["C","깔끔하게 접는다"],["D","다른 사람 의견부터 구한다"]] },
+    { situation: "동업자가 손실 위험은 있지만 잘되면 큰 사업 확장을 제안한다.",
+      options: [["A","동참한다"],["B","일부만 투자한다"],["C","거절한다"],["D","더 알아보고 결정한다"]] },
+    { situation: "친구가 술자리에서 계속 무리한 부탁을 한다.",
+      options: [["A","들어준다"],["B","한 번은 들어주고 다음부턴 선을 긋는다"],["C","그 자리에서 거절한다"],["D","농담으로 넘기며 피한다"]] },
+    { situation: "가족이 상의 없이 내 물건을 남에게 빌려줬다.",
+      options: [["A","넘어간다"],["B","다음에 조용히 얘기한다"],["C","그 자리에서 바로 말한다"],["D","서운함을 감추고 참는다"]] },
+    { situation: "동료가 자기 업무를 습관적으로 나에게 떠넘긴다.",
+      options: [["A","계속 도와준다"],["B","이번까지만 돕고 다음부턴 거절한다"],["C","바로 선을 긋고 거절한다"],["D","상사에게 먼저 알린다"]] },
+    { situation: "처음 만난 사람이 좋은 투자 정보라며 함께하자고 한다.",
+      options: [["A","바로 믿고 함께한다"],["B","관심은 가지되 직접 알아본다"],["C","일단 거리를 둔다"],["D","주변 사람에게 물어본다"]] },
+    { situation: "새로 알게 된 사람이 첫 만남부터 아주 친근하게 다가온다.",
+      options: [["A","나도 편하게 마음을 연다"],["B","좋게 보되 시간을 두고 지켜본다"],["C","다소 경계하며 거리를 둔다"],["D","그 사람의 행동을 유심히 관찰한다"]] },
+    { situation: "SNS에서 본 놀라운 소식을 지인이 사실이라며 전해준다.",
+      options: [["A","그대로 믿고 넘어간다"],["B","믿되 한 번 더 찾아본다"],["C","믿지 않고 직접 검색해본다"],["D","다른 사람들 반응부터 살핀다"]] },
+    { situation: "갑자기 다음 주에 휴가가 하루 생겼다.",
+      options: [["A","바로 떠날 곳을 정해 움직인다"],["B","가까운 곳 위주로 계획을 짠다"],["C","정한 게 없으면 그냥 집에서 쉰다"],["D","같이 갈 사람부터 찾아본다"]] },
+    { situation: "새로운 업무 방식을 도입하자는 제안이 갑자기 나왔다.",
+      options: [["A","일단 바로 시도해본다"],["B","작게 시범 적용부터 해본다"],["C","충분히 검토한 뒤 결정한다"],["D","다른 팀 사례부터 찾아본다"]] },
+    { situation: "평소 갖고 싶던 물건을 마침 큰 폭으로 할인하는 걸 봤다.",
+      options: [["A","바로 구매한다"],["B","하루 정도 고민하고 산다"],["C","정말 필요한지부터 따져본다"],["D","다른 사람에게 물어보고 결정한다"]] },
+    { situation: "회의에서 내 의견에 누군가 강하게 반박한다.",
+      options: [["A","곧바로 맞서 논리로 반박한다"],["B","침착하게 근거를 들어 설명한다"],["C","일단 물러서고 나중에 다시 얘기한다"],["D","다른 사람들 의견부터 들어본다"]] },
+    { situation: "친한 친구와 오해로 다투게 됐다.",
+      options: [["A","바로 전화해서 끝장을 본다"],["B","시간을 두고 차분히 대화를 청한다"],["C","먼저 연락하지 않고 기다린다"],["D","다른 친구에게 먼저 상황을 얘기한다"]] },
+    { situation: "가족과 중요한 문제로 의견이 크게 갈린다.",
+      options: [["A","내 뜻을 강하게 주장한다"],["B","절충안을 먼저 제안한다"],["C","갈등을 피해 대화를 미룬다"],["D","다른 가족에게 먼저 의견을 구한다"]] },
   ];
 
   function formatPrice(price) {
@@ -431,6 +473,7 @@
         renderTiers();
         renderQuestions();
         updateCityFieldVisibility();
+        updateBehaviorFieldVisibility();
         updateSubmitButton();
         // 상품 클릭 → 바로 입력칸으로 스크롤(2026-08-23 사용자 요청: "고객들이 편하게
         // 작업할 수 있도록" — 폼까지 직접 스크롤하지 않아도 되게 함).
@@ -461,6 +504,32 @@
     document.getElementById("cn-partner-city-field").style.display = needsAstrology ? "block" : "none";
   }
   updateCityFieldVisibility();
+
+  // ---- 행동DNA 15문항 렌더 + 표시 여부(PREMIUM에서만 노출) ----
+  const behaviorFieldEl = document.getElementById("cn-behavior-field");
+  const behaviorQuestionsEl = document.getElementById("cn-behavior-questions");
+  let behaviorRendered = false;
+  function renderBehaviorQuestions() {
+    if (behaviorRendered) return;
+    behaviorQuestionsEl.innerHTML = CN_BEHAVIOR_QUESTIONS.map((q, i) => `
+      <div class="cn-behavior-q">
+        <div class="situation">${i + 1}. ${q.situation}</div>
+        <div class="cn-behavior-options">
+          ${q.options.map(([key, text]) => `
+            <label><input type="radio" name="cn-behavior-${i}" value="${key}" required /> ${text}</label>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+    behaviorRendered = true;
+  }
+  function updateBehaviorFieldVisibility() {
+    const needsBehavior = currentTier().systems.includes("behavior");
+    if (needsBehavior) renderBehaviorQuestions();
+    behaviorFieldEl.style.display = needsBehavior ? "block" : "none";
+    behaviorQuestionsEl.querySelectorAll("input[type=radio]").forEach((el) => { el.required = needsBehavior; });
+  }
+  updateBehaviorFieldVisibility();
 
   // ---- 질문 입력칸 동적 렌더(선택 티어의 질문 개수만큼) ----
   const questionsEl = document.getElementById("cn-questions");
@@ -619,12 +688,26 @@
       .map((el) => el.value.trim())
       .filter((v) => v.length > 0);
 
+    // 행동DNA 15문항 답변 수집(PREMIUM만) — behavior.js의 BEHAVIOR_QUESTIONS와 같은
+    // 순서로 라디오 그룹 이름을 cn-behavior-0~14로 매겨뒀으므로 그 순서 그대로 배열로 만든다.
+    const needsBehavior = tier.systems.includes("behavior");
+    const behaviorAnswers = needsBehavior
+      ? CN_BEHAVIOR_QUESTIONS.map((_, i) => {
+          const checked = behaviorQuestionsEl.querySelector(`input[name="cn-behavior-${i}"]:checked`);
+          return checked ? checked.value : null;
+        })
+      : null;
+
     if (!name || !email) {
       alert("이름과 이메일을 입력해주세요.");
       return;
     }
     if (needsAstrology && !city) {
       alert("태어난 지역을 선택해주세요.");
+      return;
+    }
+    if (needsBehavior && behaviorAnswers.some((a) => !a)) {
+      alert("행동DNA 15문항에 전부 답해주세요.");
       return;
     }
 
@@ -668,6 +751,7 @@
         unknown_time: unknownTime, gender,
         ...(city ? { latitude: city.lat, longitude: city.lng } : {}),
         ...(partner ? { partner } : {}),
+        ...(needsBehavior ? { behavior_answers: behaviorAnswers } : {}),
         questions,
       },
     };
@@ -682,6 +766,7 @@
       `태어난시간: ${unknownTime ? "모름" : hour + "시"}\n` +
       (city ? `출생지: ${city.name} (위도 ${city.lat}, 경도 ${city.lng})\n` : "") +
       partnerSummaryLine +
+      (needsBehavior ? `행동DNA 15문항: 전체 답변 완료\n` : "") +
       `전달받을 이메일: ${email}\n\n` +
       `질문:\n${questions.length ? questions.map((q, i) => `${i + 1}. ${q}`).join("\n") : "(없음)"}\n\n` +
       `---\n운영자 메모: 이 이메일 전체(맨 위 [천지인운명관...]부터 아래 JSON 끝까지)를 그대로 복사해서\n` +

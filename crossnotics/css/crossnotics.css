@@ -389,6 +389,47 @@ body::before {
 .cn-question-item { margin-bottom: 8px; }
 .cn-question-item label { margin-bottom: 2px; }
 
+/* 2026-08-24 추가 — 행동DNA 15문항(PREMIUM 전용). 공지문 톤의 안내문 +
+   상황극 카드 목록. 라디오 보기는 폼의 다른 입력과 구분되게 카드 안에 두어
+   "이것도 신청 폼의 일부"라는 느낌을 준다. */
+.cn-behavior-intro {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.75;
+  margin: 0 0 18px;
+}
+.cn-behavior-q {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.cn-behavior-q .situation {
+  font-size: 14.5px;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.cn-behavior-options { display: flex; flex-direction: column; gap: 7px; }
+.cn-behavior-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+.cn-behavior-options input[type="radio"] { margin-top: 3px; flex-shrink: 0; }
+
 .cn-submit {
   background: linear-gradient(135deg, var(--gold) 0%, #c99a4e 55%, var(--accent) 130%);
   color: #16111f;

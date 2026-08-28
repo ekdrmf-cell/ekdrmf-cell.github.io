@@ -264,6 +264,28 @@ SYSTEM_PROMPT = """당신은 천지인운명관(사주ㆍ서양점성술ㆍ타�
    각 항목은 {"heading": string, "body": string} 형식이고, decade_roadmap.body 안에서
    대운 8구간을 문단 구분(빈 줄) 없이 이어 쓰지 말고 각 구간 앞에 "N. 몇 세~몇 세(간지)"
    처럼 번호를 매겨 구분하세요.
+9-A-1. **2026-08-24 추가 — computed.json에 behavior 필드가 있으면
+   long_term_strategy.behavior_dna를 채우세요(없으면 behavior_dna는 null).** 이
+   필드는 손님이 신청 시 직접 답한 상황극 15문항(행동DNA)을 이 서비스가 결정론적으로
+   채점한 결과입니다 — computed.behavior.axes 배열의 각 항목(axisLabel/pattern/
+   strength/crossRef)을 그대로 근거로 쓰고, 절대 새로 지어내지 마세요.
+   - **"여러 렌즈가 겹칠수록, 상은 선명해집니다"라는 이 서비스의 핵심 철학을 여기서
+     실제로 보여주는 자리입니다.** 각 축의 crossRef 문구를 참고해서, 이미 앞선
+     system_sections(사주ㆍ별자리)에서 다룬 신호와 이번 축의 실제 답변 패턴이 같은
+     방향을 가리키면 "사주에서도 그랬듯, 실제 선택에서도 같은 경향이 나타납니다"처럼
+     세 번째 독립된 근거로서 짚어주세요. 다른 방향을 가리키면 숨기지 말고 "다만 실제
+     선택에서는 조금 다른 결이 나타납니다"처럼 정직하게 쓰세요(cross_analysis와 동일한
+     원칙 — 불일치를 감추지 않음).
+   - **strength가 "혼합"(상황에 따라 유동적)인 축은 절대 하나의 성향으로 단정하지
+     마세요** — "이 부분은 상황에 따라 유연하게 다르게 판단하시는 편으로 보입니다"처럼
+     있는 그대로 씁니다. 데이터가 애매한데 확신 있게 쓰는 건 이 문서 전체에서 가장 자주
+     지적받은 문제(근거 없는 확신 금지)와 동일한 위반입니다.
+   - 축 이름(axisLabel)ㆍ패턴(적극/절충/회피/판단보류형/상황에 따라 유동적) 같은 라벨은
+     그대로 써도 되지만(5-A번 원칙과 동일 — 라벨이 아니라 설명이 부실한 게 문제), 매번
+     "이게 무슨 뜻인지" 이유를 만들어 풀어주세요(5-A번 문체 원칙을 그대로 적용).
+   - 5개 축을 전부 한 문단에 나열하지 말고, 앞으로 나올 decade_roadmap/action_plan의
+     조언과 자연스럽게 이어지도록(예: 위험 감수 성향이 신중한 쪽이면 뒤에 나올 로드맵
+     조언의 톤도 그와 일관되게) 문단을 구성하세요.
 9-B. **scope가 "full"("single" 제외)/"premium"이면 action_plan을 채우세요**(그 외는
    null). 지금까지의 해석을 실제로 "이번 주ㆍ이번 달에 뭘 하면 좋을지"로 옮기는 짧은
    실행 목록입니다 — 새 사실을 지어내지 말고, 앞서 다룬 계산값(오행 우세/부족, 지금
@@ -513,6 +535,7 @@ REPORT_SCHEMA = {
                     "decade_roadmap": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
                     "lifetime_design": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
                     "second_act": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
+                    "behavior_dna": {"type": ["object", "null"], "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
                 },
             },
             "closing": {"type": "string"},
