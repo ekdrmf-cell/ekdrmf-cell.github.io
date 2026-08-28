@@ -62,13 +62,23 @@ def load_tier_catalog():
 
 
 def extract_intake_json(raw_text):
-    """이메일 원문(또는 intake.json 그 자체)에서 intake JSON을 뽑아낸다."""
+    """이메일 원문(또는 intake.json 그 자체)에서 intake JSON을 뽑아낸다.
+
+    2026-08-24 원인 분석 — 실제로 "Invalid control character at: line 1 column 71" 같은
+    에러가 반복됨. index.html이 JSON.stringify(intakeJson)로 만드는 건 원래 줄바꿈 없는
+    한 줄짜리 텍스트인데, 이메일이 Gmail/SMTP를 거치는 과정에서 너무 긴 줄을 자동으로
+    줄바꿈해버리는 경우가 있다(70~76자 부근에서 실제로 끊김 — 표준 이메일 줄바꿈 관례와
+    일치). 그 줄바꿈이 JSON 문자열 값 한가운데 들어가면 Python json 모듈이 기본(strict)
+    모드에서는 "제어 문자(줄바꿈 등)가 문자열 안에 그대로 있으면 안 된다"며 거부한다.
+    strict=False를 주면 그런 제어 문자를 문자열의 일부로 그냥 허용하므로(의미상으로도
+    문제 없음 — 어차피 원래 있던 게 아니라 전송 중 끼어든 줄바꿈일 뿐), 이 사고의 원인을
+    코드 쪽에서 흡수한다."""
     text = raw_text.strip()
     if not text:
         raise PipelineError("입력이 비어있습니다.")
     if text.startswith("{"):
         try:
-            return json.loads(text)
+            return json.loads(text, strict=False)
         except json.JSONDecodeError as e:
             raise PipelineError(f"JSON 파싱 실패: {e}")
 
@@ -90,7 +100,7 @@ def extract_intake_json(raw_text):
             depth -= 1
             if depth == 0:
                 try:
-                    return json.loads(text[brace_start:i + 1])
+                    return json.loads(text[brace_start:i + 1], strict=False)
                 except json.JSONDecodeError as e:
                     raise PipelineError(f"JSON 파싱 실패: {e}")
     raise PipelineError("JSON 블록이 중간에 잘린 것 같습니다 — 이메일 본문 전체를 다시 복사해주세요.")
