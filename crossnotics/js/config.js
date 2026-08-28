@@ -27,22 +27,14 @@ function contactMail(subject, body) {
   window.location.href = `mailto:${SITE_CONFIG.contactEmail}?subject=${s}&body=${b}`;
 }
 
-// 구매 문의: 결제 링크가 있으면 새 탭으로 열고, 계좌 안내문구만 있으면 입금 안내 팝업을
-// 띄운 뒤 이메일 문의로 이어지고, 둘 다 없으면 바로 이메일 문의로 대체합니다.
-function contactPurchase(subject, body) {
-  if (SITE_CONFIG.paymentLink) {
-    window.open(SITE_CONFIG.paymentLink, "_blank", "noopener");
-    return;
-  }
-  if (SITE_CONFIG.paymentGuideText) {
-    showPaymentGuide(SITE_CONFIG.paymentGuideText, () => contactMail(subject, body));
-    return;
-  }
-  contactMail(subject, body);
-}
-
-// 계좌 안내 팝업(crossnotics/css/base.css의 공용 .modal 스타일 재사용)
-function showPaymentGuide(guideText, onConfirm) {
+// 계좌 안내 팝업(crossnotics/css/base.css의 공용 .modal 스타일 재사용) — 2026-08-24
+// 수정: 예전엔 확인 버튼이 "입금 완료, 문의 이메일 보내기"였는데, 사용자 지시로 "신청하기
+// → 계좌 안내 → [입금 완료]면 신청 완료, [입금 안 함]이면 신청 취소"라는 명확한 이분법으로
+// 바꿈. 실제 입금 여부를 사이트가 검증할 방법은 없다(계좌 API 연동 없음) — 이 버튼은
+// 손님이 스스로 밝히는 것뿐이고, 진짜 검증은 사장님이 로컬 프로그램에서 은행 앱과 대조해
+// 직접 한다(2026-08-24 논의). onCancel을 추가해 "입금 안 함"을 눌렀을 때도 호출하는 곳에서
+// 반응할 수 있게 함(예: "신청이 취소되었습니다" 화면 표시).
+function showPaymentGuide(guideText, onConfirm, onCancel) {
   let backdrop = document.getElementById("payment-guide-backdrop");
   if (!backdrop) {
     backdrop = document.createElement("div");
@@ -55,11 +47,14 @@ function showPaymentGuide(guideText, onConfirm) {
       <h3>입금 안내</h3>
       <p>아래 계좌로 입금해주시면 확인 후 상품을 보내드립니다.</p>
       <p style="color:var(--text);font-weight:600;">${guideText}</p>
-      <button class="btn btn-primary btn-block" id="payment-guide-confirm">입금 완료, 문의 이메일 보내기</button>
-      <button class="btn btn-block" id="payment-guide-close" style="margin-top:8px;">닫기</button>
+      <button class="btn btn-primary btn-block" id="payment-guide-confirm">입금 완료</button>
+      <button class="btn btn-block" id="payment-guide-close" style="margin-top:8px;">입금 안 함</button>
     </div>`;
   backdrop.classList.add("open");
-  document.getElementById("payment-guide-close").onclick = () => backdrop.classList.remove("open");
+  document.getElementById("payment-guide-close").onclick = () => {
+    backdrop.classList.remove("open");
+    onCancel && onCancel();
+  };
   document.getElementById("payment-guide-confirm").onclick = () => {
     backdrop.classList.remove("open");
     onConfirm && onConfirm();

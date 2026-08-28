@@ -284,7 +284,7 @@
 
       <div id="cn-questions"></div>
 
-      <button type="submit" class="cn-submit" id="cn-submit-btn">신청하기 (입금 안내로 이동)</button>
+      <button type="submit" class="cn-submit" id="cn-submit-btn">신청하기</button>
     </form>
 
     <div class="cn-apply-result" id="cn-apply-result" style="display:none;"></div>
@@ -555,7 +555,7 @@
   // 버튼 문구도 달라야 헷갈리지 않는다 ----
   const submitBtn = document.getElementById("cn-submit-btn");
   function updateSubmitButton() {
-    submitBtn.textContent = currentTier().price === 0 ? "무료로 받기" : "신청하기 (입금 안내로 이동)";
+    submitBtn.textContent = currentTier().price === 0 ? "무료로 받기" : "신청하기";
   }
   updateSubmitButton();
 
@@ -782,7 +782,11 @@
       window.open(SITE_CONFIG.paymentLink, "_blank", "noopener");
       submitApplication(subject, body, email);
     } else if (SITE_CONFIG.paymentGuideText) {
-      showPaymentGuide(SITE_CONFIG.paymentGuideText, () => submitApplication(subject, body, email));
+      showPaymentGuide(
+        SITE_CONFIG.paymentGuideText,
+        () => submitApplication(subject, body, email),
+        () => showApplyCancelled()
+      );
     } else {
       submitApplication(subject, body, email);
     }
@@ -797,6 +801,25 @@
   // CN_MAIL_ENDPOINT가 아직 비어있으면(Apps Script 배포 전) 예전 mailto로 폴백한다 —
   // 이 커밋이 배포돼도 설정 전까지는 지금과 동일하게 작동해서 서비스가 끊기지 않는다.
   const applyResultEl = document.getElementById("cn-apply-result");
+
+  // 2026-08-24 추가 — 계좌 안내 팝업에서 "입금 안 함"을 누르면 폼을 그대로 두지 않고
+  // 명확히 "신청이 취소되었습니다"를 보여준다(사용자 지시: 완료/취소를 분명하게 나눌 것).
+  function showApplyCancelled() {
+    document.getElementById("cn-form").style.display = "none";
+    applyResultEl.style.display = "block";
+    applyResultEl.innerHTML = `
+      <div class="cn-apply-fail">
+        <div class="cn-apply-title">신청이 취소되었습니다</div>
+        <p>입금을 완료하지 않아 신청이 접수되지 않았습니다. 다시 신청하시려면 아래에서 처음부터 진행해주세요.</p>
+        <button type="button" class="cn-submit" id="cn-apply-restart">다시 신청하기</button>
+      </div>`;
+    applyResultEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("cn-apply-restart").addEventListener("click", () => {
+      applyResultEl.style.display = "none";
+      document.getElementById("cn-form").style.display = "";
+    });
+  }
+
   async function submitApplication(subject, body, email) {
     if (!CN_MAIL_ENDPOINT) {
       contactMail(subject, body);
@@ -823,7 +846,7 @@
       applyResultEl.innerHTML = `
         <div class="cn-apply-ok">
           <div class="cn-apply-icon">✦</div>
-          <div class="cn-apply-title">신청이 접수되었습니다</div>
+          <div class="cn-apply-title">신청이 완료되었습니다</div>
           <p>확인 후 <b>${email}</b>로 리포트를 보내드립니다. 영업일 기준 1~2일 정도 소요됩니다.</p>
           <p class="cn-apply-note">이메일이 오지 않으면 스팸함도 확인해주세요.</p>
         </div>`;
