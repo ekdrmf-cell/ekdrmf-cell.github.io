@@ -279,6 +279,71 @@ body::before {
 }
 .cn-philosophy b { color: var(--text); }
 
+.cn-diff {
+  background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  margin: 0 0 40px;
+  box-shadow: var(--shadow-card);
+}
+.cn-diff-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.cn-diff-title::before { content: "✦ "; color: var(--gold); }
+.cn-diff-intro {
+  font-size: 15.5px;
+  line-height: 1.9;
+  color: var(--text-dim);
+  margin: 0 0 16px;
+}
+.cn-diff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.cn-diff-list li {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text-dim);
+  padding-left: 22px;
+  position: relative;
+}
+.cn-diff-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--gold);
+  font-weight: 700;
+}
+.cn-diff-list li b { color: var(--text); }
+.cn-diff-free {
+  margin-top: 20px;
+  background: linear-gradient(160deg, var(--gold-soft), rgba(166, 138, 255, 0.06));
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+}
+.cn-diff-free-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.cn-diff-free p {
+  font-size: 14.5px;
+  line-height: 1.8;
+  color: var(--text-dim);
+  margin: 0;
+}
+
 .cn-tiers {
   display: grid;
   gap: 18px;
