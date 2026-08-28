@@ -49,6 +49,9 @@
              vertical-align: middle; margin-right: 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .cost-note { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; }
+  summary { cursor: pointer; color: var(--text-dim); font-size: 13px; margin-top: 18px; }
+  .order-list-note { font-size: 12.5px; color: var(--text-dim); margin-top: 10px; }
+  input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -60,14 +63,29 @@
   <div class="panel" id="panel-input">
     <h2>1. 주문 이메일 가져오기</h2>
     <div class="row">
-      <button id="btn-fetch" class="secondary">📥 주문 가져오기 (Gmail에서 자동으로)</button>
+      <button id="btn-fetch-all" class="secondary">📥 Gmail에서 주문 목록 가져오기</button>
     </div>
     <p class="sub" id="fetch-status" style="margin: 8px 0 0;"></p>
-    <textarea id="raw-input" placeholder="위 버튼으로 자동으로 가져오거나, ekdrmf@gmail.com으로 온 신청 이메일 본문 전체를 여기에 직접 붙여넣으세요 (제목 아래 내용 전부, 맨 아래 JSON 블록까지 포함)."></textarea>
-    <div class="row">
-      <button id="btn-parse">주문 확인</button>
+
+    <div id="order-list-wrap" class="hidden" style="margin-top:16px;">
+      <div id="order-list-table"></div>
+      <div class="row" style="margin-top:10px;">
+        <button id="btn-batch-generate" disabled>선택한 주문 일괄 처리 (0건)</button>
+        <button class="secondary" id="btn-select-all">전체 선택</button>
+        <button class="secondary" id="btn-select-none">전체 해제</button>
+      </div>
+      <p class="order-list-note">체크 안 한 주문은 다음에 목록을 다시 가져와도 그대로 남아있습니다 —
+        휴대폰 은행 앱에서 실제로 입금이 확인된 주문만 이름을 대조해서 체크해주세요.</p>
     </div>
-    <div class="error hidden" id="parse-error"></div>
+
+    <details>
+      <summary>또는 이메일 본문을 직접 붙여넣기</summary>
+      <textarea id="raw-input" style="margin-top:10px;" placeholder="ekdrmf@gmail.com으로 온 신청 이메일 본문 전체를 여기에 직접 붙여넣으세요 (제목 아래 내용 전부, 맨 아래 JSON 블록까지 포함)."></textarea>
+      <div class="row">
+        <button id="btn-parse">주문 확인</button>
+      </div>
+      <div class="error hidden" id="parse-error"></div>
+    </details>
   </div>
 
   <div class="panel hidden" id="panel-preview">
@@ -121,24 +139,106 @@ async function loadOrders() {
   $("orders-table").innerHTML = html;
 }
 
-$("btn-fetch").onclick = async () => {
-  $("fetch-status").textContent = "Gmail에서 새 주문 이메일을 확인하는 중...";
-  $("btn-fetch").disabled = true;
+// ---- 주문 목록 일괄 가져오기(2026-08-24 신설) — 사용자 지시: "주문이 1개든 100개든
+// 한 번에 처리되면 좋겠다." 목록에 뜬 건 아직 "처리 완료"가 아니다 — 체크해서 일괄
+// 생성을 실제로 성공해야만(서버가 mark_order_fetched 호출) 다음 조회에서 사라진다. ----
+let pendingOrders = [];
+
+$("btn-fetch-all").onclick = async () => {
+  $("fetch-status").textContent = "Gmail에서 처리 안 한 주문을 전부 확인하는 중...";
+  $("btn-fetch-all").disabled = true;
   try {
-    const res = await fetch("/api/fetch-order", { method: "POST" });
+    const res = await fetch("/api/list-orders", { method: "POST" });
     const data = await res.json();
     if (!data.ok) {
-      $("fetch-status").textContent = data.error || "가져올 주문이 없습니다.";
+      $("fetch-status").textContent = data.error || "목록을 가져오지 못했습니다.";
+      $("order-list-wrap").classList.add("hidden");
       return;
     }
-    $("raw-input").value = data.raw;
-    $("fetch-status").textContent = `가져왔습니다: "${data.subject || ""}" (${data.date || ""})`;
-    $("btn-parse").click();
+    pendingOrders = data.orders || [];
+    if (!pendingOrders.length) {
+      $("fetch-status").textContent = "새로 처리할 주문이 없습니다.";
+      $("order-list-wrap").classList.add("hidden");
+      return;
+    }
+    $("fetch-status").textContent = `${pendingOrders.length}건을 가져왔습니다 — 입금 확인된 것만 체크 후 일괄 처리하세요.`;
+    renderOrderList();
   } catch (e) {
     $("fetch-status").textContent = "가져오기 실패: " + e;
   } finally {
-    $("btn-fetch").disabled = false;
+    $("btn-fetch-all").disabled = false;
   }
+};
+
+function renderOrderList() {
+  const rows = pendingOrders.map((o, i) => {
+    const p = o.preview;
+    const price = p && p.tier_price != null ? (p.tier_price === 0 ? "무료" : p.tier_price.toLocaleString() + "원") : "-";
+    return `
+      <tr data-idx="${i}">
+        <td>${o.parse_error ? "" : `<input type="checkbox" class="order-check" data-idx="${i}" />`}</td>
+        <td>${p ? escapeHtml(p.customer_name || "-") : "-"}</td>
+        <td>${p ? escapeHtml(p.tier_name) : "-"}</td>
+        <td>${price}</td>
+        <td>${escapeHtml(o.date || "-")}</td>
+        <td class="order-status">${o.parse_error ? `<span class="status-review">파싱 오류: ${escapeHtml(o.parse_error)}</span>` : "대기중"}</td>
+      </tr>`;
+  }).join("");
+  $("order-list-table").innerHTML = `<table><tr><th></th><th>이름</th><th>상품</th><th>금액</th><th>날짜</th><th>상태</th></tr>${rows}</table>`;
+  $("order-list-wrap").classList.remove("hidden");
+  $("order-list-table").querySelectorAll(".order-check").forEach((el) => {
+    el.addEventListener("change", updateBatchButtonLabel);
+  });
+  updateBatchButtonLabel();
+}
+
+function updateBatchButtonLabel() {
+  const n = $("order-list-table").querySelectorAll(".order-check:checked").length;
+  $("btn-batch-generate").textContent = `선택한 주문 일괄 처리 (${n}건)`;
+  $("btn-batch-generate").disabled = n === 0;
+}
+
+$("btn-select-all").onclick = () => {
+  $("order-list-table").querySelectorAll(".order-check").forEach((el) => { el.checked = true; });
+  updateBatchButtonLabel();
+};
+$("btn-select-none").onclick = () => {
+  $("order-list-table").querySelectorAll(".order-check").forEach((el) => { el.checked = false; });
+  updateBatchButtonLabel();
+};
+
+// 체크한 것들을 순서대로(동시에 여러 개 아님 — API 요청이 겹치지 않게, 진행 상황도
+// 한눈에 보이게) 하나씩 실제 생성한다. 하나가 실패해도 나머지는 계속 진행한다.
+$("btn-batch-generate").onclick = async () => {
+  const idxs = [...$("order-list-table").querySelectorAll(".order-check:checked")].map((el) => Number(el.dataset.idx));
+  $("btn-batch-generate").disabled = true;
+  $("btn-select-all").disabled = true;
+  $("btn-select-none").disabled = true;
+  for (const i of idxs) {
+    const order = pendingOrders[i];
+    const statusEl = $("order-list-table").querySelector(`tr[data-idx="${i}"] .order-status`);
+    statusEl.innerHTML = `<span class="spinner"></span>생성 중... (30초~2분)`;
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intake: order.intake, reply_email: order.reply_email, message_key: order.message_key }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        statusEl.innerHTML = `<span class="status-review">실패: ${escapeHtml(data.error)}</span>`;
+        continue;
+      }
+      const r = data.result;
+      const warn = ((r.warnings && r.warnings.length) || r.page_status === "REVIEW") ? " ⚠" : "";
+      statusEl.innerHTML = `<span class="status-pass">완료${warn}</span> · <a href="/api/pdf/${r.order_id}" target="_blank">PDF 열기</a>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span class="status-review">실패: ${escapeHtml(String(e))}</span>`;
+    }
+  }
+  $("btn-select-all").disabled = false;
+  $("btn-select-none").disabled = false;
+  updateBatchButtonLabel();
+  loadOrders();
 };
 
 $("btn-parse").onclick = async () => {

@@ -146,10 +146,16 @@ def _extract_body_text(msg):
     return payload.decode(charset, errors="replace") if payload else ""
 
 
-def fetch_latest_order_email():
-    """Gmail 받은편지함에서 아직 안 가져온 가장 최근 '천지인운명관' 주문 이메일을 찾아
-    본문을 반환한다. 이미 가져온 적 있는 이메일(Message-ID 기준, fetched_email_ids.json에
-    기록)은 건너뛴다. 새 이메일이 없으면 None을 반환한다."""
+def fetch_all_pending_orders():
+    """Gmail 받은편지함에서 아직 리포트를 생성하지 않은 '천지인운명관' 주문 이메일을
+    전부(최신순) 찾아 리스트로 반환한다 — 2026-08-24, 사용자 지시로 "1개든 100개든
+    한 번에" 목록으로 보여주는 방식으로 전면 개편(예전 fetch_latest_order_email은
+    한 번에 1건만 가져오던 방식이라 폐기).
+
+    **여기서는 fetched_email_ids.json에 아무것도 기록하지 않는다** — 목록에 보여주는 것과
+    "처리 완료"는 다른 일이다. 화면에 뜬 주문 중 사장님이 실제로 입금을 확인하고 체크해서
+    리포트를 생성한 것만 mark_order_fetched()로 기록되고, 체크 안 한(=아직 입금 미확인)
+    주문은 다음에 또 목록에 그대로 남아있어야 한다."""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
         raise PipelineError(
             "Gmail 연동 정보가 없습니다 — tools/crossnotics-report/.env 파일에 GMAIL_ADDRESS와 "
@@ -164,6 +170,7 @@ def fetch_latest_order_email():
     except imaplib.IMAP4.error as e:
         raise PipelineError(f"Gmail 로그인 실패: {e} (앱 비밀번호가 맞는지 확인해주세요)")
 
+    results = []
     try:
         imap.select("INBOX", readonly=True)
         # 2026-08-24 수정 — 예전엔 SUBJECT 검색어로 "천지인운명관"(한글)을 그대로 넘겼는데,
@@ -189,7 +196,7 @@ def fetch_latest_order_email():
                 continue
             message_key = header_msg.get("Message-ID") or msg_id.decode()
             if message_key in fetched_ids:
-                continue
+                continue  # 이미 리포트까지 생성 완료한 주문은 목록에서 제외
 
             status, msg_data = imap.fetch(msg_id, "(RFC822)")
             if status != "OK" or not msg_data or not msg_data[0]:
@@ -199,17 +206,27 @@ def fetch_latest_order_email():
             if not body.strip():
                 continue
 
-            fetched_ids.add(message_key)
-            _save_fetched_ids(fetched_ids)
-            return {
-                "subject": _decode_subject(msg.get("Subject")),
+            results.append({
+                "message_key": message_key,
+                "subject": subject,
                 "date": msg.get("Date"),
                 "raw": body,
-            }
+            })
 
-        return None
+        return results
     finally:
         imap.logout()
+
+
+def mark_order_fetched(message_key):
+    """리포트를 실제로 생성 완료한 주문만 여기로 기록한다(app.py의 /api/generate가 성공한
+    뒤에만 호출) — 목록에 보여준 것만으로는 기록하지 않으므로, 체크 안 한 주문은 다음
+    조회에도 계속 목록에 남는다."""
+    if not message_key:
+        return
+    fetched_ids = _load_fetched_ids()
+    fetched_ids.add(message_key)
+    _save_fetched_ids(fetched_ids)
 
 
 def summarize_intake(intake, catalog, reply_email=None):
