@@ -16,7 +16,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.header import decode_header
 from pathlib import Path
 
@@ -166,16 +166,28 @@ def fetch_latest_order_email():
 
     try:
         imap.select("INBOX", readonly=True)
-        status, data = imap.search(None, "SUBJECT", f'"{ORDER_SUBJECT_MARKER}"')
+        # 2026-08-24 수정 — 예전엔 SUBJECT 검색어로 "천지인운명관"(한글)을 그대로 넘겼는데,
+        # charset을 안 정해주면(None) imaplib이 검색 명령 전체를 ASCII로 인코딩하려다
+        # UnicodeEncodeError로 죽는 실제 사고가 났음("'ascii' codec can't encode..."). IMAP
+        # 서버에 한글 검색어를 안전하게 보내는 방법(CHARSET UTF-8 + 리터럴)은 imaplib
+        # 버전별로 까다로워서, 아예 서버 쪽 검색은 ASCII로만 안전한 기준(최근 날짜)으로
+        # 좁히고, 실제 "천지인운명관" 여부 판정은 파이썬에서 제목을 디코딩해 직접 비교한다
+        # — 원인이 되는 "한글을 IMAP 검색어로 보내는 행위" 자체를 없앤 것.
+        since_date = (datetime.now() - timedelta(days=90)).strftime("%d-%b-%Y")
+        status, data = imap.search(None, "SINCE", since_date)
         if status != "OK":
             raise PipelineError("Gmail 검색에 실패했습니다.")
         msg_ids = data[0].split()
 
         for msg_id in reversed(msg_ids):  # 최신 이메일부터
-            status, hdr_data = imap.fetch(msg_id, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
-            header_block = hdr_data[0][1].decode("utf-8", errors="replace") if status == "OK" and hdr_data and hdr_data[0] else ""
-            m = re.search(r"Message-ID:\s*(<[^>]+>)", header_block, re.IGNORECASE)
-            message_key = m.group(1) if m else msg_id.decode()
+            status, hdr_data = imap.fetch(msg_id, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT)])")
+            if status != "OK" or not hdr_data or not hdr_data[0]:
+                continue
+            header_msg = email.message_from_bytes(hdr_data[0][1])
+            subject = _decode_subject(header_msg.get("Subject"))
+            if ORDER_SUBJECT_MARKER not in subject:
+                continue
+            message_key = header_msg.get("Message-ID") or msg_id.decode()
             if message_key in fetched_ids:
                 continue
 
