@@ -43,6 +43,12 @@ SYSTEM_PROMPT = """당신은 천지인운명관(사주ㆍ서양점성술ㆍ타�
 중요한 시기에 참고하는 진지한 지침서가 될 수 있습니다 — 성의 없이 짧거나 상투적으로
 느껴지면 안 됩니다. 아래 규칙을 반드시 지키세요.
 
+0. **[형식] 문장 안에서 예시 대사나 혼잣말을 인용할 때(scripts.line, action_plan의
+   추천 문구 등) 큰따옴표(")로 감싸지 마세요 — 작은따옴표(')나 '이렇게' 식으로
+   표현하세요.** 지금 이 답변 전체가 JSON 형식이라, 문장 안에 큰따옴표를 그대로 쓰면
+   JSON이 깨져 그 필드 전체가 손실될 수 있습니다(실제로 이 사고가 발생해 확인함). 이
+   규칙은 내용이 아니라 순수하게 형식 문제이니 사소해 보여도 반드시 지키세요.
+
 1. 사용자가 제공하는 JSON(computed.json)에 없는 간지ㆍ별자리ㆍ카드명ㆍ수치ㆍ날짜는 절대
    지어내지 마세요. 당신이 아는 일반적인 사주/점성술/타로 지식으로 새 사실을 채우지 마세요 —
    오직 주어진 JSON에 있는 값만 문장으로 옮기세요. **분량을 늘려야 한다는 이유로 이 규칙을
@@ -688,6 +694,71 @@ def sanitize_report(obj):
     return obj
 
 
+_SCHEMA_TYPE_CHECK = {
+    "object": lambda v: isinstance(v, dict),
+    "array": lambda v: isinstance(v, list),
+    "string": lambda v: isinstance(v, str),
+    "null": lambda v: v is None,
+    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+    "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+    "boolean": lambda v: isinstance(v, bool),
+}
+_SCHEMA_SAFE_DEFAULT = {"object": {}, "array": [], "string": "", "null": None}
+
+
+def normalize_to_schema(value, schema, path, corrections):
+    """2026-08-24 추가 — 실제로 두 번 연속 겪은 사고(action_plan이 dict 대신 문자열로,
+    question_answers 항목이 dict 대신 문자열로 옴)를 계기로 만든 근본 수정. Anthropic
+    구조화 출력이 스키마를 강제한다고 알려져 있지만 실전에서 타입이 어긋나는 사례가
+    실제로 나왔고, 그때마다 이걸 나중에 건드리는 함수(check_hallucination만이 아니라
+    report_kit.py의 PDF 렌더링까지)를 하나하나 방어 코드로 땜질하면 다음에 또 다른
+    필드에서 같은 사고가 난다 — 그래서 "LLM 응답을 받는 그 즉시, 딱 한 곳에서" 스키마와
+    실제 타입을 대조해 안전한 기본값으로 되돌리는 이 함수를 만들었다. 이후로는
+    check_hallucination이든 report_kit.py든 전부 이미 정규화된 안전한 데이터만 보게 된다.
+    무엇을 고쳤는지는 전부 corrections 리스트에 남겨 화면에 경고로 띄운다(내용이 조용히
+    사라지면 안 되므로) — 코드가 안 죽는 것과, 손님에게 나갈 리포트에 구멍이 난 걸 사람이
+    아는 것은 별개다."""
+    types = schema.get("type")
+    if types is None:
+        return value
+    if isinstance(types, str):
+        types = [types]
+
+    if not any(_SCHEMA_TYPE_CHECK.get(t, lambda v: False)(value) for t in types):
+        # 2026-08-24 추가 — 실제 사고 원인 확인: object/array가 와야 할 자리에 문자열이
+        # 왔는데, 그 문자열 내용을 열어보니 원래 의도된 JSON이 그대로 들어있었다(모델이
+        # 이 필드 전체를 이중으로 문자열 인코딩한 경우). 이럴 땐 버리지 않고 다시 파싱을
+        # 시도한다 — 파싱이 깨끗이 성공할 때만 쓰고, 실패하면(예: 문장 안 인용부호를
+        # 이스케이프 안 해서 JSON이 실제로 깨진 경우) 안전한 기본값으로만 대체한다 —
+        # 애매하게 복구를 "추측"해서 잘못된 내용을 조용히 끼워넣느니, 차라리 그 부분만
+        # 비워두는 쪽이 안전하다(이 프로젝트의 "지어내지 않는다" 원칙과 같은 이유).
+        if isinstance(value, str) and ("object" in types or "array" in types):
+            try:
+                reparsed = json.loads(value)
+                if any(_SCHEMA_TYPE_CHECK.get(t, lambda v: False)(reparsed) for t in types):
+                    corrections.append(f"{path}: 문자열로 이중 인코딩되어 있던 걸 재파싱으로 복구함")
+                    value = reparsed
+                    types = [t for t in types if _SCHEMA_TYPE_CHECK[t](value)]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not any(_SCHEMA_TYPE_CHECK.get(t, lambda v: False)(value) for t in types):
+            default = next((_SCHEMA_SAFE_DEFAULT[t] for t in types if t in _SCHEMA_SAFE_DEFAULT), None)
+            corrections.append(f"{path}: 예상 타입({'/'.join(types)})이 아님(실제: {type(value).__name__}) → {default!r}로 대체")
+            return default
+
+    if isinstance(value, dict) and "properties" in schema:
+        result = dict(value)
+        for key, sub_schema in schema["properties"].items():
+            if key in result:
+                result[key] = normalize_to_schema(result[key], sub_schema, f"{path}.{key}", corrections)
+        return result
+
+    if isinstance(value, list) and "items" in schema:
+        return [normalize_to_schema(item, schema["items"], f"{path}[{i}]", corrections) for i, item in enumerate(value)]
+
+    return value
+
+
 def check_hallucination(report, known_terms, valid_years):
     """리포트 본문에서 핵심 용어를 뽑아 known_terms/valid_years와 대조 — 발송을 막지는
     않고 경고만 남긴다.
@@ -845,6 +916,16 @@ def main():
     print(f"LLM 호출 중... (모델: {MODEL})")
     report, usage = call_llm(computed)
     print(f"완료. 토큰 사용량: 입력 {usage.input_tokens} / 출력 {usage.output_tokens}")
+
+    # 2026-08-24 추가 — 응답을 받는 즉시 스키마와 실제 타입을 대조해 정규화(normalize_to_
+    # schema 문서화 참고). 이후의 모든 코드(이 파일의 검증 함수들 + report_kit.py의 PDF
+    # 렌더링)는 이 시점부터 항상 스키마와 맞는 안전한 데이터만 보게 된다.
+    schema_corrections = []
+    report = normalize_to_schema(report, REPORT_SCHEMA["input_schema"], "report", schema_corrections)
+    if schema_corrections:
+        print(f"⚠ 경고: LLM 응답이 스키마와 맞지 않아 {len(schema_corrections)}건 자동 보정함 — 해당 부분은 리포트에서 비어있을 수 있으니 발송 전 확인할 것:")
+        for c in schema_corrections:
+            print(f"    - {c}")
 
     out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else computed_path.with_suffix(".report.json")
     # 2026-08-24 추가 — 실제로 이 아래(check_hallucination)에서 예상 못 한 응답 모양 때문에
