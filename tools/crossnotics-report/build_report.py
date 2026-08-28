@@ -690,27 +690,44 @@ def sanitize_report(obj):
 
 def check_hallucination(report, known_terms, valid_years):
     """리포트 본문에서 핵심 용어를 뽑아 known_terms/valid_years와 대조 — 발송을 막지는
-    않고 경고만 남긴다."""
-    all_text = report.get("intro", "") + report.get("closing", "")
-    for sec in report.get("system_sections", []):
-        all_text += sec.get("body", "") + sec.get("key_insight", "") + " ".join(sec.get("takeaways") or [])
-    if report.get("cross_analysis"):
-        all_text += report["cross_analysis"].get("body", "")
-    for item in (report.get("opportunities") or []) + (report.get("risks") or []):
-        all_text += item.get("title", "") + item.get("body", "")
-    if report.get("action_plan"):
-        for step in report["action_plan"].get("steps") or []:
-            all_text += step.get("label", "") + step.get("desc", "")
-        for script in report["action_plan"].get("scripts") or []:
-            all_text += script.get("situation", "") + script.get("line", "")
-        for q in report["action_plan"].get("reflection_questions") or []:
-            all_text += q.get("question", "") + q.get("note", "")
-    for qa in report.get("question_answers") or []:
-        all_text += qa.get("body", "")
-    if report.get("long_term_strategy"):
-        for part in report["long_term_strategy"].values():
-            if isinstance(part, dict):
-                all_text += part.get("body", "")
+    않고 경고만 남긴다.
+
+    2026-08-24 추가 — 실제로 LLM이 action_plan을 dict가 아니라 문자열로 반환한 사례가
+    있었음(원인 불명 — 스키마로 강제하는데도 발생. max_tokens 근처까지 간 대형 응답에서
+    발생한 것으로 추정되나 확실친 않음). 그때 이 함수가 .get()을 그대로 호출하다
+    AttributeError로 죽으면서, **이미 돈을 내고 받은 LLM 응답을 저장도 못 하고 통째로
+    날렸다** — 검증 코드의 버그로 API 비용을 날리는 건 절대 안 되므로, 아래 모든 블록을
+    isinstance로 방어해서 "이 필드가 예상과 다른 모양이어도 이 함수는 절대 죽지 않는다"를
+    보장한다(무엇이 이상한지는 여전히 신호로 남기되, 죽지는 않게)."""
+    def _d(v):
+        return v if isinstance(v, dict) else {}
+
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    all_text = str(report.get("intro") or "") + str(report.get("closing") or "")
+    for sec in _l(report.get("system_sections")):
+        sec = _d(sec)
+        all_text += str(sec.get("body") or "") + str(sec.get("key_insight") or "") + " ".join(_l(sec.get("takeaways")))
+    all_text += str(_d(report.get("cross_analysis")).get("body") or "")
+    for item in _l(report.get("opportunities")) + _l(report.get("risks")):
+        item = _d(item)
+        all_text += str(item.get("title") or "") + str(item.get("body") or "")
+    action_plan = _d(report.get("action_plan"))
+    for step in _l(action_plan.get("steps")):
+        step = _d(step)
+        all_text += str(step.get("label") or "") + str(step.get("desc") or "")
+    for script in _l(action_plan.get("scripts")):
+        script = _d(script)
+        all_text += str(script.get("situation") or "") + str(script.get("line") or "")
+    for q in _l(action_plan.get("reflection_questions")):
+        q = _d(q)
+        all_text += str(q.get("question") or "") + str(q.get("note") or "")
+    for qa in _l(report.get("question_answers")):
+        all_text += str(_d(qa).get("body") or "")
+    for part in _d(report.get("long_term_strategy")).values():
+        if isinstance(part, dict):
+            all_text += str(part.get("body") or "")
 
     # 2026-08-24 — 이전엔 본문에 "%"가 있으면 무조건 경고했으나, 사용자 확인: "퍼센트가
     # 들어가는건 아무 문제가 없어. 오히려 좋은거야." 손님 본인의 실제 계산값을 %로 표현하는
@@ -829,6 +846,14 @@ def main():
     report, usage = call_llm(computed)
     print(f"완료. 토큰 사용량: 입력 {usage.input_tokens} / 출력 {usage.output_tokens}")
 
+    out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else computed_path.with_suffix(".report.json")
+    # 2026-08-24 추가 — 실제로 이 아래(check_hallucination)에서 예상 못 한 응답 모양 때문에
+    # 죽으면서, 이미 돈을 내고 받은 LLM 응답이 저장도 안 된 채 통째로 날아간 사고가 있었음.
+    # 그래서 LLM 호출이 끝나는 즉시(뒤에 나올 검증ㆍ정제 단계가 뭘 하든 상관없이) 원본을
+    # 먼저 디스크에 저장해둔다 — 이후 단계가 죽어도 최소한 이 raw 파일로 복구할 수 있다.
+    raw_backup_path = out_path.with_suffix(".raw.json")
+    raw_backup_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
     known_terms = collect_known_terms(computed)
     valid_years = collect_valid_years(computed)
     check_hallucination(report, known_terms, valid_years)  # 원본 그대로 측정 — 얼마나 자주 규칙을 어기는지 계속 눈으로 볼 것
@@ -842,9 +867,11 @@ def main():
 
     log_question_answerability(report, computed)
 
-    out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else computed_path.with_suffix(".report.json")
     out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"리포트 JSON 저장: {out_path}")
+    # 최종 저장이 여기까지 문제없이 왔다는 건 raw 백업이 더 이상 필요 없다는 뜻 — 폴더에
+    # 쌍둥이 파일이 계속 쌓이지 않도록 정리한다.
+    raw_backup_path.unlink(missing_ok=True)
     print("(PDF 생성은 report_kit.py 완성 후 build_pdf_from_report()로 이어서 처리)")
 
 
