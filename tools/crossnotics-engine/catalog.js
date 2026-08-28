@@ -10,9 +10,8 @@
  * price는 전부 실제 확인된 값만 넣었다(추측해서 채우지 않음, verify-before-acting 원칙).
  */
 const CROSSNOTICS_TIERS = {
-  // 2026-08-24 — 사용자 지시로 무료 → 5,000원 전환. crossnotics/index.html의 CN_TIERS와
-  // 반드시 같이 맞출 것 — 여기 question_limit이 사이트보다 낮으면 정상 신청도
-  // run.js에서 "질문 개수 초과"로 거부돼버림(question_limit은 여기가 유일한 강제 기준).
+  // 2026-08-24 — 사용자 지시로 무료 → 5,000원 전환(질문 기능은 추가하지 않음, 질문 없는
+  // 설계 그대로 유지). crossnotics/index.html의 CN_TIERS와 반드시 같이 맞출 것.
   "crossnotics-mini": {
     name: "오늘의 사주 미니 진단",
     label: "MINI",
@@ -20,7 +19,7 @@ const CROSSNOTICS_TIERS = {
     tier: "mini",
     scope: "mini",
     systems: ["saju"],
-    question_limit: 1,
+    question_limit: 0,
     pages_note: "1페이지",
     pages_approx: 1,
   },

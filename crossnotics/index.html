@@ -354,14 +354,12 @@
   const CN_TIERS = [
     {
       // 2026-08-24 — 사용자 지시로 무료 → 5,000원 유료 전환. 더 이상 "FREE"가 아니므로
-      // 라벨을 tierKey와 맞춰 "MINI"로 변경. 유료 전환에 맞춰 질문 1개(다른 유료
-      // 티어들의 최소 기준과 동일)를 새로 열어 가격에 맞는 기능을 하나 추가함 — 이
-      // 부분은 사용자가 구체적으로 지정하지 않아 판단해서 넣은 것이니, 원하시는 게
-      // 다르면 알려주세요.
+      // 라벨을 tierKey와 맞춰 "MINI"로 변경. 질문 기능은 추가하지 않음(사용자 확인:
+      // "질문은 받지마"는 상품에 질문 기능을 넣지 말라는 뜻이었음).
       code: "crossnotics-mini", tierKey: "mini", label: "MINI", name: "오늘의 사주 미니 진단", price: 5000,
-      systems: ["saju"], systemLabels: ["사주"], questionLimit: 1,
+      systems: ["saju"], systemLabels: ["사주"], questionLimit: 0,
       daeYunRange: "없음", hasOppRisk: false, hasActionPlan: false, hasLongTerm: false,
-      features: ["사주 네 기둥(년ㆍ월ㆍ일ㆍ시 네 개의 간지 기둥) 핵심 요약", "오늘 기준 오행 흐름", "질문 1개까지", "가장 빠르고 부담 없이 받아보는 미니 진단"],
+      features: ["사주 네 기둥(년ㆍ월ㆍ일ㆍ시 네 개의 간지 기둥) 핵심 요약", "오늘 기준 오행 흐름", "가장 빠르고 부담 없이 받아보는 미니 진단"],
     },
     {
       code: "crossnotics-saju-light", tierKey: "light", label: "LIGHT", name: "사주 라이트 진단", price: 30000,
