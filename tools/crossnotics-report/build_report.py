@@ -1204,6 +1204,132 @@ def normalize_to_schema(value, schema, path, corrections):
     return value
 
 
+_TIER_REQUIRED_NEW_SYSTEMS = {
+    "dual": ["tojeong"],
+    "master": ["tojeong", "yukhyo"],
+    "premium": ["tojeong", "yukhyo", "seongmyeonghak", "pungsu", "taekil"],
+}
+
+
+def _build_tojeong_section(computed):
+    tj = (computed.get("saju") or {}).get("tojeong")
+    if not tj:
+        return None
+    g = tj["gwae"]
+    body = (
+        f"{tj['target_year']}년 토정비결은 {g['code']}괘입니다. "
+        f"상괘는 {g['sang_meaning']['name']}로, {g['sang_meaning']['meaning']} "
+        f"{g['jung_meaning']} {g['ha_meaning']} "
+        f"{(computed.get('saju') or {}).get('tojeong', {}).get('methodology_note', '')}"
+    ).strip()
+    return {"system": "tojeong", "heading": f"{tj['target_year']}년 토정비결 — {g['code']}괘",
+            "body": body, "key_insight": g["sang_meaning"]["meaning"], "takeaways": []}
+
+
+def _build_yukhyo_section(computed):
+    yh = (computed.get("saju") or {}).get("yukhyo")
+    if not yh:
+        return None
+    bg = yh["bon_gwae"]
+    body = (
+        f"지금 이 순간 뽑아본 괘의 하괘는 {bg['ha_meaning']['name']}, 상괘는 {bg['sang_meaning']['name']}입니다. "
+        f"{bg['ha_meaning']['meaning']} {bg['sang_meaning']['meaning']}"
+    )
+    jg = yh.get("ji_gwae")
+    if jg:
+        body += (
+            f" 변효가 있어 지괘도 함께 나왔습니다 — 지금은 이렇지만 변화가 있다면 "
+            f"{jg['ha_meaning']['name']}과 {jg['sang_meaning']['name']} 쪽으로 흘러갈 수 있습니다."
+        )
+    else:
+        body += " 변효 없이 지금 상태가 그대로 유지되는 흐름입니다."
+    body += " " + (yh.get("methodology_note") or "")
+    return {"system": "yukhyo", "heading": "육효ㆍ주역 — 지금 이 순간의 괘",
+            "body": body.strip(), "key_insight": bg["sang_meaning"]["meaning"], "takeaways": []}
+
+
+def _build_seongmyeonghak_section(computed):
+    sm = (computed.get("saju") or {}).get("seongmyeonghak")
+    if not sm:
+        return None
+    letters = "ㆍ".join(f"{l['char']}({l['oheng']})" for l in sm.get("letters") or [])
+    pairs = " ".join(f"{p['from']}→{p['to']}: {p['relation']}." for p in sm.get("pairs") or [])
+    body = f"{sm.get('name')}의 발음오행은 {letters}입니다. {pairs} {sm.get('flow_summary') or ''} {sm.get('methodology_note') or ''}"
+    return {"system": "seongmyeonghak", "heading": "성명학 — 이름의 발음오행",
+            "body": body.strip(), "key_insight": sm.get("flow_summary") or "", "takeaways": []}
+
+
+def _build_pungsu_section(computed):
+    pu = (computed.get("saju") or {}).get("pungsu")
+    if not pu:
+        return None
+    parts = []
+    for rec in pu.get("recommendations") or []:
+        spaces = "ㆍ".join(s["label"] for s in rec.get("spaces") or [])
+        parts.append(f"부족한 {rec['oheng']} 기운은 {rec['color']}과 {rec['direction']} 방향으로 보완할 수 있고, {spaces} 같은 공간에 적용해보시면 좋습니다.")
+    parts.extend(pu.get("dominant_note") or [])
+    body = " ".join(parts) + " " + (pu.get("methodology_note") or "")
+    return {"system": "pungsu", "heading": "풍수지리 — 생활 속 오행 배치",
+            "body": body.strip(), "key_insight": (parts[0] if parts else ""), "takeaways": []}
+
+
+def _build_taekil_section(computed):
+    tk = (computed.get("saju") or {}).get("taekil")
+    if not tk:
+        return None
+    good = tk.get("good_days") or []
+    avoid = tk.get("avoid_days") or []
+    body = f"앞으로 {tk.get('range_days')}일 중 {len(good)}일이 특히 힘이 되는 날, {len(avoid)}일이 피하면 좋은 날로 나타납니다."
+    if good:
+        body += f" 예를 들어 {good[0]['date']}은 {good[0]['reason']}입니다."
+    if avoid:
+        body += f" 반대로 {avoid[0]['date']}은 {avoid[0]['reason']}입니다."
+    body += " " + (tk.get("methodology_note") or "")
+    return {"system": "taekil", "heading": "택일 — 앞으로 30일 참고",
+            "body": body.strip(), "key_insight": body[:60], "takeaways": []}
+
+
+_NEW_SYSTEM_BUILDERS = {
+    "tojeong": _build_tojeong_section, "yukhyo": _build_yukhyo_section,
+    "seongmyeonghak": _build_seongmyeonghak_section, "pungsu": _build_pungsu_section,
+    "taekil": _build_taekil_section,
+}
+
+
+def ensure_required_new_engine_sections(report, computed):
+    """2026-08-29 추가 — check_required_tier_sections()는 신규 5개 시스템 섹션이
+    빠진 걸 경고만 했는데, 사용자 지적: "안다고 방치할 수는 없다ㆍ덮어쓴다고 원인이
+    사라지지 않는다." 발송을 막는 게이트를 다는 것도 결국 감지일 뿐 생성 자체를
+    고치는 게 아니다 — ensure_emphasis/ensure_term_glosses와 완전히 같은 원칙을
+    여기도 적용한다: **LLM이 안 써도 코드가 computed.json의 실제 계산값으로 그
+    섹션을 직접 조립해 채운다.** 새 텍스트를 지어내는 게 아니라 이미 계산된 진짜
+    데이터(gwae 뜻풀이ㆍ발음오행ㆍ풍수 추천ㆍ택일 길흉일)를 문장으로 엮는 것뿐이라
+    1번 규칙(지어내지 않기)을 그대로 지킨다 — {{용어}} 자동 치환과 동일한 성격.
+    LLM이 이미 그 시스템을 다뤘으면(system 태그로 확인) 손대지 않는다."""
+    tier = computed.get("tier")
+    required = _TIER_REQUIRED_NEW_SYSTEMS.get(tier)
+    if not required:
+        return
+
+    sections = report.get("system_sections")
+    if not isinstance(sections, list):
+        return
+    systems_present = {s.get("system") for s in sections if isinstance(s, dict)}
+
+    added = []
+    for key in required:
+        if key in systems_present:
+            continue
+        builder = _NEW_SYSTEM_BUILDERS.get(key)
+        sec = builder(computed) if builder else None
+        if sec:
+            sections.append(sec)
+            added.append(key)
+
+    if added:
+        print(f"✓ 신규 참고 시스템 섹션 자동 보강 완료({', '.join(added)} — computed.json 실제 값으로 직접 조립)")
+
+
 def check_required_tier_sections(report, computed):
     """2026-08-29 추가 — 규칙(8번, 10-F-1번)을 정독하며 발견: 티어마다 "이 섹션은
     무조건 들어가야 한다"는 지시가 프롬프트에 상세히 있는데, 그게 실제로 지켜졌는지
@@ -1907,6 +2033,7 @@ def main():
 
     ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
     ensure_unanswerable_reason(report)  # redirected/unanswerable 인용구 박스가 비지 않도록 body 첫 문장 재사용
+    ensure_required_new_engine_sections(report, computed)  # 신규 5개 시스템 섹션이 빠지면 computed.json 실제 값으로 코드가 직접 채움
 
     known_terms = collect_known_terms(computed)
     valid_years = collect_valid_years(computed)
