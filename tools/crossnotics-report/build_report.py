@@ -144,7 +144,14 @@ def expand_term_placeholders(obj, gloss_map, unmapped):
     if isinstance(obj, list):
         return [expand_term_placeholders(v, gloss_map, unmapped) for v in obj]
     if isinstance(obj, dict):
-        return {k: expand_term_placeholders(v, gloss_map, unmapped) for k, v in obj.items()}
+        # 2026-08-29 추가 — "heading"(소제목ㆍ챕터 제목) 필드는 손대지 않는다. 5-A번
+        # 규칙상 소제목은 3~8글자 내외 짧은 이름표라 뜻풀이 문장이 그 안에 끼어들면
+        # 안 된다 — check_term_glosses()도 원래 heading은 검사 대상에서 뺐던 것과
+        # 같은 이유(실제로 이 함수가 heading까지 훑어서 문제가 생긴 사고가 있었음).
+        return {
+            k: (v if k == "heading" else expand_term_placeholders(v, gloss_map, unmapped))
+            for k, v in obj.items()
+        }
     return obj
 
 SYSTEM_PROMPT = """당신은 천지인운명관(사주ㆍ서양점성술ㆍ타로 통합 진단 서비스)의 리포트 작성
@@ -1243,7 +1250,11 @@ def check_hallucination(report, known_terms, valid_years):
     # 간지(2글자 한글, 예: "경오"), 별자리("~자리"로 끝남), 원소(단일 한글자+조사) 패턴만
     # 가볍게 검사 — 완벽한 NLP가 아니라 "발송 전 훑어볼 신호"로만 쓴다(설계 문서 참고).
     sign_candidates = re.findall(r"[가-힣]+자리", all_text)
-    unknown = [s for s in set(sign_candidates) if s not in known_terms]
+    # 2026-08-29 수정 — 50회 2차 시뮬레이션에서 실제로 재현: "별자리"라는 일반 명사
+    # 자체도 "자리"로 끝나서 이 정규식에 매번 걸림(특정 별자리 이름이 아니라 "별자리"라는
+    # 단어 그 자체는 계산값 대조가 필요 없음) — 매번 오탐 경고가 났던 진짜 원인.
+    GENERIC_JARI_WORDS = {"별자리"}
+    unknown = [s for s in set(sign_candidates) if s not in known_terms and s not in GENERIC_JARI_WORDS]
     if unknown:
         print(f"⚠ 경고: 리포트에 computed.json에 없는 별자리 표현이 있을 수 있음: {unknown}")
     else:
@@ -1280,7 +1291,11 @@ def _ensure_term_glosses_once(obj, gloss_map):
     if isinstance(obj, list):
         return [_ensure_term_glosses_once(v, gloss_map) for v in obj]
     if isinstance(obj, dict):
-        return {k: _ensure_term_glosses_once(v, gloss_map) for k, v in obj.items()}
+        # expand_term_placeholders()와 같은 이유로 "heading"은 제외.
+        return {
+            k: (v if k == "heading" else _ensure_term_glosses_once(v, gloss_map))
+            for k, v in obj.items()
+        }
     return obj
 
 
