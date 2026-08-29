@@ -284,10 +284,19 @@ def build_pdf(computed, report, out_path, product_name):
     if has_indicators:
         k.h1("종합 지표")
         if correlation.get("mode") == "cross_correlation" and correlation.get("agreement_score") is not None:
+            # 2026-08-30 추가 — 사용자 지적: "74% 같은 숫자만 던지고 근거가 안 보인다."
+            # agreement_score의 실제 계산 근거(correlate.js): 사주ㆍ점성술ㆍ타로를 전부
+            # "불ㆍ땅ㆍ바람ㆍ물" 네 기운 비율로 환산한 뒤, 체계끼리 그 비율이 얼마나
+            # 비슷한지(코사인 유사도) 평균 낸 값 — 이 한 줄을 sublabel에 덧붙여 손님이
+            # 숫자의 출처를 바로 알 수 있게 한다.
             k.stat_hero(
                 f"{int(round(correlation['agreement_score'] * 100))}%",
                 "체계 일치도",
-                sublabel=f"중심 기운: {correlation.get('dominant_axis', '-')}",
+                sublabel=(
+                    f"중심 기운: {correlation.get('dominant_axis', '-')} · "
+                    "사주ㆍ점성술ㆍ타로를 불ㆍ땅ㆍ바람ㆍ물 네 기운 비율로 바꿔, "
+                    "체계끼리 그 비율이 얼마나 비슷한지 비교한 값"
+                ),
             )
         if saju and saju.get("oheng_count"):
             k.h2("사주 오행 분포")

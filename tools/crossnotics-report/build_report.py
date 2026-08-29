@@ -216,13 +216,27 @@ SYSTEM_PROMPT = """당신은 천지인운명관(사주ㆍ서양점성술ㆍ타�
 뿐이지 주인공이 아닙니다 — 주인공은 항상 손님 본인입니다. **체계를 설명하는 게 목적이
 아니라, 여러 체계를 이용해 "이 사람이 어떤 사람인지"를 설명하는 게 목적입니다.**
 
+**2026-08-30 추가 — 용어 통일: 이 네 가지를 함께 가리킬 때는 항상 "사주ㆍ점성술ㆍ타로ㆍ
+행동진단"이라는 순서와 표현 그대로 쓰세요.** "네 가지 분석 축", "네 체계", "네 가지
+진단 영역"처럼 매번 다른 말로 바꿔 부르지 마세요 — 같은 넷을 가리키는 이름이 문서 안에서
+여러 개면 손님이 다른 걸 가리키는 건지 헷갈립니다.
+
 **쓰기 전에 먼저(내부적으로만, 출력하지 않음) 이 손님을 한 문장으로 정의하세요** —
 예: "신중하게 생각하지만 한번 결정하면 쉽게 물러서지 않는 사람." 이후 모든
 system_sections/opportunities/risks/action_plan/question_answers가 이 한 문장(핵심
 인물상)과 연결되어야 합니다. 직업 섹션에서는 "그래서 조직에서도...", 돈 섹션에서는
 "이 성향은 돈을 다룰 때...", 관계 섹션에서는 "사람을 만날 때도..."처럼, 서로 다른
 system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인물상이 여러 장면에서
-반복해서 드러나는 하나의 이야기가 되게 하세요.
+드러나는 하나의 이야기가 되게 하세요.
+**2026-08-30 추가 — 사용자 지적: "47페이지 전체에서 같은 핵심 서사가 계속 반복
+설명된다."** 위 지시는 "같은 인물상이 여러 장면에 걸쳐 있다"는 뜻이지, "같은 설명을
+매번 처음부터 다시 하라"는 뜻이 아닙니다. 이 핵심 인물상은 리포트 앞부분(사주 총론
+등)에서 한 번 제대로 설명하고 나면, 그 뒤 섹션에서는 **이미 설명한 내용을 다시 풀어
+쓰지 말고, "그래서 이 성향이 이 장면(직업ㆍ돈ㆍ관계)에서는 구체적으로 이렇게
+나타난다"는 새로운 각도만 짧게 이어서 쓰세요** — 예: "앞서 본 신중한 성향은 직장
+생활에서 이런 식으로 나타납니다"처럼 한 문장으로만 연결하고, "신중하지만 한번 결정하면
+쉽게 물러서지 않는다"는 설명 자체를 매번 다시 풀어 쓰지 마세요. 10페이지 이상 지난
+뒤에 같은 서사를 처음 보는 것처럼 또 설명하고 있다면 잘못 쓰고 있는 것입니다.
 
 0. **[형식] 문장 안에서 예시 대사나 혼잣말을 인용할 때(scripts.line, action_plan의
    추천 문구 등) 큰따옴표(")로 감싸지 마세요 — 작은따옴표(')나 '이렇게' 식으로
@@ -760,6 +774,16 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
    **어느 경우든 다른 질문의 답과 거의 같은 문장을 복사한 것처럼 쓰지 마세요** — 질문마다
    실제로 다른 데이터를 근거로 다르게 답해야 합니다. questions가 비어있으면
    question_answers는 null로 두세요.
+   **2026-08-30 추가 — 질문에 답하기 전에(내부적으로만) 먼저 "이 질문 뒤에 있는 진짜
+   궁금증이 뭔가"를 스스로 물어보세요.** 표면적 질문 문구와 실제 관심사가 다를 때가
+   많습니다(예: "삼재가 언제인가요?" → 실제로는 "언제 조심해야 하나요?", "로또
+   1등 될까요?" → 실제로는 "뜻밖의 재물운이 있나요?"). direct/redirected/unanswerable
+   어느 판정이든 이 진짜 궁금증에 답하는 걸 목표로 삼으세요 — 질문 문구 그대로에만
+   기계적으로 반응하지 마세요.
+   **다른 질문의 답과 의미적으로 모순되지 않게 하세요** — 앞선 답변에서 "혼자 결정하고
+   독립적으로 추진하는 성향"이라고 했으면서 뒤에서 "중요한 결정은 항상 남에게 의존한다"고
+   쓰는 식으로 서로 부딪히면 안 됩니다(상황별로 다르게 나타나는 걸 설명하는 경우는
+   예외지만, 그럴 땐 "다만 ~한 상황에서는" 처럼 그 차이 자체를 문장 안에서 설명하세요).
 10-A. **2026-08-23 추가 — saju.correspondence 필드(명리학 대응표 지식베이스)로 answerability가
    바뀌는 질문 유형.** 손님의 띠 특징, 우세/부족 오행에 어울리는 색ㆍ방향ㆍ숫자ㆍ음식ㆍ신체ㆍ
    직업, 사주에 등장한 십신ㆍ12운성의 "의미"를 묻는 질문(예: "제 띠 특징이 뭔가요", "저한테
@@ -1085,6 +1109,106 @@ def call_llm(computed):
                 raise RuntimeError(f"LLM 응답에 필수 필드 누락: {missing} — 이대로 저장/발송하면 안 됨")
             return report, response.usage
     raise RuntimeError("LLM이 submit_report 도구를 호출하지 않음 — 응답 확인 필요")
+
+
+# 2026-08-30 추가 — LLM→PDF 신뢰성 프로토콜 문서(20-21번) 대응: 검증에서 문제(회피형
+# 답변, 근거 없는 해석 등)를 찾았을 때 지금까지는 사람이 보고 판단하거나(HUMAN-REVIEW),
+# 리포트 전체를 다시 생성해야 했다(24개 질문 중 1개가 문제여도 전부 재생성 = 돈 낭비이자
+# 멀쩡한 23개까지 건드릴 위험). 이 함수는 "문제 있는 필드 하나만" 최소 컨텍스트로 LLM에
+# 다시 요청해서 그 자리에만 갈아 끼운다 — 전체 재생성 대신 최소 범위 수정.
+#
+# 2026-08-30 — 사용자 지시(ask_before_spending_api_money 메모리): 실제 LLM 호출(_call_
+# rewrite_llm)은 여기서 구현만 하고 호출은 안 한다 — 실제로 쓰려면 먼저 허락을 받는다.
+# path 탐색ㆍ프롬프트 구성ㆍ결과 splice-back 로직은 dry_run(가짜 응답)으로 이미 검증함
+# (scratchpad/test_targeted_rewrite.py 참고).
+
+def _get_by_path(obj, path):
+    for key in path:
+        obj = obj[key]
+    return obj
+
+
+def _set_by_path(obj, path, value):
+    for key in path[:-1]:
+        obj = obj[key]
+    obj[path[-1]] = value
+
+
+def build_targeted_rewrite_prompt(report, computed, path, reason):
+    """path(예: ("question_answers", 5, "body"))가 가리키는 필드 하나만 다시 쓰게 하는
+    최소 프롬프트를 만든다. 전체 report/computed를 다 넘기지 않고, 이 필드를 판단하는 데
+    필요한 최소 맥락만 골라 넘긴다(토큰ㆍ비용 절약 + "이 필드만 고치라"는 범위를 명확히
+    좁히는 효과 둘 다)."""
+    original_value = _get_by_path(report, path)
+    context = {"path": list(path), "original_value": original_value, "problem_found": reason}
+
+    if path[0] == "question_answers":
+        qa = _get_by_path(report, path[:-1])
+        context["question"] = qa.get("question")
+        context["answerability"] = qa.get("answerability")
+        context["relevant_computed_hint"] = (
+            "이 손님의 questions/answerability 판정에 실제로 쓰인 computed.json 전체를 "
+            "참고하되, 지어낸 사실을 새로 추가하지 마세요(1번 규칙과 동일)."
+        )
+    elif path[0] == "system_sections":
+        sec = _get_by_path(report, path[:-1])
+        context["system"] = sec.get("system")
+        context["heading"] = sec.get("heading")
+
+    user_message = (
+        "아래는 이미 완성된 리포트 중 문제가 발견된 필드 하나입니다. 전체를 다시 쓰지 말고 "
+        "이 필드 하나만 다시 써서 submit_field_rewrite 도구로 제출하세요. 리포트의 다른 "
+        "부분은 이미 정상이니 손대지 마세요.\n\n"
+        f"[문제로 지적된 내용]\n{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
+        f"[이 손님의 전체 계산값 — 사실 근거로만 쓰고 새 사실을 지어내지 마세요]\n"
+        f"```json\n{json.dumps(computed, ensure_ascii=False)}\n```"
+    )
+    return user_message
+
+
+_FIELD_REWRITE_SCHEMA = {
+    "name": "submit_field_rewrite",
+    "description": "지적된 문제를 해결한, 그 필드 하나만의 새 값을 제출한다.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"new_value": {"type": "string", "description": "그 필드에 들어갈 새 문자열"}},
+        "required": ["new_value"],
+    },
+}
+
+
+def _call_targeted_rewrite_llm(user_message):
+    """실제 API 호출. 2026-08-30 기준 아직 실행 승인을 받지 않아 코드로만 존재 —
+    호출하려면 사용자에게 먼저 물어볼 것(ask_before_spending_api_money)."""
+    client = anthropic.Anthropic()
+    with client.messages.stream(
+        model=MODEL,
+        max_tokens=4096,
+        thinking={"type": "disabled"},
+        system="당신은 천지인운명관 리포트의 특정 필드 하나를 최소 범위로 고치는 담당입니다. "
+               "지적된 문제만 고치고, 그 외에는 원문 스타일ㆍ분량ㆍ어조를 최대한 유지하세요.",
+        tools=[_FIELD_REWRITE_SCHEMA],
+        tool_choice={"type": "tool", "name": "submit_field_rewrite"},
+        messages=[{"role": "user", "content": user_message}],
+    ) as stream:
+        response = stream.get_final_message()
+    for block in response.content:
+        if block.type == "tool_use" and block.name == "submit_field_rewrite":
+            return block.input["new_value"], response.usage
+    raise RuntimeError("LLM이 submit_field_rewrite 도구를 호출하지 않음")
+
+
+def apply_targeted_rewrite(report, computed, path, reason, rewrite_fn=None):
+    """path가 가리키는 필드 하나만 최소 범위로 재작성해 그 자리에 갈아 끼운다(TARGETED-
+    REWRITE — 전체 재생성이 아님). rewrite_fn을 넘기면 그 함수를 대신 쓴다(테스트용 —
+    실제 API를 안 부르고 가짜 응답으로 splice-back 로직만 검증할 때 사용, dry_run 개념).
+    안 넘기면 실제 _call_targeted_rewrite_llm을 쓴다(비용 발생 — 호출 전 사용자 승인 필요)."""
+    call = rewrite_fn or _call_targeted_rewrite_llm
+    user_message = build_targeted_rewrite_prompt(report, computed, path, reason)
+    new_value, usage = call(user_message)
+    old_value = _get_by_path(report, path)
+    _set_by_path(report, path, new_value)
+    return {"path": path, "old_value": old_value, "new_value": new_value, "reason": reason, "usage": usage}
 
 
 def collect_known_terms(computed):
