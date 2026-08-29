@@ -1258,6 +1258,61 @@ def check_hallucination(report, known_terms, valid_years):
         print("✓ 연도 언급 전부 se_un/dae_yun/생년 범위 안에 있음")
 
 
+def _ensure_term_glosses_once(obj, gloss_map):
+    if isinstance(obj, str):
+        for term in GLOSSARY_TERMS:
+            gloss = gloss_map.get(term)
+            if not gloss:
+                continue
+            positions = []
+            start = 0
+            while True:
+                idx = obj.find(term, start)
+                if idx == -1:
+                    break
+                after = obj[idx + len(term):idx + len(term) + 3].lstrip()
+                if not after.startswith("("):
+                    positions.append(idx)
+                start = idx + len(term)
+            for idx in reversed(positions):  # 뒤에서부터 삽입해야 앞쪽 위치가 안 밀림
+                obj = obj[:idx + len(term)] + f"({gloss})" + obj[idx + len(term):]
+        return obj
+    if isinstance(obj, list):
+        return [_ensure_term_glosses_once(v, gloss_map) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _ensure_term_glosses_once(v, gloss_map) for k, v in obj.items()}
+    return obj
+
+
+def ensure_term_glosses(obj, gloss_map):
+    """2026-08-29 추가 — check_term_glosses()는 경고만 했는데, 실제 100회 무료
+    시뮬레이션(원본은 진짜 발송된 최광호 프리미엄 리포트)에서 100번 전부 똑같은
+    경고("겁재ㆍ도화살ㆍ상관..." 등 14개 용어가 괄호 뜻풀이 없이 쓰임)가 반복됐다 —
+    ensure_emphasis()와 똑같이 "경고는 있지만 아무도 안 읽고 그대로 나간다"는 걸
+    이미 한 번 확인했으므로, 여기도 같은 원칙을 적용한다: 검증이 아니라 생성
+    직후 데이터 자체를 코드가 직접 고친다.
+
+    expand_term_placeholders()와 동작 방식은 같다(report 전체를 재귀로 훑으며 문자열만
+    처리) — 다만 그건 `{{용어}}` 표시가 있는 자리만 채우고, 이건 모델이 `{{}}` 없이
+    맨몸으로 써버린 GLOSSARY_TERMS까지 사후에 gloss_map으로 직접 감싼다. 이미 괄호가
+    붙어있는 경우(모델이 스스로 뜻풀이를 붙였거나 "칠살(편관)"처럼 결합 라벨인 경우)는
+    손대지 않는다 — check_term_glosses()와 동일한 판정 기준(뒤 3글자 내에 "("가
+    있는가)을 그대로 씀.
+
+    2026-08-29 수정 — 100회 시뮬레이션 실제 실행 중 발견: "홍염살"의 뜻풀이 원문
+    자체가 "도화살처럼 이성에게..."로 시작한다(computed.json의 실제 데이터). 한 번만
+    훑으면 "도화살"을 먼저 처리한 뒤 "홍염살"을 나중에 채워 넣는 과정에서 방금 새로
+    생긴 "도화살" 언급을 다시 못 본다 — 그래서 결과가 바뀌지 않을 때까지(고정점)
+    반복한다. 한 텀 안에 중첩 가능한 용어 수가 유한하므로(최대 GLOSSARY_TERMS 개수)
+    반드시 수렴하지만, 방어적으로 상한을 둔다."""
+    for _ in range(5):
+        new_obj = _ensure_term_glosses_once(obj, gloss_map)
+        if new_obj == obj:
+            break
+        obj = new_obj
+    return obj
+
+
 def check_term_glosses(report):
     """2026-08-29 추가 — "전문용어는 등장하는 자리에서 예외 없이 괄호로 풀어주라"는 규칙이
     실제로 어겨진 사고(화개살이 뜻풀이 없이 그대로 나온 사례)를 계기로 신설. 이 규칙은
@@ -1600,6 +1655,11 @@ def main():
         print(f"⚠ 경고: {{}} 안에 사전에 없는 용어명이 있어 뜻풀이를 못 채움 — 발송 전 확인할 것: {sorted(set(unmapped_terms))}")
     else:
         print("✓ 용어 뜻풀이 자동 삽입 완료")
+
+    # 2026-08-29 추가 — {{}}를 안 쓰고 GLOSSARY_TERMS를 맨몸으로 쓴 경우까지 코드가
+    # 직접 보강(위 expand_term_placeholders와 같은 gloss_map 재사용, 100회 시뮬레이션에서
+    # 매번 재현된 실제 결함을 메움).
+    report = ensure_term_glosses(report, gloss_map)
 
     ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
 
