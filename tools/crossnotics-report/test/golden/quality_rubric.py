@@ -138,13 +138,26 @@ def score_judge(report, computed):
 # verify_naturalness(문장 자연스러움만 봄)와 겹치지 않는, "이 손님한테 맞춤인가ㆍ
 # 실제로 도움이 되는가" 쪽 기준. 텍스트 "OK/문제있음"이 아니라 숫자라서 후보 모델끼리
 # 직접 비교 가능하다 — 이게 사용자가 요구한 "정량적 품질 평가"의 핵심.
+#
+# 2026-08-30 수정 — 사용자 지적 두 가지 반영:
+# 1. "나를 분석했다는 느낌"(feels_personally_analyzed)은 이 상품의 핵심 가치와 직결되므로
+#    나머지 5개와 같은 무게의 항목 하나가 아니라 **게이팅(gating) 지표**로 분리한다 —
+#    다른 5개가 다 높아도 이 항목이 기준 미달이면 전체 FAIL로 취급한다.
+# 2. Golden은 "지금 최고 결과"가 아니라 "정해진 합격선을 통과한 결과"여야 한다 — 그래서
+#    점수 자체가 아니라 아래 PASS_THRESHOLDS(이 프로젝트가 이미 스스로 요구해온 품질
+#    규칙에서 도출한 합격선)를 기준으로 PASS/FAIL을 가른다. Claude(golden)가 이 채점을
+#    받아도 자동으로 만점/합격 처리하지 않는다 — 실제로 이 기준에 못 미치면 Claude
+#    결과도 그대로 FAIL로 기록한다(passes_bar 참고).
 # ============================================================
 _QUALITY_SCORE_SCHEMA = {
     "name": "submit_quality_scores",
-    "description": "리포트의 의미/품질을 6개 기준으로 1~5점 채점해 제출한다.",
+    "description": "리포트의 의미/품질을 채점해 제출한다. feels_personally_analyzed는 이 "
+                   "상품의 핵심 가치이므로 특히 엄격하게(관대하게 후하지 않게) 채점할 것.",
     "input_schema": {
         "type": "object",
         "properties": {
+            "feels_personally_analyzed": {"type": "integer", "minimum": 1, "maximum": 5,
+                "description": "[핵심 게이팅 지표] 고객이 읽었을 때 \"나를 분석했다\"고 느낄 정도(1=일반 데이터 나열처럼 느껴짐, 5=나를 오래 아는 사람이 써준 것 같음). 이 상품의 존재 이유와 직결되는 항목이니 다른 항목보다 엄격하게 채점하세요."},
             "personalization": {"type": "integer", "minimum": 1, "maximum": 5,
                 "description": "개인화 정도 — 이 손님의 실제 계산값이 아니면 나올 수 없는 문장인가(1=아무 손님에게나 복붙해도 말 되는 문구, 5=이 손님 고유 데이터로만 성립하는 문장)"},
             "qa_actually_answers": {"type": "integer", "minimum": 1, "maximum": 5,
@@ -155,14 +168,34 @@ _QUALITY_SCORE_SCHEMA = {
                 "description": "해석의 깊이 — 계산값→성향→왜 그런지 이유까지 들어갔는가(1=공식만 읽어줌, 5=이유와 실제 삶의 장면까지 이어짐)"},
             "cliche_free": {"type": "integer", "minimum": 1, "maximum": 5,
                 "description": "상투적인 운세 문구를 피했는가(1=\"좋은 일이 생길 것입니다\" 류 뻔한 문구 다수, 5=전혀 없음)"},
-            "feels_personally_analyzed": {"type": "integer", "minimum": 1, "maximum": 5,
-                "description": "고객이 읽었을 때 \"나를 분석했다\"고 느낄 정도(1=일반 데이터 나열처럼 느껴짐, 5=나를 오래 아는 사람이 써준 것 같음)"},
-            "notes": {"type": "string", "description": "점수 근거를 1~2문장으로"},
+            "notes": {"type": "string", "description": "점수 근거를 1~2문장으로, feels_personally_analyzed는 반드시 근거 포함"},
         },
-        "required": ["personalization", "qa_actually_answers", "context_consistency",
-                     "interpretive_depth", "cliche_free", "feels_personally_analyzed", "notes"],
+        "required": ["feels_personally_analyzed", "personalization", "qa_actually_answers",
+                     "context_consistency", "interpretive_depth", "cliche_free", "notes"],
     },
 }
+
+# 합격선 — "지금 나온 것 중 제일 나은 값"이 아니라, 이 프로젝트가 SYSTEM_PROMPT 5번ㆍ
+# 5-A번 규칙에서 이미 스스로 요구해온 수준을 숫자로 못박은 것. GATING_CRITERION은
+# 이 값 미만이면 나머지 점수와 무관하게 전체 FAIL — 이 상품의 핵심 가치라서.
+PASS_THRESHOLDS = {
+    "feels_personally_analyzed": 4,  # 게이팅 지표 — 미달 시 전체 FAIL
+    "personalization": 4,
+    "qa_actually_answers": 4,
+    "context_consistency": 3,
+    "interpretive_depth": 3,
+    "cliche_free": 4,
+}
+GATING_CRITERION = "feels_personally_analyzed"
+
+
+def passes_bar(scores):
+    """scores(judge_semantic_quality의 반환값)가 PASS_THRESHOLDS를 전부 만족하는지
+    판정한다. GATING_CRITERION 미달이면 다른 게 아무리 높아도 무조건 FAIL —
+    "Claude가 냈다"는 이유로 자동 합격시키지 않는다."""
+    failures = [k for k, min_v in PASS_THRESHOLDS.items() if scores.get(k, 0) < min_v]
+    gating_failed = scores.get(GATING_CRITERION, 0) < PASS_THRESHOLDS[GATING_CRITERION]
+    return (not failures), failures, gating_failed
 
 
 def judge_semantic_quality(report, computed, model=None):
@@ -175,9 +208,11 @@ def judge_semantic_quality(report, computed, model=None):
     judge_model = model or br.GROUNDEDNESS_MODEL
     prompt = (
         "아래는 사주ㆍ점성술ㆍ타로 통합 리포트의 계산값과, 그 계산값으로 작성된 리포트 "
-        "본문입니다. 문장 표현이 아니라(그건 이미 별도로 평가함) 다음 6개 기준으로만 "
+        "본문입니다. 문장 표현이 아니라(그건 이미 별도로 평가함) 다음 기준으로만 "
         "1~5점씩 채점하세요 — 반드시 근거를 들어 판단하고, 애매하면 중간값(3)이 아니라 "
-        "실제로 본문에서 확인되는 근거를 기준으로 판정하세요.\n\n"
+        "실제로 본문에서 확인되는 근거를 기준으로 판정하세요. **feels_personally_analyzed는 "
+        "이 상품이 파는 것의 핵심이므로, 후하게 주지 말고 정말로 이 손님만의 이야기로 "
+        "읽히는지 엄격하게 보세요.**\n\n"
         f"[계산값]\n```json\n{json.dumps(computed, ensure_ascii=False)}\n```\n\n"
         f"[리포트 본문]\n```json\n{json.dumps(report, ensure_ascii=False)}\n```"
     )
@@ -221,10 +256,21 @@ def score_report(report, computed, pdf_path=None, include_judge=False, include_s
 
     if include_semantic:
         scores = judge_semantic_quality(report, computed)
-        print(f"\n=== B-2. JUDGE — 의미/품질 1~5점(LLM, 비용 발생) ===")
+        ok, failures, gating_failed = passes_bar(scores)
+        print(f"\n=== B-2. JUDGE — 의미/품질(LLM, 비용 발생) ===")
+        gate_mark = "✓" if scores.get(GATING_CRITERION, 0) >= PASS_THRESHOLDS[GATING_CRITERION] else "✗"
+        print(f"  [게이팅] {gate_mark} {GATING_CRITERION}: {scores.get(GATING_CRITERION)} (합격선 {PASS_THRESHOLDS[GATING_CRITERION]}+)")
         for k, v in scores.items():
-            print(f"  {k}: {v}")
+            if k in (GATING_CRITERION, "notes"):
+                continue
+            mark = "✓" if v >= PASS_THRESHOLDS.get(k, 0) else "✗"
+            print(f"  {mark} {k}: {v} (합격선 {PASS_THRESHOLDS.get(k, '-')}+)")
+        print(f"  notes: {scores.get('notes')}")
+        print(f"  => 합격선 종합: {'PASS' if ok else 'FAIL'}"
+              + (f" (게이팅 지표 미달 — 다른 점수와 무관하게 FAIL)" if gating_failed else "")
+              + (f" — 미달 항목: {failures}" if failures and not gating_failed else ""))
         out["semantic_scores"] = scores
+        out["semantic_pass"] = {"ok": ok, "failures": failures, "gating_failed": gating_failed}
 
     return out
 
