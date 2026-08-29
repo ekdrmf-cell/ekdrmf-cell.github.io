@@ -1382,9 +1382,12 @@ def check_emphasis_markers(report):
     구멍. check_term_glosses()와 같은 원칙: 판단이 필요 없는 순수 기계적 사실(별표
     두 개가 몇 번 나왔는가)이므로 LLM 판단 없이 정규식으로 직접 센다.
 
-    system_sections 하나당 최소 1곳은 강조돼야 한다는 게 5-A번 규칙의 취지이므로,
-    그 개수를 최소 기준선으로 삼는다(원문은 "1~3곳"이라 상한은 없음 — 여기선 하한만
-    검사)."""
+    문단(빈 줄로 구분된 블록, `##` 소제목ㆍ`[[CARD:...]]` 마커만 있는 블록은 제외)마다
+    최소 1곳은 강조돼야 한다는 게 5-A번 규칙의 취지이므로, 그 개수를 최소 기준선으로
+    삼는다(원문은 "1~3곳"이라 상한은 없음 — 여기선 하한만 검사). **2026-08-29 수정 —
+    80회 3차 시뮬레이션에서 발견: 처음엔 "섹션 개수"를 기준선으로 썼는데, 소제목이
+    여러 개라 문단이 여러 개인 섹션에서 그 기준이 실제 요구치보다 낮게 잡혔다 —
+    ensure_emphasis()와 똑같이 문단 단위로 다시 세도록 수정."""
     def _d(v):
         return v if isinstance(v, dict) else {}
 
@@ -1393,8 +1396,11 @@ def check_emphasis_markers(report):
 
     all_text = str(report.get("intro") or "") + str(report.get("closing") or "")
     sections = _l(report.get("system_sections"))
+    minimum = 0
     for sec in sections:
-        all_text += str(_d(sec).get("body") or "")
+        body = str(_d(sec).get("body") or "")
+        all_text += body
+        minimum += sum(1 for p in body.split("\n\n") if _is_content_paragraph(p))
     all_text += str(_d(report.get("cross_analysis")).get("body") or "")
     for item in _l(report.get("opportunities")) + _l(report.get("risks")):
         all_text += str(_d(item).get("body") or "")
@@ -1402,7 +1408,6 @@ def check_emphasis_markers(report):
         all_text += str(_d(qa).get("body") or "")
 
     bold_count = len(re.findall(r"\*\*[^*]{1,120}\*\*", all_text))
-    minimum = len(sections)
     if bold_count < minimum:
         print(
             f"⚠ 경고: 강조 표시(**)가 {bold_count}번밖에 안 쓰였음(섹션 {minimum}개 기준 "
@@ -1413,6 +1418,21 @@ def check_emphasis_markers(report):
 
 
 _SENTENCE_END_RE = re.compile(r"[^.!?\n]*[.!?]")
+_CARD_MARKER_ONLY_RE = re.compile(r"^\[\[CARD:[^\]]*\]\]$")
+
+
+def _is_content_paragraph(p):
+    """## 소제목 줄이나 [[CARD:포지션]] 마커만 있는 문단은 강조 대상이 아니다(둘 다
+    그 자체가 짧은 이름표ㆍ표시일 뿐 "문단"이 아님) — 2026-08-29 80회 3차 시뮬레이션에서
+    다중 소제목 섹션(카드 2개짜리 타로 섹션 등)을 테스트하며 이 구분이 필요함을 확인."""
+    p = p.strip()
+    if not p:
+        return False
+    if p.startswith("##"):
+        return False
+    if _CARD_MARKER_ONLY_RE.match(p):
+        return False
+    return True
 
 
 def ensure_emphasis(report):
@@ -1423,11 +1443,12 @@ def ensure_emphasis(report):
     코드가 결과물 자체를 항상 보장한다." 검증(check_emphasis_markers)이 아니라 생성
     직후 데이터를 직접 고치는 단계.
 
-    section.body에 강조 표시가 하나도 없으면, 그 섹션의 key_insight(모델이 이미
-    필수로 채운 한 문장 핵심 요약)를 본문에서 찾아 강조로 감싼다 — 본문에 그 문장이
-    그대로 없으면(패러프레이즈된 경우) 본문의 첫 문장을 대신 강조한다. 둘 다 "이미
-    모델이 쓴 문장을 그대로 재사용"할 뿐 새 텍스트를 지어내지 않으므로 1번 규칙(지어
-    내지 않기)을 그대로 지킨다."""
+    2026-08-29 수정 — 80회 3차 시뮬레이션에서 실제 발견: 5-A번 규칙은 "문단당" 1~3곳
+    강조를 요구하는데, 처음 구현은 "섹션당" 1곳만 보장했다. 소제목(##)이 여러 개라
+    사실상 문단이 여러 개인 섹션(카드 2장을 한 섹션에서 다루는 타로 등)에서는 그
+    보장이 부족했다 — 그래서 섹션 전체가 아니라 문단(빈 줄로 구분된 블록)마다
+    독립적으로 검사ㆍ보강한다. `##` 소제목 줄이나 `[[CARD:...]]` 마커만 있는 블록은
+    강조 대상에서 제외(이름표ㆍ표시일 뿐 산문이 아니므로)."""
     def _d(v):
         return v if isinstance(v, dict) else {}
 
@@ -1440,22 +1461,35 @@ def ensure_emphasis(report):
         body = sec.get("body")
         if not isinstance(body, str) or not body.strip():
             continue
-        if re.search(r"\*\*[^*]{1,120}\*\*", body):
-            continue  # 이미 모델이 강조를 넣었으면 손대지 않는다
 
         insight = sec.get("key_insight")
-        if isinstance(insight, str) and insight.strip() and insight.strip() in body:
-            target = insight.strip()
-        else:
-            m = _SENTENCE_END_RE.match(body.strip())
-            target = m.group(0).strip() if m else None
+        insight = insight.strip() if isinstance(insight, str) else None
 
-        if target and target in body:
-            sec["body"] = body.replace(target, f"**{target}**", 1)
+        paragraphs = body.split("\n\n")
+        changed = False
+        for i, p in enumerate(paragraphs):
+            if not _is_content_paragraph(p):
+                continue
+            if re.search(r"\*\*[^*]{1,120}\*\*", p):
+                continue  # 이 문단엔 이미 강조가 있음
+
+            target = None
+            if insight and insight in p:
+                target = insight
+            else:
+                m = _SENTENCE_END_RE.match(p.strip())
+                target = m.group(0).strip() if m else None
+
+            if target and target in p:
+                paragraphs[i] = p.replace(target, f"**{target}**", 1)
+                changed = True
+
+        if changed:
+            sec["body"] = "\n\n".join(paragraphs)
             fixed += 1
 
     if fixed:
-        print(f"✓ 강조 표시 자동 보강 완료({fixed}개 섹션에 모델이 이미 쓴 핵심 문장을 강조 처리함)")
+        print(f"✓ 강조 표시 자동 보강 완료({fixed}개 섹션의 문단들에 모델이 이미 쓴 문장을 강조 처리함)")
 
 
 def verify_groundedness(report, computed):
