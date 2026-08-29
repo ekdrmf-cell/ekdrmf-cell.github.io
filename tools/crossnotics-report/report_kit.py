@@ -473,9 +473,178 @@ def build_pdf(computed, report, out_path, product_name):
         # 2026-08-23 발견 — watermark_text 기본값이 "서비스허브"(상위 우산 브랜드)라 표지에
         # "CHUNJIIN PERSONAL REPORT"라고 써놓고 워터마크는 다른 브랜드명이 반복되는
         # 불일치가 있었음(시각 점검으로 발견). 크로스노틱스는 자체 브랜드명으로 오버라이드.
-        watermark_text="천지인운명관 · 무단 전재·재배포 금지",
+        watermark_text=_WATERMARK_TEXT,
     )
+
+    check_pdf_text_roundtrip(out_path, report, computed, _customer_name)
+    check_pdf_structural_integrity(out_path, computed.get("tier"))
+
     return out_path
+
+
+_WATERMARK_TEXT = "천지인운명관 · 무단 전재·재배포 금지"
+_WS_RE = re.compile(r"\s+")
+
+
+def _norm_ws(s):
+    return _WS_RE.sub(" ", str(s or "")).strip()
+
+
+def check_pdf_text_roundtrip(pdf_path, report, computed, customer_name):
+    """2026-08-30 추가 — LLM→PDF 신뢰성 프로토콜 문서(17번) 검토 중 발견: 최종
+    PDF에서 텍스트를 뽑아 report.json과 대조하는 자동 검사가 이 프로젝트에 전혀
+    없었다. 지금까지는 이번 세션에서 제가 디버깅할 때 pypdf로 수동으로 읽어본 게
+    전부였다 — report_kit.py(렌더링 코드) 자체의 버그로 특정 섹션ㆍQ&A가 통째로
+    누락되거나 잘못 매핑돼도 report.json만 보는 build_report.py의 검증들은 절대
+    못 잡는다(그 검증들은 report.json이 옳다는 전제 위에서만 동작함). 이 검사가
+    유일하게 "실제로 손님 손에 들어가는 파일"을 직접 확인한다.
+
+    문단 줄바꿈으로 PDF 안에서 문장이 여러 줄로 쪼개지는 건 정상 렌더링이라, 공백을
+    전부 한 칸으로 정규화한 뒤 부분 문자열로만 대조한다(완전 일치 요구 안 함)."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(pdf_path))
+    full_text = _norm_ws("\n".join((p.extract_text() or "") for p in reader.pages))
+
+    problems = []
+    name = str(customer_name or "").strip()
+    if name and name != "고객" and name not in full_text:
+        problems.append(f"고객 이름({name!r})이 최종 PDF 텍스트에서 안 보임")
+
+    for sec in (report.get("system_sections") or []):
+        if not isinstance(sec, dict):
+            continue
+        body = str(sec.get("body") or "")
+        snippet = _norm_ws(re.sub(r"\*\*|\[\[CARD:[^\]]*\]\]|##[^\n]*", "", body))[:20]
+        if snippet and snippet not in full_text:
+            problems.append(f"system_sections[{sec.get('system')}] 본문이 PDF에서 안 보임(렌더링 누락 가능성): {snippet!r}")
+
+    for qa in (report.get("question_answers") or []):
+        if not isinstance(qa, dict):
+            continue
+        q = _norm_ws(str(qa.get("question") or ""))[:15]
+        if q and q not in full_text:
+            problems.append(f"질문 {q!r}이 PDF에서 안 보임(Q&A 렌더링 누락 가능성)")
+
+    if problems:
+        print("⚠ 경고: PDF ↔ report.json 내용 대조 불일치 — 발송 전 확인할 것:")
+        for p in problems:
+            print(f"    - {p}")
+    else:
+        print("✓ PDF ↔ report.json 내용 대조 통과(고객 이름ㆍ섹션 본문ㆍQ&A 전부 최종 PDF에 실제로 있음)")
+
+
+_TIER_EXPECTED_PAGES = {
+    "mini": (2, 12), "light": (4, 18), "single": (6, 22), "full": (10, 32),
+    "master": (18, 48), "premium": (22, 60),
+}
+
+
+def check_pdf_structural_integrity(pdf_path, tier):
+    """2026-08-30 추가 — LLM→PDF 신뢰성 프로토콜 문서(16번, 시각 검사)에 대응.
+    사용자 지시: PyMuPDF/pdftoppm이 이 환경에서 안 되니(이번 세션 초반에 확인,
+    DLL 로드 실패) "시각 검사 포기"가 아니라 "PDF 내부 구조 검사로 대체"할 것.
+
+    2026-08-30 시도 후 기각 — 실제로 먼저 만들어본 것: pypdf의 visitor_text로
+    각 텍스트 조각의 좌표(cm×tm 합성)를 구해 "페이지 밖으로 밀려난 텍스트"를
+    잡으려 했으나, 실제 렌더링된 PDF로 테스트해보니 워터마크(대각선 반복 타일링)와
+    여러 장식 컴포넌트(도넛 그래프 등, canvas.translate/rotate 사용)가 좌표계를
+    로컬로 바꿔써서 정상적으로 렌더링된 페이지에서도 좌표가 페이지 밖 값으로
+    나왔다 — 오탐이 너무 많아 신호로 못 씀(실제 워터마크 페이지에서 x범위가
+    -753~1086까지 나오는 것으로 직접 확인). 그래서 좌표 기반 검사 대신, 좌표 없이도
+    확실히 신뢰할 수 있는 구조 검사만 남긴다:
+    - 페이지 수가 티어별 상식적 범위 안인가(극단적 과소/과다 생성 감지)
+    - 빈 페이지가 있는가(텍스트가 사실상 없는 페이지)
+    - 유니코드 대체 문자(�)가 있는가 — 다만 이건 보조 신호일 뿐이다. 직접 테스트로
+      확인함: reportlab이 폰트에 없는 글리프를 그릴 때도 PDF의 ToUnicode 맵은 원래
+      문자 코드를 그대로 보존하는 경우가 많아서, "화면엔 빈칸으로 깨졌는데 텍스트
+      추출은 멀쩡한 한자를 그대로 돌려주는" 경우가 실제로 있다(직접 만든 테스트
+      PDF로 재현 확인) — 즉 이 문자열 검사만으로는 그 부류의 버그를 확실히 못
+      잡는다. 그 버그의 진짜 방지책은 sanitize_report()가 이미 하고 있고(report.json
+      쪽 문자열은 렌더링 전에 폰트 cmap과 대조해 미지원 글자를 제거), 이 파일ㆍ
+      pdf_kit.py 자체가 하드코딩한 UI 문구까지 포함해서 검사하려면 아래
+      check_static_ui_glyph_coverage()(코드 수정 후 수동으로 돌리는 정적 감사)를
+      따로 쓴다."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(pdf_path))
+    pages = reader.pages
+    problems = []
+
+    lo, hi = _TIER_EXPECTED_PAGES.get(tier, (1, 200))
+    if not (lo <= len(pages) <= hi):
+        problems.append(f"페이지 수 {len(pages)}장이 '{tier}' 티어 상식 범위({lo}~{hi}장) 밖임")
+
+    for i, p in enumerate(pages):
+        text = (p.extract_text() or "").strip()
+        if len(text) < 20:
+            problems.append(f"{i+1}페이지에 텍스트가 사실상 없음(빈 페이지 가능성, {len(text)}자)")
+        if chr(0xFFFD) in text:  # 리터럴로 안 쓰는 이유: check_static_ui_glyph_coverage가 소스 문자열 리터럴을 스캔하면서 이 글자 자체를 오탐으로 잡기 때문
+            problems.append(f"{i+1}페이지에 깨진 글자(유니코드 대체 문자) 발견 — 폰트에 없는 글자가 섞였을 가능성")
+
+    if problems:
+        print("⚠ 경고: PDF 구조 검사 불일치 — 발송 전 확인할 것:")
+        for p in problems:
+            print(f"    - {p}")
+    else:
+        print(f"✓ PDF 구조 검사 통과({len(pages)}페이지, 빈 페이지ㆍ깨진 글자 없음)")
+
+
+def _extract_string_literals(py_path):
+    # 2026-08-30 수정 — 실제로 돌려보니 이 파일 맨 위 독스트링(역사적 버그를 설명하며
+    # 예시로 "신금(辛金)"을 직접 인용한 문장)과, check_pdf_structural_integrity 자신의
+    # 독스트링("유니코드 대체 문자(�)가 있는가" 설명 문장)이 그대로 걸렸다 — 둘 다
+    # 손님에게 렌더링되는 UI 문구가 아니라 개발자용 설명일 뿐이라 오탐이다. 모듈ㆍ함수ㆍ
+    # 클래스의 독스트링(각 본문의 첫 statement가 Expr(문자열)인 경우)은 애초에 검사
+    # 대상에서 제외한다.
+    import ast
+    tree = ast.parse(Path(py_path).read_text(encoding="utf-8"))
+    docstring_nodes = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            ds = ast.get_docstring(node, clean=False)
+            if ds is not None and node.body and isinstance(node.body[0], ast.Expr):
+                docstring_nodes.add(id(node.body[0].value))
+    return [
+        n.value for n in ast.walk(tree)
+        if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docstring_nodes
+    ]
+
+
+def check_static_ui_glyph_coverage():
+    """2026-08-30 추가 — check_pdf_structural_integrity 문서화 참고: "폰트에 없는
+    글자가 빈칸으로 깨지는" 버그(report_kit.py 파일 맨 위 주석에 기록된 실제 사고)를
+    sanitize_report()는 report.json(LLM 응답) 문자열만 처리해서 막는다 — 이
+    report_kit.py/pdf_kit.py 자체가 하드코딩한 UI 문구(챕터 제목ㆍ워터마크ㆍ라벨 등)는
+    그 필터를 아예 거치지 않는다. 이건 요청마다 도는 런타임 검사가 아니라(코드는
+    요청마다 안 바뀌므로 매번 돌 필요가 없다) 이 두 파일을 고친 뒤 사람이 한 번
+    실행해보는 정적 감사 스크립트다 — ast로 파이썬 문자열 리터럴만 뽑아 폰트 cmap과
+    대조한다(주석은 어차피 렌더링 안 되므로 검사 대상에서 자동으로 빠짐)."""
+    import sys as _sys
+    _sys.path.insert(0, str(HERE))
+    from build_report import _pdf_font_cmap
+
+    cmap = _pdf_font_cmap()
+
+    def _bad_chars(s):
+        return {ch for ch in s if not (ch.isspace() or ord(ch) < 0x20 or ord(ch) in cmap)}
+
+    problems = []
+    for py_file in (HERE / "report_kit.py", HERE / "pdf_kit.py"):
+        if not py_file.exists():
+            continue
+        for s in _extract_string_literals(py_file):
+            bad = _bad_chars(s)
+            if bad:
+                problems.append((py_file.name, s[:40], bad))
+
+    if problems:
+        print("⚠ 경고: 코드에 하드코딩된 문구 중 폰트가 못 그리는 글자 발견 — 수정 필요:")
+        for f, s, bad in problems:
+            print(f"    - {f}: {s!r} 안의 {bad}")
+    else:
+        print("✓ report_kit.py/pdf_kit.py 하드코딩 문구 글리프 검사 통과")
+    return problems
 
 
 def main():

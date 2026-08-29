@@ -156,12 +156,32 @@ def expand_term_placeholders(obj, gloss_map, unmapped):
     if isinstance(obj, list):
         return [expand_term_placeholders(v, gloss_map, unmapped) for v in obj]
     if isinstance(obj, dict):
+        def _strip_bare(v):
+            # heading/toc_preview/takeaways는 뜻풀이를 절대 안 붙이지만, `{{용어}}`
+            # 표시 자체는 벗겨줘야 한다 — 2026-08-30 추가: 안 벗기면 모델이 혹시라도
+            # 이 짧은 라벨 자리에 `{{}}`를 썼을 때 중괄호가 그대로 손님 눈에 보이는
+            # 새로운 결함이 생긴다(재현 테스트로 확인). 뜻풀이 삽입 없이 라벨만 남김.
+            if isinstance(v, str):
+                return _PLACEHOLDER_RE.sub(lambda m: m.group(1).strip(), v)
+            if isinstance(v, list):
+                return [_strip_bare(x) for x in v]
+            return v
+
         # 2026-08-29 추가 — "heading"(소제목ㆍ챕터 제목) 필드는 손대지 않는다. 5-A번
         # 규칙상 소제목은 3~8글자 내외 짧은 이름표라 뜻풀이 문장이 그 안에 끼어들면
         # 안 된다 — check_term_glosses()도 원래 heading은 검사 대상에서 뺐던 것과
         # 같은 이유(실제로 이 함수가 heading까지 훑어서 문제가 생긴 사고가 있었음).
+        # 2026-08-29 재수정 — 사용자 검수로 실제 발견: toc_preview(목차 미리보기)도
+        # heading과 똑같이 짧은 제목 나열인데 dict의 "heading" 키만 빼놓고 top-level의
+        # toc_preview 리스트는 안 빼놔서, 목차 1번 항목에 "일간(태어난 날의 천간,
+        # 사주 여덟...)" 전체 뜻풀이가 그대로 박혀 들어갔다(같은 원인, 다른 위치).
+        # 2026-08-30 재수정 — 같은 감사를 반복하다 직접 발견(아직 실제 사고로 터지진
+        # 않았지만 같은 스키마 모양): takeaways도 "2~4개 핵심 정리 불릿"이라는 짧은
+        # 나열형 리스트인데 빠져 있었다. 재현 테스트로 확인: {{정관}}이 들어간 takeaway
+        # 항목이 "정관(나를 적당히...)이 강함"으로 그대로 부풀려짐 — heading/toc_preview와
+        # 완전히 같은 모양의 결함이라 같이 예외 처리한다.
         return {
-            k: (v if k == "heading" else expand_term_placeholders(v, gloss_map, unmapped))
+            k: (_strip_bare(v) if k in ("heading", "toc_preview", "takeaways") else expand_term_placeholders(v, gloss_map, unmapped))
             for k, v in obj.items()
         }
     return obj
@@ -1122,13 +1142,36 @@ def _strip_unsupported_glyphs(text):
     return cleaned
 
 
+# 2026-08-29 추가 — 실제 사고 발견(사용자 검수): "여왕에서 시종으로 흘러간다는 게
+# 흥미운 지점입니다"처럼 LLM이 맞춤법을 틀린 사례가 실제로 있었다. "이 오타 하나는
+# 너무 좁아서 규칙까지 만들 필요 없다"는 판단으로 그 파일 하나만 손으로 고치려
+# 했었는데, 사용자가 명시적으로 반려함: "고칠때에는 영구적으로 고치도록 해." 그래서
+# 한 번 확인된 오타는 전부 여기 사전에 등록해 모든 리포트에서 자동 교정한다 — 다음에
+# 새 오타가 발견되면 이 사전에 한 줄만 추가하면 영구히 막힌다(같은 실수를 손으로
+# 다시 고치는 게 아니라).
+_KNOWN_TYPO_FIXES = {
+    "흥미운": "흥미로운",
+}
+
+
+def _fix_known_typos(text):
+    for wrong, right in _KNOWN_TYPO_FIXES.items():
+        if wrong in text:
+            text = text.replace(wrong, right)
+    return text
+
+
 def sanitize_report(obj):
     """report(dict) 전체를 재귀적으로 훑어 모든 문자열 값에서 PDF 폰트가 못 그리는 글자를
     제거한다. intro/body/heading처럼 필드를 하나하나 골라 처리하면 스키마에 필드가 추가될
     때마다 또 빠뜨릴 위험이 있으므로(실제로 이번에 그렇게 놓쳤었음), 구조를 가리지 않고
-    모든 문자열을 훑는 일반적인 방식을 쓴다."""
+    모든 문자열을 훑는 일반적인 방식을 쓴다.
+
+    2026-08-29 추가 — 같은 이유로 알려진 맞춤법 오타(_KNOWN_TYPO_FIXES)도 여기서 함께
+    교정한다 — 폰트 안전화와 같은 성격(생성 이후 최종 산출물에 결함이 남을 수 없게
+    구조적으로 막는 것)이라 같은 재귀 훑기에 얹는 게 자연스럽다."""
     if isinstance(obj, str):
-        return _strip_unsupported_glyphs(obj)
+        return _fix_known_typos(_strip_unsupported_glyphs(obj))
     if isinstance(obj, list):
         return [sanitize_report(v) for v in obj]
     if isinstance(obj, dict):
@@ -1297,8 +1340,14 @@ def _build_taekil_section(computed):
     if avoid:
         body += f" 반대로 {avoid[0]['date']}은 {avoid[0]['reason']}입니다."
     body += " " + (tk.get("methodology_note") or "")
+    body = body.strip()
+    # 2026-08-29 수정 — 실제 사고 발견(사용자 검수): key_insight를 body[:60]으로 그냥
+    # 잘라서 "예를 들어 2026-09"처럼 날짜 중간에서 끊긴 문장이 "한눈에 보기"ㆍ챕터
+    # 인용구에 그대로 노출됐다. 문장 경계를 아는 _find_first_sentence()를 재사용해
+    # 항상 완결된 문장만 key_insight로 쓴다.
+    key_insight = _find_first_sentence(body) or body[:60]
     return {"system": "taekil", "heading": "택일 — 앞으로 30일 참고",
-            "body": body.strip(), "key_insight": body[:60], "takeaways": []}
+            "body": body, "key_insight": key_insight, "takeaways": []}
 
 
 _NEW_SYSTEM_BUILDERS = {
@@ -1326,7 +1375,15 @@ def ensure_required_new_engine_sections(report, computed):
     sections = report.get("system_sections")
     if not isinstance(sections, list):
         return
-    systems_present = {s.get("system") for s in sections if isinstance(s, dict)}
+
+    def _has_content(sec):
+        # 2026-08-30 추가 — 지금까지는 system 태그만 있으면 "이미 다뤘다"고 보고 건너
+        # 뛰었는데, 그러면 모델이 스키마의 required(system/heading/body)만 만족시키려
+        # body를 빈 문자열(또는 공백)로만 채워도 이 함수가 진짜 데이터로 채우는 걸
+        # 영구히 건너뛴다 — "태그가 있다"와 "내용이 실제로 있다"는 다르다.
+        return isinstance(sec, dict) and isinstance(sec.get("body"), str) and len(sec.get("body").strip()) >= 10
+
+    systems_present = {s.get("system") for s in sections if _has_content(s)}
 
     added = []
     for key in required:
@@ -1335,11 +1392,438 @@ def ensure_required_new_engine_sections(report, computed):
         builder = _NEW_SYSTEM_BUILDERS.get(key)
         sec = builder(computed) if builder else None
         if sec:
+            # 내용 없이 태그만 있던 기존 항목이 있으면 빼고 교체 — 빈 섹션과 방금
+            # 조립한 진짜 섹션이 나란히 중복 등장하는 걸 막는다.
+            sections[:] = [s for s in sections if not (isinstance(s, dict) and s.get("system") == key)]
             sections.append(sec)
             added.append(key)
 
     if added:
         print(f"✓ 신규 참고 시스템 섹션 자동 보강 완료({', '.join(added)} — computed.json 실제 값으로 직접 조립)")
+
+
+_KOREAN_COUNT_WORDS = {"한": 1, "두": 2, "세": 3, "네": 4, "다섯": 5, "여섯": 6, "일곱": 7, "여덟": 8, "아홉": 9, "열": 10}
+_MAJOR_ARCANA_PREFIX_RE = re.compile(r"^\d+\.\s")
+
+
+def ensure_tarot_suit_tally(report, computed):
+    """근본 수정 — check_tarot_suit_tally가 잡아내는 "LLM이 카드 계열 개수를 잘못
+    세서 문장에 씀" 문제를 경고만 하고 두지 않고, 실제 computed.json 값으로 본문
+    문장의 한글 수사를 직접 고쳐 쓴다. 숫자 하나만 정답으로 치환하는 순수 기계적
+    교정이라 문장 훼손 위험이 없다(check_term_glosses류의 ensure_* 패턴과 동일)."""
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    draws = _l((computed.get("tarot") or {}).get("draws"))
+    if not draws:
+        return
+
+    real_counts = {"완드": 0, "소드": 0, "컵": 0, "펜타클": 0, "메이저": 0}
+    for d in draws:
+        name = str((d or {}).get("card_name") or "")
+        if name.startswith("완드"):
+            real_counts["완드"] += 1
+        elif name.startswith("소드"):
+            real_counts["소드"] += 1
+        elif name.startswith("컵"):
+            real_counts["컵"] += 1
+        elif name.startswith("펜타클"):
+            real_counts["펜타클"] += 1
+        elif _MAJOR_ARCANA_PREFIX_RE.match(name):
+            real_counts["메이저"] += 1
+
+    count_word_alt = "|".join(_KOREAN_COUNT_WORDS.keys())
+    real_word = {v: k for k, v in _KOREAN_COUNT_WORDS.items()}
+
+    for sec in _l(report.get("system_sections")):
+        if not (isinstance(sec, dict) and sec.get("system") == "tarot"):
+            continue
+        body = str(sec.get("body") or "")
+        if not body:
+            continue
+
+        def _fix(m):
+            suit, word = m.group(1), m.group(2)
+            real_n = real_counts.get(suit, 0)
+            if real_n and real_n in real_word and _KOREAN_COUNT_WORDS.get(word) != real_n:
+                start = m.start(2) - m.start(0)
+                end = m.end(2) - m.start(0)
+                return m.group(0)[:start] + real_word[real_n] + m.group(0)[end:]
+            return m.group(0)
+
+        sec["body"] = re.sub(
+            rf"(완드|소드|컵|펜타클|메이저)\s*(?:계열이|카드가)\s*({count_word_alt})\s*장",
+            _fix,
+            body,
+        )
+
+
+def check_tarot_suit_tally(report, computed):
+    """2026-08-29 추가 — 사용자 검수로 실제 발견: 실제 발송된 리포트에서 열 장 중
+    완드3ㆍ소드2ㆍ컵2ㆍ메이저3이 진짜 계산값인데, 본문 총론 문장은 "소드 계열이 세
+    장ㆍ메이저 카드가 두 장"이라고 잘못 집계해서 썼다(LLM의 산수 실수, 카드 자체는
+    안 지어냈으니 check_hallucination()이 안 걸러짐 — 그건 "있는 카드인가"만 보지
+    "개수를 정확히 셌는가"는 안 보기 때문). computed.json의 실제 draws에서 계열별
+    개수를 코드로 직접 세서, 본문에 쓰인 "~계열이 O 장" 문장의 숫자(한글 수사)와
+    대조한다 — 판단이 필요 없는 순수 산수 대조라 여기서 기계적으로 처리(check_term_
+    glosses와 같은 성격). 문장 패턴을 못 찾으면(다른 표현으로 썼을 수 있음) 조용히
+    건너뛴다 — 별자리 검사와 같은 이유로 완벽한 검사가 아니라 신호일 뿐."""
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    draws = _l((computed.get("tarot") or {}).get("draws"))
+    if not draws:
+        return
+
+    real_counts = {"완드": 0, "소드": 0, "컵": 0, "펜타클": 0, "메이저": 0}
+    for d in draws:
+        name = str((d or {}).get("card_name") or "")
+        if name.startswith("완드"):
+            real_counts["완드"] += 1
+        elif name.startswith("소드"):
+            real_counts["소드"] += 1
+        elif name.startswith("컵"):
+            real_counts["컵"] += 1
+        elif name.startswith("펜타클"):
+            real_counts["펜타클"] += 1
+        elif _MAJOR_ARCANA_PREFIX_RE.match(name):
+            real_counts["메이저"] += 1
+
+    all_text = "".join(
+        str((sec or {}).get("body") or "")
+        for sec in _l(report.get("system_sections"))
+        if isinstance(sec, dict) and sec.get("system") == "tarot"
+    )
+    if not all_text:
+        return
+
+    count_word_alt = "|".join(_KOREAN_COUNT_WORDS.keys())
+    problems = []
+    for suit, real_n in real_counts.items():
+        if real_n == 0:
+            continue
+        m = re.search(rf"{suit}\s*(?:계열이|카드가)\s*({count_word_alt})\s*장", all_text)
+        if m and _KOREAN_COUNT_WORDS[m.group(1)] != real_n:
+            problems.append(f"{suit}: 실제로는 {real_n}장인데 본문은 '{m.group(1)} 장'이라고 씀")
+
+    if problems:
+        print("⚠ 경고: 타로 카드 계열 개수가 실제 계산값과 다름(LLM 집계 오류 가능성) — 발송 전 확인할 것:")
+        for p in problems:
+            print(f"    - {p}")
+    else:
+        print("✓ 타로 카드 계열 개수 검사 통과(문장 패턴 발견 시에만 대조, 완벽하지 않음)")
+
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_ws(s):
+    return _WS_RE.sub(" ", str(s or "")).strip()
+
+
+def check_qa_count_and_order(report, computed):
+    """2026-08-30 추가 — LLM→PDF 신뢰성 프로토콜 문서 검토 중 발견: 고객이 실제로
+    낸 질문 개수(computed["customer"]["questions"])와 report["question_answers"]의
+    개수ㆍ순서가 일치하는지 대조하는 코드가 이 프로젝트에 하나도 없었다(grep 0건
+    확인). SYSTEM_PROMPT 10번 규칙("질문 개수만큼 정확히, 빠뜨리거나 합치지
+    말 것")을 LLM이 지킬 거라는 믿음에만 의존하고 있었다 — 지금까지 우연히 한 번도
+    안 터졌을 뿐, 코드 검증은 전혀 없었다.
+
+    LLM이 질문을 답변에 옮길 때 줄바꿈(\\r\\n)을 공백으로 펴서 약간 다르게 옮기는
+    걸 실제 리포트에서 확인했으므로(정상적인 재구성), 완전 일치가 아니라 공백
+    정규화 후 대조한다. 값을 지어낼 방법이 없는 순수 대조라 check_tarot_suit_tally와
+    같은 성격 — 경고만 하고 자동 수정은 하지 않는다(질문이 빠졌다면 코드가 안전하게
+    새 답을 지어낼 수 없으므로 사람ㆍLLM 재작성이 필요한 영역)."""
+    raw_questions = ((computed.get("customer") or {}).get("questions")) or []
+    if not isinstance(raw_questions, list) or not raw_questions:
+        return
+    qa_list = report.get("question_answers")
+    if not isinstance(qa_list, list):
+        print(f"⚠ 경고: 고객이 질문 {len(raw_questions)}개를 냈는데 question_answers 자체가 없음 — 발송 전 확인할 것")
+        return
+
+    problems = []
+    if len(raw_questions) != len(qa_list):
+        problems.append(f"질문 {len(raw_questions)}개를 냈는데 답변은 {len(qa_list)}개임(개수 불일치)")
+
+    norm_raw = [_normalize_ws(q) for q in raw_questions]
+    norm_qa = [_normalize_ws((qa or {}).get("question")) for qa in qa_list if isinstance(qa, dict)]
+    for i, rq in enumerate(norm_raw):
+        if i >= len(norm_qa):
+            problems.append(f"{i+1}번째 질문({rq[:30]}...)에 대응하는 답변 항목 자체가 없음")
+            continue
+        aq = norm_qa[i]
+        # 완전 일치는 요구하지 않는다(모델이 줄바꿈을 공백으로 펴는 정상적인 재구성은
+        # 허용) — 대신 앞부분이 상당 부분 겹치는지만 본다. 안 겹치면 순서가 섞였거나
+        # 질문이 통째로 바뀐 것.
+        if rq[:15] not in aq and aq[:15] not in rq:
+            # 다른 위치에 이 질문이 있는지 찾아 "순서만 바뀜"과 "질문 자체가 사라짐"을 구분
+            found_elsewhere = any(rq[:15] in other or other[:15] in rq for j, other in enumerate(norm_qa) if j != i)
+            if found_elsewhere:
+                problems.append(f"{i+1}번째 질문이 답변 순서상 다른 자리로 밀려남(순서 불일치): {rq[:30]}...")
+            else:
+                problems.append(f"{i+1}번째 질문이 답변 목록 어디에도 안 보임(질문 누락 가능성): {rq[:30]}...")
+
+    if problems:
+        print("⚠ 경고: 질문-답변 개수ㆍ순서 불일치 — 발송 전 반드시 확인할 것:")
+        for p in problems:
+            print(f"    - {p}")
+    else:
+        print(f"✓ 질문-답변 개수ㆍ순서 검사 통과({len(raw_questions)}개 모두 순서대로 대응됨)")
+
+
+_LEFTOVER_PATTERNS = ["TODO", "FIXME", "DEBUG", "PLACEHOLDER", "{{", "}}", "여기에 입력", "lorem ipsum", "Lorem ipsum"]
+
+
+def check_leftover_placeholders(report):
+    """2026-08-30 추가 — LLM→PDF 신뢰성 프로토콜 문서 검토 중 발견: TODOㆍFIXMEㆍ
+    DEBUGㆍ남은 `{{}}` 표시 같은 잔재 문자열을 검색하는 코드가 이 프로젝트에 전혀
+    없었다(grep 0건 확인). expand_term_placeholders()가 사전에 없는 용어까지도
+    중괄호를 벗기게 되어 있어 `{{}}`가 최종 문서에 남을 가능성은 이미 낮지만, 그건
+    "그 함수가 항상 완벽히 호출된다"는 가정에 의존하는 것이라 별도의 마지막 안전망을
+    둔다 — 순수 문자열 검색이라 판단이 필요 없고 실수로 놓칠 이유가 없다."""
+    hits = []
+
+    def _walk(obj, path):
+        if isinstance(obj, str):
+            for pat in _LEFTOVER_PATTERNS:
+                if pat in obj:
+                    hits.append((path, pat))
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                _walk(v, f"{path}[{i}]")
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                _walk(v, f"{path}.{k}")
+
+    _walk(report, "report")
+    if hits:
+        print("⚠ 경고: 남은 placeholder/디버그 문구 발견 — 발송 전 확인할 것:")
+        for path, pat in hits:
+            print(f"    - {path}: {pat!r}")
+    else:
+        print("✓ placeholder/디버그 문구 잔재 검사 통과")
+
+
+_ASPECT_TYPE_WORDS = {
+    "합(컨정션)": ["합"],
+    "대립(오퍼지션)": ["대립", "오퍼지션"],
+    "삼각(트라인)": ["삼각", "트라인"],
+    "사각(스퀘어)": ["사각", "스퀘어"],
+    "육각(섹스타일)": ["육각", "섹스타일"],
+}
+_ALL_ASPECT_WORDS = sorted({w for words in _ASPECT_TYPE_WORDS.values() for w in words}, key=len, reverse=True)
+_HANGUL_RE = re.compile(r"[가-힣]")
+
+
+def _aspect_word_present(word, window):
+    for m in re.finditer(re.escape(word), window):
+        if word == "합":
+            # 2026-08-30 수정 — 실제 오탐 발견: "눈여겨볼 만합니다"의 "만합니다"에서
+            # "합"만 걸려서 금성-목성이 실제론 사각(스퀘어)인데 "합"으로 잘못
+            # 표현됐다고 오판했다("합"은 워낙 흔한 한글 음절이라 다른 단어 중간에도
+            # 수시로 나타남). 바로 앞 글자가 한글 음절이면(그 단어의 일부일 뿐이면)
+            # 무시하고, 공백ㆍ조사 경계처럼 새 단어로 시작하는 경우만 인정한다.
+            before = window[m.start() - 1] if m.start() > 0 else " "
+            if _HANGUL_RE.match(before):
+                continue
+        return True
+    return False
+
+
+def check_aspect_consistency(report, computed):
+    """2026-08-30 추가 — QA 파이프라인 문서 검토 중 이번 세션에서 실제로 손으로
+    한 번 검증한 것(리뷰어가 "금성-토성/천왕성은 스퀘어여야 한다"고 주장했는데 절대
+    도수로 직접 계산해 틀렸음을 확인함)을 영구적인 자동 검사로 만든다. computed.
+    astrology.aspects에 이미 engine이 계산한 실제 타입이 있으므로(재계산 불필요),
+    본문에서 두 행성명이 가까이 언급되며 어스펙트 단어가 함께 쓰인 자리를 찾아
+    실제 타입과 대조한다.
+
+    2026-08-30 수정 — 실제 오탐 발견: 같은 두 행성이 본문 여러 자리에서 언급될 때
+    "처음 찾은 자리 하나만" 보고 멈췄더니, 마침 그 첫 자리엔 아무 관계 설명이 없고
+    (예: 단순히 좌표만 나열하는 문장) 두 번째 자리에 정확한 표현("목성과 금성 사이에
+    사각(스퀘어) 관계")이 있는데도 그걸 못 보고 지나간 채 앞의 약한 오탐만 보고
+    FAIL로 판정했다. 이제 이 쌍이 언급된 모든 자리를 다 보고, 그중 하나라도 정확한
+    표현이 있으면 통과시킨다(다른 자리의 표현이 다소 부정확해도, 정확한 설명이
+    최소 한 번 있으면 손님에게 잘못된 정보가 전달되는 게 아니므로).
+
+    check_tarot_suit_tally와 같은 성격(문장 패턴을 찾았을 때만 대조, 완벽하지
+    않음) — "삼각관계"처럼 어스펙트와 무관한 일반 표현이 드물게 오탐될 수 있으나
+    경고만 할 뿐 자동 수정은 안 하므로 위험이 낮다."""
+    aspects = ((computed.get("astrology") or {}).get("aspects")) or []
+    if not aspects:
+        return
+
+    texts = []
+    for sec in (report.get("system_sections") or []):
+        if isinstance(sec, dict) and sec.get("system") == "astrology":
+            texts.append(str(sec.get("body") or ""))
+            texts.append(str(sec.get("key_insight") or ""))
+    ca = report.get("cross_analysis")
+    if isinstance(ca, dict):
+        texts.append(str(ca.get("body") or ""))
+    full_text = "\n".join(t for t in texts if t)
+    if not full_text.strip():
+        return
+
+    problems = []
+    checked_pairs = set()
+    for asp in aspects:
+        b1, b2, real_type = asp.get("body1"), asp.get("body2"), asp.get("type")
+        if not (b1 and b2 and real_type):
+            continue
+        pair_key = frozenset((b1, b2))
+        if pair_key in checked_pairs:
+            continue
+        real_words = _ASPECT_TYPE_WORDS.get(real_type, [])
+        saw_any_mention = False
+        saw_correct = False
+        wrong_examples = []
+        for m in re.finditer(re.escape(b1), full_text):
+            window = full_text[max(0, m.start() - 60): m.start() + 60]
+            if b2 not in window:
+                continue
+            mentioned = [w for w in _ALL_ASPECT_WORDS if _aspect_word_present(w, window)]
+            if not mentioned:
+                continue
+            saw_any_mention = True
+            if any(w in real_words for w in mentioned):
+                saw_correct = True
+                break  # 정확한 표현을 이미 찾았으니 이 쌍은 더 볼 필요 없음
+            wrong_examples.append(mentioned)
+        if saw_any_mention:
+            checked_pairs.add(pair_key)
+            if not saw_correct:
+                problems.append(f"{b1}-{b2}: 실제로는 {real_type}인데 본문엔 {wrong_examples[0]}로만 표현됨")
+
+    if problems:
+        print("⚠ 경고: 어스펙트 명칭이 실제 계산값과 다름 — 발송 전 확인할 것:")
+        for p in problems:
+            print(f"    - {p}")
+    else:
+        print("✓ 어스펙트 명칭 검사 통과(문장 패턴 발견 시에만 대조, 완벽하지 않음)")
+
+
+_OVERCLAIM_TOPICS = {
+    "건강/질병": ["질병", "암입니다", "건강이 나빠질 것", "반드시 아프", "확실히 병"],
+    "임신/자녀 성별": ["아들입니다", "딸입니다", "남자아이입니다", "여자아이입니다", "임신할 것입니다", "임신하게 됩니다"],
+    "로또/복권": ["당첨됩니다", "당첨될 것입니다", "1등이 될 것"],
+    "사망": ["사망할 것", "죽을 것", "명을 다할 시점"],
+    "법적 결과": ["승소할 것입니다", "패소할 것입니다", "무죄가 될 것"],
+    "투자 수익": ["수익이 날 것입니다", "반드시 오릅니다", "손실 없이"],
+}
+
+
+def check_overclaim_topics(report):
+    """2026-08-30 추가 — QA 파이프라인/LLM→PDF 신뢰성 문서 둘 다 지적한 항목:
+    건강ㆍ임신ㆍ자녀 성별ㆍ로또ㆍ사망ㆍ법적 결과ㆍ투자 수익처럼, 이 서비스가
+    확정적으로 말하면 실제 법적ㆍ신뢰 리스크가 되는 주제에서 단정적 표현을 썼는지
+    검사한다. check_unanswerable_reason_tone과 다른 문제(그건 "컴퓨터 말투",
+    이건 "의료ㆍ법률 자문처럼 들리는 확정적 발언")라 별도 목록으로 둔다. 표현을
+    코드가 안전하게 다시 쓸 방법은 없으므로(문장 재구성 필요) 경고만 한다."""
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    texts = []
+    for sec in _l(report.get("system_sections")):
+        if isinstance(sec, dict):
+            texts.append((f"system_sections[{sec.get('system')}]", str(sec.get("body") or "")))
+    for qa in _l(report.get("question_answers")):
+        if isinstance(qa, dict):
+            texts.append((f"question_answers[{str(qa.get('question'))[:20]}]", str(qa.get("body") or "")))
+
+    hits = []
+    for label, text in texts:
+        if not text:
+            continue
+        for topic, phrases in _OVERCLAIM_TOPICS.items():
+            for phrase in phrases:
+                if phrase in text:
+                    hits.append((label, topic, phrase))
+
+    if hits:
+        print("⚠ 경고: 확정적 표현 금지 주제(건강ㆍ임신ㆍ로또ㆍ사망ㆍ법률ㆍ투자)에서 단정적 문구 발견 — 발송 전 확인할 것:")
+        for label, topic, phrase in hits:
+            print(f"    - {label} [{topic}]: {phrase!r}")
+    else:
+        print("✓ 확정적 표현(건강ㆍ임신ㆍ로또ㆍ사망ㆍ법률ㆍ투자) 검사 통과")
+
+
+_QA_AVOIDANCE_PHRASES = [
+    "계산하지 못했습니다", "계산할 수 없습니다", "말씀드리기 어렵습니다", "답변하기 어렵습니다",
+    "답하기 어렵습니다", "알 수 없습니다", "확인할 수 없습니다", "판단할 수 없습니다",
+    "판단하기 어렵습니다", "확정하기 어렵습니다", "알기 어렵습니다", "포함되어 있지 않습니다",
+]
+
+
+def check_qa_avoidance_ending(report):
+    """2026-08-30 추가 — QA 파이프라인/LLM→PDF 신뢰성 문서 둘 다 강조한 항목(9-10번
+    규칙 문서화 참고). check_unanswerable_reason_tone은 unanswerable_reason
+    필드 하나만(컴퓨터 말투 4단어) 보는데, 이 검사는 question_answers 전체
+    body를 대상으로 더 넓은 회피 표현 목록을 쓰고, "단어가 있다"가 아니라
+    "답변이 그 표현으로 끝나는가"만 FAIL 후보로 본다(문서 12번 판정 기준과 동일 —
+    회피 표현 뒤에 실질적 설명이 이어지면 정상적인 사용이므로 PASS)."""
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    hits = []
+    for qa in _l(report.get("question_answers")):
+        if not isinstance(qa, dict):
+            continue
+        body = str(qa.get("body") or "").strip()
+        if not body:
+            continue
+        for phrase in _QA_AVOIDANCE_PHRASES:
+            if body.endswith(phrase) or body.endswith(phrase + "."):
+                hits.append((qa.get("question"), phrase))
+                break
+
+    if hits:
+        print("⚠ 경고: 회피형 표현으로 답변이 끝남(질문 거절 인상) — 발송 전 확인할 것:")
+        for q, phrase in hits:
+            print(f"    - {str(q)[:40]!r}: '...{phrase}'로 끝남")
+    else:
+        print("✓ Q&A 회피형 답변 종료 검사 통과")
+
+
+def check_qa_duplicates_sections(report):
+    """2026-08-30 추가 — 이전 검토(사용자 지적: 궁합 질문 답변이 궁합 system_section과
+    거의 같은 문장)에서 나온 걸 기계적으로 대조하는 함수가 없었다. question_answers의
+    각 body에서 문장 단위로 쪼개, system_sections의 아무 body에나 그대로(정규화한
+    공백 기준) 들어있는 문장이 있으면 표시한다 — 완전 일치만 잡으므로(유사 표현은
+    못 잡음) 과탐지 위험은 낮다."""
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    section_sentences = set()
+    for sec in _l(report.get("system_sections")):
+        if not isinstance(sec, dict):
+            continue
+        body = str(sec.get("body") or "")
+        for s in re.split(r"(?<=[.!?])\s+", body):
+            s = _normalize_ws(s)
+            if len(s) >= 20:  # 너무 짧은 문장은 우연히 겹칠 수 있어 제외
+                section_sentences.add(s)
+
+    if not section_sentences:
+        return
+
+    hits = []
+    for qa in _l(report.get("question_answers")):
+        if not isinstance(qa, dict):
+            continue
+        body = str(qa.get("body") or "")
+        for s in re.split(r"(?<=[.!?])\s+", body):
+            s = _normalize_ws(s)
+            if len(s) >= 20 and s in section_sentences:
+                hits.append((qa.get("question"), s))
+
+    if hits:
+        print("⚠ 경고: Q&A 답변이 system_sections 본문과 완전히 같은 문장을 복사함 — 발송 전 확인할 것:")
+        for q, s in hits:
+            print(f"    - {str(q)[:40]!r}: {s[:60]!r}")
+    else:
+        print("✓ Q&A ↔ system_sections 문장 복사 검사 통과")
 
 
 def check_required_tier_sections(report, computed):
@@ -1550,9 +2034,9 @@ def _ensure_term_glosses_once(obj, gloss_map):
     if isinstance(obj, list):
         return [_ensure_term_glosses_once(v, gloss_map) for v in obj]
     if isinstance(obj, dict):
-        # expand_term_placeholders()와 같은 이유로 "heading"은 제외.
+        # expand_term_placeholders()와 같은 이유로 "heading"ㆍ"toc_preview"ㆍ"takeaways" 제외.
         return {
-            k: (v if k == "heading" else _ensure_term_glosses_once(v, gloss_map))
+            k: (v if k in ("heading", "toc_preview", "takeaways") else _ensure_term_glosses_once(v, gloss_map))
             for k, v in obj.items()
         }
     return obj
@@ -1692,16 +2176,28 @@ def _find_first_sentence(text):
     중에서도 흘러 다니는 쪽입니다. 사업 수완이...)"처럼 괄호 *안*에 마침표가 있으면
     거기서 강조를 끊어버려 "**...쪽입니다.**" 뒤로 괄호가 안 닫힌 채 남는 사고가 실제
     PDF에서 확인됨. 괄호 안에 있는 마침표는 무시하고, 괄호 바깥(깊이 0)의 첫 마침표까지만
-    문장으로 인정한다."""
+    문장으로 인정한다.
+
+    2026-08-30 수정 — 적대적 테스트로 발견: 모델이 괄호를 닫지 않고 써버리면(예: 여는
+    괄호 뒤에 닫는 괄호가 끝까지 안 나옴) depth가 끝까지 0으로 안 돌아와서 이 함수가
+    None을 반환했다 — 그러면 호출부(ensure_emphasis/ensure_unanswerable_reason)가
+    "문장부호가 아예 없을 때"와 똑같은 폴백(p.strip()[:120] 단순 글자수 자르기)으로
+    떨어져서, 고쳤다고 생각했던 "문장 중간에서 잘림" 버그가 다른 경로로 재발했다.
+    괄호가 안 닫혀도 본문 어딘가에 마침표는 있을 수 있으니, 깊이 0에서 못 찾으면
+    깊이와 무관하게 발견한 마지막 문장부호까지는 재사용한다(완전히 문장부호가 없는
+    경우에만 호출부의 120자 폴백으로 넘어가게 함)."""
     depth = 0
+    last_punct_end = None
     for i, ch in enumerate(text):
         if ch == "(":
             depth += 1
         elif ch == ")":
             depth = max(0, depth - 1)
-        elif ch in ".!?" and depth == 0:
-            return text[:i + 1]
-    return None
+        elif ch in ".!?":
+            if depth == 0:
+                return text[:i + 1]
+            last_punct_end = i + 1
+    return text[:last_punct_end] if last_punct_end else None
 
 
 def _is_content_paragraph(p):
@@ -1796,24 +2292,48 @@ def ensure_unanswerable_reason(report):
     def _l(v):
         return v if isinstance(v, list) else []
 
-    fixed = 0
+    filled = 0
+    deduped = 0
     for qa in _l(report.get("question_answers")):
         qa = _d(qa)
         if qa.get("answerability") not in ("redirected", "unanswerable"):
             continue
-        if qa.get("unanswerable_reason"):
-            continue
         body = qa.get("body")
-        if not isinstance(body, str) or not body.strip():
-            continue
-        found = _find_first_sentence(body.strip())
-        reason = found if found else body.strip()[:120]  # 문장부호 없으면 앞부분이라도 재사용
-        if reason:
-            qa["unanswerable_reason"] = reason
-            fixed += 1
+        body_stripped = body.strip() if isinstance(body, str) else ""
 
-    if fixed:
-        print(f"✓ unanswerable_reason 자동 보강 완료({fixed}개 — body 첫 문장을 그대로 재사용)")
+        reason = qa.get("unanswerable_reason")
+        if not reason:
+            if not body_stripped:
+                continue
+            found = _find_first_sentence(body_stripped)
+            reason = found if found else body_stripped[:120]  # 문장부호 없으면 앞부분이라도 재사용
+            if reason:
+                qa["unanswerable_reason"] = reason
+                filled += 1
+
+        # 2026-08-29 수정 — 실제 사고 발견(사용자 검수): 인용구 박스(reason)와 그
+        # 바로 아래 본문(body) 둘 다에 똑같은 문장이 그대로 나란히 찍혀서 같은
+        # 말을 두 번 하는 것처럼 보였다(Q2ㆍQ4에서 실제 확인).
+        # 2026-08-30 수정 — "reason이 원래 비어있어서 방금 채운 경우"에만 이 중복 제거를
+        # 걸었었는데, 10번 규칙 자체가 모델에게 "unanswerable_reason에 이유를 명시하고
+        # body 맨 앞에도 그 이유를 먼저 밝히라"고 시키고 있어서, 모델이 규칙대로 둘 다
+        # 직접 채운 경우(reason이 원래부터 있던 경우)엔 이 함수가 아예 손을 안 대 중복이
+        # 그대로 남는 걸 재현 테스트로 확인함 — reason 출처(방금 채웠는지 모델이 원래
+        # 썼는지)와 무관하게 항상 대조해야 진짜로 막힌다.
+        if isinstance(reason, str) and reason and body_stripped.startswith(reason):
+            rest = body_stripped[len(reason):].lstrip()
+            new_body = rest if rest else body_stripped
+            if new_body != body:
+                qa["body"] = new_body
+                deduped += 1
+
+    msgs = []
+    if filled:
+        msgs.append(f"{filled}개 필드 채움(body 첫 문장 재사용)")
+    if deduped:
+        msgs.append(f"{deduped}개 중복 문장 제거(reason과 body 서두가 겹침)")
+    if msgs:
+        print(f"✓ unanswerable_reason 자동 보강 완료: {', '.join(msgs)}")
 
 
 _COMPUTER_SPEAK_WORDS = ["계산", "데이터", "범위", "포함되어 있지"]
@@ -2071,11 +2591,19 @@ def main():
     ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
     ensure_unanswerable_reason(report)  # redirected/unanswerable 인용구 박스가 비지 않도록 body 첫 문장 재사용
     ensure_required_new_engine_sections(report, computed)  # 신규 5개 시스템 섹션이 빠지면 computed.json 실제 값으로 코드가 직접 채움
+    ensure_tarot_suit_tally(report, computed)  # 타로 카드 계열 개수를 LLM이 잘못 셌으면 computed.json 실제 값으로 문장의 수사를 코드가 직접 고침
 
     known_terms = collect_known_terms(computed)
     valid_years = collect_valid_years(computed)
     check_hallucination(report, known_terms, valid_years)  # 원본 그대로 측정 — 얼마나 자주 규칙을 어기는지 계속 눈으로 볼 것
     check_required_tier_sections(report, computed)  # 티어별 필수 섹션(신규 5개 시스템 등)이 실제로 있는지 대조
+    check_tarot_suit_tally(report, computed)  # 위 ensure_tarot_suit_tally가 이미 고쳤어야 함 — 남아있다면 정규식이 못 잡은 새 패턴이라는 신호
+    check_qa_count_and_order(report, computed)  # 고객이 낸 질문 개수ㆍ순서와 question_answers가 실제로 대응하는지 대조
+    check_leftover_placeholders(report)  # TODOㆍFIXMEㆍDEBUGㆍ남은 {{}} 같은 잔재 문자열 검색
+    check_aspect_consistency(report, computed)  # 본문의 "삼각/사각/육각/합/대립" 표현이 computed.astrology.aspects 실제 값과 맞는지 대조
+    check_overclaim_topics(report)  # 건강ㆍ임신ㆍ로또ㆍ사망ㆍ법률ㆍ투자 주제에서 단정적 표현 검사
+    check_qa_avoidance_ending(report)  # Q&A 답변이 회피형 표현으로 끝나는지 검사
+    check_qa_duplicates_sections(report)  # Q&A 답변이 system_sections 본문과 완전히 같은 문장을 복사하는지 대조
     check_unanswerable_reason_tone(report)  # redirected/unanswerable 이유 문장에 컴퓨터 말투가 남았는지 대조
     check_term_glosses(report)  # 최종 안전망 — {{}}를 안 쓰고 용어를 그냥 맨몸으로 쓴 경우만 여기서 잡힘
     check_emphasis_markers(report)  # ensure_emphasis() 이후에도 남는 예외가 있는지 계속 눈으로 볼 것(항상 통과해야 정상)
