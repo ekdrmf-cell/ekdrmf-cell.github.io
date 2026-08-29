@@ -72,14 +72,24 @@ STRUCTURAL_TERM_GLOSSARY = {
     # 실제로 설명 없이 노출된 사고가 있었음. GLOSSARY_TERMS(맨몸 텍스트 스캔용)에는 넣지
     # 않는다 — 한 글자라 무관한 문장에서 오검출될 위험이 크므로, {{}} 명시적 표시로만
     # 치환한다.
+    # 2026-08-30 수정 — 실제 사고 발견(미뤄뒀던 작업 점검 중): saju.js의 DI_SHI_KO(엔진이
+    # computed.json에 실제로 쓰는 값)는 장생ㆍ목욕ㆍ관대ㆍ임관ㆍ제왕ㆍ쇠ㆍ병ㆍ사ㆍ묘ㆍ절ㆍ
+    # 태ㆍ양(총 12개, 5개는 두 글자) — 그런데 이 사전과 SYSTEM_PROMPT는 그 중 5개를
+    # 생ㆍ욕ㆍ대ㆍ관ㆍ왕(한 글자 축약형)으로 잘못 등록해뒀다. 그 결과 손님의 기둥이 하필
+    # 이 5개 단계(장생ㆍ목욕ㆍ관대ㆍ임관ㆍ제왕) 중 하나에 해당하면, LLM이 실제 값 그대로
+    # `{{장생}}`을 쓰든(사전에 "생"만 있어 못 찾아 뜻풀이 없이 깨짐) 프롬프트 지시대로
+    # `{{생}}`을 쓰든(computed.json 실제 값과 다른 축약형을 지어내 씀, 1번 규칙 위반)
+    # 둘 다 틀린다. 엔진의 실제 출력값(두 글자 전통 명칭)을 그대로 키로 쓰도록 통일한다
+    # — correspondence.js의 TWELVE_STAGE_MEANING도 이미 이 두 글자 명칭을 쓰고 있어(saju.js
+    # DI_SHI_KO와 동일 키), 이렇게 고치면 두 파일의 12운성 명칭이 비로소 일치한다.
     "절": "완전히 멈춰서 새로 시작하기 직전인 단계",
     "태": "아직 겉으로 드러나지 않았지만 새로 시작할 씨앗을 품은 단계",
     "양": "씨앗이 조금씩 자라나기 시작하는 단계",
-    "생": "실제로 태어나 첫발을 떼는 단계",
-    "욕": "아직 서툴지만 이것저것 부딫혀보며 배우는 단계",
-    "대": "어느 정도 갖춰져서 본격적으로 나설 준비가 된 단계",
-    "관": "사회적으로 자리를 잡고 인정받는 단계",
-    "왕": "기운이 가장 왕성하고 절정에 오른 단계",
+    "장생": "실제로 태어나 첫발을 떼는 단계",
+    "목욕": "아직 서툴지만 이것저것 부딫혀보며 배우는 단계",
+    "관대": "어느 정도 갖춰져서 본격적으로 나설 준비가 된 단계",
+    "임관": "사회적으로 자리를 잡고 인정받는 단계",
+    "제왕": "기운이 가장 왕성하고 절정에 오른 단계",
     "쇠": "절정을 지나 차분하게 다져지는 단계",
     "병": "기운이 잦아들면서 겉보다 안을 들여다보게 되는 단계",
     "사": "벌여둔 일을 마무리하고 정리하는 단계",
@@ -119,7 +129,7 @@ def build_term_gloss_map(computed):
     return gloss_map
 
 
-def expand_term_placeholders(obj, gloss_map, unmapped):
+def expand_term_placeholders(obj, gloss_map, unmapped, seen=None):
     """report(dict) 전체를 재귀적으로 훑어 `{{용어명}}` 표시를 실제 "용어명(뜻풀이)"로
     바꾼다. sanitize_report()와 같은 방식(구조를 가리지 않고 모든 문자열을 훑음)이라
     스키마에 필드가 추가돼도 빠뜨릴 위험이 없다.
@@ -131,30 +141,36 @@ def expand_term_placeholders(obj, gloss_map, unmapped):
     결정하는 것"까지로 좁히고, 뜻풀이 자체는 항상 이 코드가 정확한 사전에서 가져와
     채운다. 이제 모델이 뜻풀이를 빠뜨리거나 틀리게 지어낼 방법이 아예 없다 — 사전에
     없는 용어명을 썼을 때만(목록 밖 이름ㆍ오타) 예외적으로 걸리며, 그 경우 중괄호만
-    벗겨서 최소한 안 깨지게 하고 unmapped에 남겨 경고로 띄운다."""
-    if isinstance(obj, str):
-        # 2026-08-29 추가 — 실제 사고 재현: 같은 문단 안에서 "정관"이 두 문장 뒤에
-        # 다시 언급되니까 뜻풀이 전체("나를 적당히 다스려주는 기운으로...")가 통째로
-        # 또 붙어서 똑같은 문장이 두 번 반복되는 것처럼 읽혔다. 사람은 한 번 정의한
-        # 용어를 같은 글 안에서 또 나오면 그냥 라벨만 쓴다 — 이 문자열(하나의 body/
-        # key_insight/takeaway 값) 안에서는 같은 용어를 처음 한 번만 풀어주고, 그
-        # 다음부터는 라벨만 남긴다(더 넓은 범위, 예: 다른 섹션에서 다시 나오는 경우는
-        # 손님이 다시 읽을 수도 있으니 그대로 유지 — 이 문자열 하나로만 범위를 좁힘).
-        seen_in_this_string = set()
+    벗겨서 최소한 안 깨지게 하고 unmapped에 남겨 경고로 띄운다.
 
+    2026-08-30 수정 — 미뤄뒀던 작업 재점검 중 사용자 지적("리포트 전체에서 같은 용어
+    뜻풀이가 너무 자주 반복된다")을 실제로 반영: 원래는 "seen_in_this_string"이라는
+    이름 그대로 문자열(필드) 하나 안에서만 중복을 막았다 — 그래서 같은 용어가 body A,
+    key_insight B, 다른 섹션의 body C에서 각각 처음 등장하면 그때마다 매번 새로 풀어썼다.
+    이제 `seen`을 report 전체 순회에 걸쳐 공유하는 집합으로 바꿔, 어느 필드에서든
+    한 번 풀어쓴 용어는 리포트 전체에서 그 뒤로는 라벨만 남긴다(dict의 키 순서가
+    report_kit.py의 렌더링 순서와 대체로 일치하므로 "처음 등장 = 페이지상 먼저 나오는
+    자리"에 가깝다). ensure_term_glosses()의 `{{}}` 없는 맨몸 표기 쪽과도 이 집합을
+    공유해서, 두 메커니즘 중 어느 쪽으로 먼저 풀어썼든 서로 인지하게 한다(main()
+    참고)."""
+    if seen is None:
+        seen = set()
+    if isinstance(obj, str):
         def _sub(m):
             term = m.group(1).strip()
             gloss = gloss_map.get(term)
             if gloss is None:
                 unmapped.append(term)
                 return term
-            if term in seen_in_this_string:
+            if term in seen:
                 return term
-            seen_in_this_string.add(term)
-            return f"{term}({gloss})"
+            seen.add(term)
+            # 2026-08-30 수정 — 사용자 지시: 괄호 안의 내용(뜻풀이)이 주가 되고 용어는
+            # 괄호로 표시만 하도록 순서를 뒤집는다("용어(뜻풀이)" → "뜻풀이(용어)").
+            return f"{gloss}({term})"
         return _PLACEHOLDER_RE.sub(_sub, obj)
     if isinstance(obj, list):
-        return [expand_term_placeholders(v, gloss_map, unmapped) for v in obj]
+        return [expand_term_placeholders(v, gloss_map, unmapped, seen) for v in obj]
     if isinstance(obj, dict):
         def _strip_bare(v):
             # heading/toc_preview/takeaways는 뜻풀이를 절대 안 붙이지만, `{{용어}}`
@@ -181,7 +197,7 @@ def expand_term_placeholders(obj, gloss_map, unmapped):
         # 항목이 "정관(나를 적당히...)이 강함"으로 그대로 부풀려짐 — heading/toc_preview와
         # 완전히 같은 모양의 결함이라 같이 예외 처리한다.
         return {
-            k: (_strip_bare(v) if k in ("heading", "toc_preview", "takeaways") else expand_term_placeholders(v, gloss_map, unmapped))
+            k: (_strip_bare(v) if k in ("heading", "toc_preview", "takeaways") else expand_term_placeholders(v, gloss_map, unmapped, seen))
             for k, v in obj.items()
         }
     return obj
@@ -332,9 +348,10 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
      바꿨습니다** — `{{용어명}}`만 정확히 쓰면 뜻풀이는 시스템이 항상 정확하게
      채워줍니다. 대상 용어: 십신(비견ㆍ겁재ㆍ식신ㆍ상관ㆍ편재ㆍ정재ㆍ편관ㆍ칠살ㆍ정관ㆍ
      편인ㆍ정인), 신살(도화살ㆍ역마살ㆍ화개살ㆍ홍염살), 구조 용어(일간ㆍ일지ㆍ년주ㆍ
-     월주ㆍ일주ㆍ시주ㆍ지장간ㆍ12운성ㆍ공망), **그리고 12운성의 개별 단계 이름(절ㆍ태ㆍ
-     양ㆍ생ㆍ욕ㆍ대ㆍ관ㆍ왕ㆍ쇠ㆍ병ㆍ사ㆍ묘) — 한 글자라 "사"(죽음)ㆍ"병"(질병)처럼
-     흔한 단어로 오해하기 쉬우니 절대 맨몸으로 쓰지 말고 반드시 `{{쇠}}`처럼 표시하세요.**
+     월주ㆍ일주ㆍ시주ㆍ지장간ㆍ12운성ㆍ공망), **그리고 12운성의 개별 단계 이름(장생ㆍ
+     목욕ㆍ관대ㆍ임관ㆍ제왕ㆍ쇠ㆍ병ㆍ사ㆍ묘ㆍ절ㆍ태ㆍ양 — computed.json에 실제로 나오는
+     이름 그대로) — 한 글자짜리는 "사"(죽음)ㆍ"병"(질병)처럼 흔한 단어로 오해하기
+     쉬우니 절대 맨몸으로 쓰지 말고 반드시 `{{쇠}}`처럼 표시하세요.**
      `{{용어명}}` 안의 용어명은 반드시 이
      목록에 있는 것과 정확히 같은 글자여야 시스템이 인식합니다 — 다른 표현으로
      바꾸지 마세요. **2026-08-29 추가 — 실제 사고: "신유"ㆍ"무진"처럼 천간+지지
@@ -777,13 +794,19 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
 10-C. **2026-08-23 추가 — saju.shensha 필드로 신살(도화ㆍ역마ㆍ화개ㆍ홍염) 질문도
    "direct"로 승격됩니다.** "저 도화살 있나요", "역마살이 있어서 이사를 자주 다니나요"
    같은 질문은 이제 saju.shensha.taohua/yeokma/hwagae/hongyeom의 present(있음/없음)ㆍ
-   meaning(의미)ㆍfound_in(어느 기둥에 있는지)만 근거로 답하세요 — present가 false면
+   meaning(의미)ㆍfound_in(어느 지지에 있는지)만 근거로 답하세요 — present가 false면
    "이 손님 사주에는 해당 신살이 없다"고 명확히 답하고, 있지도 않은데 있는 것처럼
    얼버무리지 마세요. shensha.basis_note에 있듯 일지 기준이 기본이고 by_year_branch는
    참고용 고전식 기준이니, 둘이 다르게 나오면 "일지 기준으로는 ~하지만, 년지 기준(고전식)
    으로는 ~하다"처럼 둘 다 밝혀도 됩니다(지어내는 게 아니라 이미 계산된 두 값을 그대로
    전달하는 것이므로 1번 규칙 위반이 아님). meaning 문구는 "전통적으로 여겨진다" 톤을
    유지하고, 확정적 사건 예언으로 바꿔 쓰지 마세요(4번 규칙과 동일).
+   **2026-08-30 추가 — 용어 통일: found_in은 그 기둥의 "지지"만 대조한 결과입니다
+   (천간까지 포함한 기둥 전체를 본 게 아님)** — 그러니 "day"가 있으면 "일주"가
+   아니라 "일지"라고 쓰세요(년/월/시도 마찬가지로 항상 "OO주"가 아니라 "OO지"). 같은
+   리포트 안에서 이 신살 하나를 두고 "일지에 있다"와 "일주에 있다"를 섞어 쓰지 마세요
+   — 실제 사고(사용자 검수로 발견): 홍염살을 설명하며 이 둘을 혼용해 손님이 다른
+   기준을 말하는 건지 헷갈리게 만든 사례가 있었습니다.
 10-D. **2026-08-23 추가 — astrology.correspondence 필드로 점성술 "의미" 질문도 "direct"로
    승격됩니다.** "제 태양이 처녀자리인데 무슨 뜻이에요", "이 하우스가 무슨 의미인가요",
    "이 어스펙트는 어떤 관계예요" 같은 질문은 astrology.correspondence.planet_meanings/
@@ -1993,7 +2016,7 @@ def check_hallucination(report, known_terms, valid_years):
         print("✓ 연도 언급 전부 se_un/dae_yun/생년 범위 안에 있음")
 
 
-def _ensure_term_glosses_once(obj, gloss_map):
+def _ensure_term_glosses_once(obj, gloss_map, seen):
     if isinstance(obj, str):
         # 2026-08-29 수정 — 실제 사고 재현: 겁재/정재처럼 서로의 뜻풀이 안에 서로를
         # 언급하는(가상의) 순환 관계를 넣고 적대적 테스트를 돌려보니, 용어를 하나씩
@@ -2009,40 +2032,51 @@ def _ensure_term_glosses_once(obj, gloss_map):
             gloss = gloss_map.get(term)
             if not gloss:
                 continue
-            # 2026-08-29 추가 — 실제 사고 재현: 같은 문단 안에서 "정관"이 두 문장
-            # 뒤에 다시 나오니 뜻풀이 전체가 통째로 또 붙어서 같은 문장이 두 번
-            # 반복되는 것처럼 읽혔다. 처음엔 "이번 패스에서 첫 등장만" 식으로
-            # 막았는데, 바깥의 2패스 구조(순환참조 버그 수정 때 도입) 때문에 1패스가
-            # 막은 걸 2패스가 다시 뚫어버렸다 — "이 문자열 안 어딘가에 이미 이 용어의
-            # 뜻풀이가 있는가"를 패스 횟수와 무관하게 항상 확인해야 진짜로 막힌다.
-            if (term + "(") in original:
+            # 2026-08-30 수정 — 원래는 "이 문자열 안에 이미 괄호가 있는가"만 봤는데,
+            # 그러면 리포트 전체(다른 섹션)에서 이미 풀어쓴 용어를 이 문자열이 처음
+            # 언급할 때 또 새로 풀어썼다(사용자 지적: "용어 뜻풀이가 리포트 전체에서
+            # 너무 자주 반복된다"). expand_term_placeholders()와 이 함수가 함께 공유하는
+            # `seen` 집합(리포트 전체 순회 기준)을 확인해, 어느 필드에서든 이미 풀어쓴
+            # 용어면 이 문자열에서는 맨몸 그대로 둔다.
+            if term in seen:
+                continue
+            # 2026-08-30 수정 — 삽입 형식을 "용어(뜻풀이)" → "뜻풀이(용어)"로 뒤집으면서,
+            # "이미 뜻풀이가 붙었는가" 판정 기준도 같이 뒤집는다: 예전엔 "용어(" 뒤에
+            # 괄호가 오는지 봤는데, 이제는 용어 자체가 "(용어)"처럼 괄호에 싸여 있는지
+            # 본다(모델이 "칠살(편관)"처럼 스스로 결합 라벨을 쓴 경우도 이 형태로 걸림).
+            if ("(" + term + ")") in original:
+                seen.add(term)  # 모델이 스스로 붙인 뜻풀이도 "이미 설명됨"으로 리포트 전체에 반영
                 continue
             start = 0
+            found_here = False
             while True:
                 idx = original.find(term, start)
                 if idx == -1:
                     break
-                after = original[idx + len(term):idx + len(term) + 3].lstrip()
-                if not after.startswith("("):
+                before = original[max(0, idx - 3):idx].rstrip()
+                if not before.endswith("("):
                     insertions.append((idx, term, gloss))
+                    found_here = True
                     break  # 이 문자열 안에서는 첫 번째 맨몸 등장만 풀어주고 멈춘다
                 start = idx + len(term)
+            if found_here:
+                seen.add(term)
         insertions.sort(key=lambda t: t[0], reverse=True)  # 뒤에서부터 삽입해야 앞쪽 위치가 안 밀림
         for idx, term, gloss in insertions:
-            obj = obj[:idx + len(term)] + f"({gloss})" + obj[idx + len(term):]
+            obj = obj[:idx] + f"{gloss}(" + term + ")" + obj[idx + len(term):]
         return obj
     if isinstance(obj, list):
-        return [_ensure_term_glosses_once(v, gloss_map) for v in obj]
+        return [_ensure_term_glosses_once(v, gloss_map, seen) for v in obj]
     if isinstance(obj, dict):
         # expand_term_placeholders()와 같은 이유로 "heading"ㆍ"toc_preview"ㆍ"takeaways" 제외.
         return {
-            k: (v if k in ("heading", "toc_preview", "takeaways") else _ensure_term_glosses_once(v, gloss_map))
+            k: (v if k in ("heading", "toc_preview", "takeaways") else _ensure_term_glosses_once(v, gloss_map, seen))
             for k, v in obj.items()
         }
     return obj
 
 
-def ensure_term_glosses(obj, gloss_map):
+def ensure_term_glosses(obj, gloss_map, seen=None):
     """2026-08-29 추가 — check_term_glosses()는 경고만 했는데, 실제 100회 무료
     시뮬레이션(원본은 진짜 발송된 최광호 프리미엄 리포트)에서 100번 전부 똑같은
     경고("겁재ㆍ도화살ㆍ상관..." 등 14개 용어가 괄호 뜻풀이 없이 쓰임)가 반복됐다 —
@@ -2072,10 +2106,52 @@ def ensure_term_glosses(obj, gloss_map):
     때까지"가 아니라 **정확히 2번만** 돈다: 1패스=원본 용어, 2패스=1패스가 새로 만든
     용어(홍염살→도화살 같은 실제 사례) 이렇게 "정의 안의 정의"까지만 의도적으로
     지원하고, 그 이상(정의 안의 정의 안의 정의)은 지원하지 않는다 — 실제로 이 깊이가
-    필요한 사례가 없었고, 지원하면 순환 관계에서 다시 무한히 자라기 때문이다."""
-    obj = _ensure_term_glosses_once(obj, gloss_map)
-    obj = _ensure_term_glosses_once(obj, gloss_map)
+    필요한 사례가 없었고, 지원하면 순환 관계에서 다시 무한히 자라기 때문이다.
+
+    2026-08-30 수정 — `seen`(리포트 전체 기준 "이미 풀어쓴 용어" 집합)을 외부에서
+    주입받을 수 있게 함. main()에서 expand_term_placeholders()가 쓴 것과 같은 집합을
+    넘겨주면, `{{}}`로 명시한 용어와 맨몸으로 쓴 용어가 서로의 존재를 인지해 어느
+    쪽으로 먼저 풀어썼든 리포트 전체에서 중복되지 않는다. 안 넘기면(단독 호출ㆍ기존
+    테스트 호환) 이 호출 하나에서만 유효한 새 집합을 만든다."""
+    if seen is None:
+        seen = set()
+    obj = _ensure_term_glosses_once(obj, gloss_map, seen)
+    obj = _ensure_term_glosses_once(obj, gloss_map, seen)
     return obj
+
+
+# 2026-08-30 추가 — report_kit.py 렌더링 순서를 기준으로 나눈 "챕터 묶음". 묶음이 바뀌면
+# 용어를 처음 보는 것처럼 다시 설명하고, 같은 묶음 안에서는 반복하지 않는다.
+_GLOSS_GROUPS = [
+    ["intro", "system_sections"],
+    ["cross_analysis", "opportunities", "risks", "action_plan", "long_term_strategy"],
+    ["question_answers", "closing"],
+]
+
+
+def apply_term_glosses_by_group(report, gloss_map, unmapped_terms):
+    """2026-08-30 추가 — 처음엔 리포트 전체(47페이지 전부)를 한 개의 공유 집합으로 묶어서
+    "용어를 한 번만 풀어쓴다"를 구현했는데, 다시 검토해보니 이건 "같은 챕터 안에서
+    반복된다"는 원래 불만을 없애려다 "한 번 설명하고 40페이지 뒤까지 다시는 설명 안
+    함"이라는 새 결함을 만드는 것이었다 — 그 결함을 감지하던 check_term_glosses를
+    새 설계에 맞춰 조정했을 뿐, 결함 자체를 없앤 게 아니었다(근본 원인을 옮겨놓고 안
+    보이게만 한 것, 사용자 지적으로 재점검함). 그래서 "리포트 전체 한 번"이 아니라
+    "챕터 묶음별로 한 번"으로 범위를 좁힌다(_GLOSS_GROUPS 참고) — 묶음이 바뀌면 처음
+    보는 것처럼 다시 설명하고, 같은 묶음 안(예: 사주ㆍ점성술ㆍ타로가 이어지는
+    system_sections)에서는 반복하지 않는다.
+
+    main()뿐 아니라 시뮬레이션 스크립트에서도 똑같이 재사용할 수 있도록 별도 함수로
+    뺐다 — main() 안에 인라인으로만 있으면 회귀 테스트가 이 로직을 실제로 검증하지
+    못한다."""
+    for group_keys in _GLOSS_GROUPS:
+        seen = set()
+        for k in group_keys:
+            if report.get(k) is not None:
+                report[k] = expand_term_placeholders(report[k], gloss_map, unmapped_terms, seen)
+        for k in group_keys:
+            if report.get(k) is not None:
+                report[k] = ensure_term_glosses(report[k], gloss_map, seen)
+    return report
 
 
 def check_term_glosses(report):
@@ -2110,14 +2186,24 @@ def check_term_glosses(report):
         if isinstance(part, dict):
             all_text += str(part.get("body") or "")
 
+    # 2026-08-30 수정 — 실제 회귀 발견: ensure_term_glosses()가 "리포트 전체에서 한 번만
+    # 풀어쓰고 그 다음부터는 라벨만 남긴다"로 바뀌면서(사용자 지적: 용어 뜻풀이가 리포트
+    # 전체에서 너무 자주 반복됨), 이 검사가 "용어가 나오는 모든 자리에 괄호가 있어야
+    # 한다"는 낡은 기준으로 매번 경고를 냈다(180케이스 시뮬레이션 전부 이 경고로 FAIL
+    # 처리됨). 새 설계에서는 "이 리포트 어딘가에 최소 한 번은 풀어썼는가"만 확인해야
+    # 맞다 — 두 번째부터 괄호 없이 나오는 건 버그가 아니라 의도된 동작이다.
+    # 2026-08-30 수정 — 삽입 형식이 "용어(뜻풀이)" → "뜻풀이(용어)"로 뒤집혀서, "풀어썼다"의
+    # 판정 기준도 "용어 뒤에 (" → "용어 앞에 ("로 뒤집는다.
     missing = []
     for term in GLOSSARY_TERMS:
-        for m in re.finditer(re.escape(term), all_text):
-            after = all_text[m.end():m.end() + 3].lstrip()
-            if after.startswith("("):
-                continue
+        occurrences = list(re.finditer(re.escape(term), all_text))
+        if not occurrences:
+            continue
+        glossed_at_least_once = any(
+            all_text[max(0, m.start() - 3):m.start()].rstrip().endswith("(") for m in occurrences
+        )
+        if not glossed_at_least_once:
             missing.append(term)
-            break  # 용어 하나당 한 번만 기록 — 같은 용어가 여러 곳에서 빠져도 목록 도배 방지
     if missing:
         print(f"⚠ 경고: 다음 용어가 괄호 뜻풀이 없이 쓰인 곳이 있음 — 발송 전 확인할 것: {sorted(set(missing))}")
     else:
@@ -2577,16 +2663,11 @@ def main():
     # 고치는 것 — 이 시점 이후로는 애초에 뜻풀이 누락ㆍ오류가 나올 수 없는 상태가 된다.
     gloss_map = build_term_gloss_map(computed)
     unmapped_terms = []
-    report = expand_term_placeholders(report, gloss_map, unmapped_terms)
+    apply_term_glosses_by_group(report, gloss_map, unmapped_terms)
     if unmapped_terms:
         print(f"⚠ 경고: {{}} 안에 사전에 없는 용어명이 있어 뜻풀이를 못 채움 — 발송 전 확인할 것: {sorted(set(unmapped_terms))}")
     else:
         print("✓ 용어 뜻풀이 자동 삽입 완료")
-
-    # 2026-08-29 추가 — {{}}를 안 쓰고 GLOSSARY_TERMS를 맨몸으로 쓴 경우까지 코드가
-    # 직접 보강(위 expand_term_placeholders와 같은 gloss_map 재사용, 100회 시뮬레이션에서
-    # 매번 재현된 실제 결함을 메움).
-    report = ensure_term_glosses(report, gloss_map)
 
     ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
     ensure_unanswerable_reason(report)  # redirected/unanswerable 인용구 박스가 비지 않도록 body 첫 문장 재사용

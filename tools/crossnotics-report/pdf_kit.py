@@ -69,13 +69,15 @@ _FONT_CMAP_CACHE = None
 
 # 2026-08-29 추가 — 핵심 용어(도화살ㆍ정관ㆍ지장간 등) 자체를 볼드+포인트 컬러로 항상
 # 강조한다. "**문장**"(LLM이 고른 1~3곳)과는 별개의, "이 단어는 전문용어다"라는 라벨
-# 표시라 개수 제한을 두지 않는다(문단마다 등장하는 모든 용어를 전부 강조) — 용어 뒤에
-# "("가 바로 오는 경우만 매칭해서(예: "도화살(뜻풀이)") 일반 문장 속 우연한 동음이의어
-# 오검출을 최소화한다. 긴 용어부터 매칭해야 "일간"이 "일간지"의 일부처럼 잘못 걸리는 걸
-# 방지(실제로는 겹치는 용어가 없지만 방어적으로 정렬).
+# 표시라 개수 제한을 두지 않는다(문단마다 등장하는 모든 용어를 전부 강조) — 긴 용어부터
+# 매칭해야 "일간"이 "일간지"의 일부처럼 잘못 걸리는 걸 방지(실제로는 겹치는 용어가 없지만
+# 방어적으로 정렬).
+# 2026-08-30 수정 — build_report.py의 삽입 형식이 "용어(뜻풀이)" → "뜻풀이(용어)"로
+# 뒤집혀서, 이 정규식도 "용어 뒤에 (" 대신 "용어가 (와 ) 사이에 있는가"로 뒤집는다
+# (예: "정관(뜻풀이)" → "뜻풀이(정관)").
 _TERM_HIGHLIGHT_TERMS = sorted(set(_GLOSSARY_TERMS) | set(_STRUCTURAL_TERM_GLOSSARY.keys()), key=len, reverse=True)
 _TERM_HIGHLIGHT_RE = re.compile(
-    "(" + "|".join(re.escape(t) for t in _TERM_HIGHLIGHT_TERMS) + r")(?=\()"
+    r"(?<=\()(" + "|".join(re.escape(t) for t in _TERM_HIGHLIGHT_TERMS) + r")(?=\))"
 ) if _TERM_HIGHLIGHT_TERMS else None
 
 
