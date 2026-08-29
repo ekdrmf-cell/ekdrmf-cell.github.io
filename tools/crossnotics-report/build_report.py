@@ -298,7 +298,13 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
      흔한 단어로 오해하기 쉬우니 절대 맨몸으로 쓰지 말고 반드시 `{{쇠}}`처럼 표시하세요.**
      `{{용어명}}` 안의 용어명은 반드시 이
      목록에 있는 것과 정확히 같은 글자여야 시스템이 인식합니다 — 다른 표현으로
-     바꾸지 마세요.
+     바꾸지 마세요. **2026-08-29 추가 — 실제 사고: "신유"ㆍ"무진"처럼 천간+지지
+     두 글자로 된 간지 조합 이름 자체를 `{{}}`로 감싼 사례가 있었는데, 이건 위
+     목록에 없는 용어라 시스템이 못 채우고 그대로 깨졌습니다. 간지 조합 이름은
+     이 자동 치환 대상이 아닙니다 — 바로 위 항목("임수"ㆍ"진토")과 같은 이유로,
+     간지도 당신이 그 사람과 연결되는 설명을 매번 직접 써야 하니 절대 `{{}}`로
+     감싸지 마세요. `{{}}`는 오직 위에 나열된 목록(십신ㆍ신살ㆍ구조 용어ㆍ12운성
+     단계)에만 쓰세요.
    - **"임수"ㆍ"진토"처럼 천간/지지에 오행을 붙여 부르는 표현은 위 자동 치환 대상이
      아닙니다 — 이건 당신이 계속 직접 설명하세요.** 이 표현들은 5-A번의 "이유를 만들어서
      설명하세요" 규칙대로, 그 사람의 성향과 연결되는 비유ㆍ논리를 매번 새로 만들어야
@@ -1277,6 +1283,90 @@ def check_term_glosses(report):
         print("✓ 용어 뜻풀이 누락 검사 통과")
 
 
+def check_emphasis_markers(report):
+    """2026-08-29 추가 — 실제 발송된 리포트(최광호, premium)를 열어보니 5-A번 "문단당
+    강조 표시 1~3곳" 규칙이 3만 자 본문 전체에서 딱 1번만 지켜져 있었다. 그런데도 이
+    사고를 아무도 몰랐던 이유는, verify_naturalness()의 9개 점검 항목 어디에도 강조
+    표시 개수를 세는 항목이 없었기 때문이다 — "규칙은 있지만 검증 대상이 아니었던"
+    구멍. check_term_glosses()와 같은 원칙: 판단이 필요 없는 순수 기계적 사실(별표
+    두 개가 몇 번 나왔는가)이므로 LLM 판단 없이 정규식으로 직접 센다.
+
+    system_sections 하나당 최소 1곳은 강조돼야 한다는 게 5-A번 규칙의 취지이므로,
+    그 개수를 최소 기준선으로 삼는다(원문은 "1~3곳"이라 상한은 없음 — 여기선 하한만
+    검사)."""
+    def _d(v):
+        return v if isinstance(v, dict) else {}
+
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    all_text = str(report.get("intro") or "") + str(report.get("closing") or "")
+    sections = _l(report.get("system_sections"))
+    for sec in sections:
+        all_text += str(_d(sec).get("body") or "")
+    all_text += str(_d(report.get("cross_analysis")).get("body") or "")
+    for item in _l(report.get("opportunities")) + _l(report.get("risks")):
+        all_text += str(_d(item).get("body") or "")
+    for qa in _l(report.get("question_answers")):
+        all_text += str(_d(qa).get("body") or "")
+
+    bold_count = len(re.findall(r"\*\*[^*]{1,120}\*\*", all_text))
+    minimum = len(sections)
+    if bold_count < minimum:
+        print(
+            f"⚠ 경고: 강조 표시(**)가 {bold_count}번밖에 안 쓰였음(섹션 {minimum}개 기준 "
+            f"최소 {minimum}번은 있어야 함, 5-A번 규칙) — 발송 전 확인할 것"
+        )
+    else:
+        print(f"✓ 강조 표시 개수 검사 통과({bold_count}번)")
+
+
+_SENTENCE_END_RE = re.compile(r"[^.!?\n]*[.!?]")
+
+
+def ensure_emphasis(report):
+    """2026-08-29 추가 — check_emphasis_markers()는 강조(**) 누락을 "경고"만 했는데,
+    바로 그날 밤 실제 발송된 리포트(최광호, premium)에 그 경고가 찍혀 있었는데도
+    아무도 안 보고 그대로 나간 사고가 났다. expand_term_placeholders()가 이미 증명한
+    원칙을 여기도 그대로 적용한다 — "LLM이 규칙을 기억해서 지키길 바라지 말고,
+    코드가 결과물 자체를 항상 보장한다." 검증(check_emphasis_markers)이 아니라 생성
+    직후 데이터를 직접 고치는 단계.
+
+    section.body에 강조 표시가 하나도 없으면, 그 섹션의 key_insight(모델이 이미
+    필수로 채운 한 문장 핵심 요약)를 본문에서 찾아 강조로 감싼다 — 본문에 그 문장이
+    그대로 없으면(패러프레이즈된 경우) 본문의 첫 문장을 대신 강조한다. 둘 다 "이미
+    모델이 쓴 문장을 그대로 재사용"할 뿐 새 텍스트를 지어내지 않으므로 1번 규칙(지어
+    내지 않기)을 그대로 지킨다."""
+    def _d(v):
+        return v if isinstance(v, dict) else {}
+
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    fixed = 0
+    for sec in _l(report.get("system_sections")):
+        sec = _d(sec)
+        body = sec.get("body")
+        if not isinstance(body, str) or not body.strip():
+            continue
+        if re.search(r"\*\*[^*]{1,120}\*\*", body):
+            continue  # 이미 모델이 강조를 넣었으면 손대지 않는다
+
+        insight = sec.get("key_insight")
+        if isinstance(insight, str) and insight.strip() and insight.strip() in body:
+            target = insight.strip()
+        else:
+            m = _SENTENCE_END_RE.match(body.strip())
+            target = m.group(0).strip() if m else None
+
+        if target and target in body:
+            sec["body"] = body.replace(target, f"**{target}**", 1)
+            fixed += 1
+
+    if fixed:
+        print(f"✓ 강조 표시 자동 보강 완료({fixed}개 섹션에 모델이 이미 쓴 핵심 문장을 강조 처리함)")
+
+
 def verify_groundedness(report, computed):
     """check_hallucination()의 정규식 대조가 구조적으로 못 잡는 영역을 메운다 —
     "computed.json에 없는 단어"가 아니라 "computed.json에 있는 값과 다른 내용을,
@@ -1490,10 +1580,13 @@ def main():
     else:
         print("✓ 용어 뜻풀이 자동 삽입 완료")
 
+    ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
+
     known_terms = collect_known_terms(computed)
     valid_years = collect_valid_years(computed)
     check_hallucination(report, known_terms, valid_years)  # 원본 그대로 측정 — 얼마나 자주 규칙을 어기는지 계속 눈으로 볼 것
     check_term_glosses(report)  # 최종 안전망 — {{}}를 안 쓰고 용어를 그냥 맨몸으로 쓴 경우만 여기서 잡힘
+    check_emphasis_markers(report)  # ensure_emphasis() 이후에도 남는 예외가 있는지 계속 눈으로 볼 것(항상 통과해야 정상)
     verify_groundedness(report, computed)  # 정규식으로 못 잡는 의미 단위 오류(값 바꿔치기 등) 대조
     verify_naturalness(report)  # 사실은 맞는데 표현이 헷갈리거나 부자연스러운 문장 대조
 
