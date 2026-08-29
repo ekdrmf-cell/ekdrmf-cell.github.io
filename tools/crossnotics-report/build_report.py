@@ -1589,6 +1589,74 @@ def ensure_emphasis(report):
         print(f"✓ 강조 표시 자동 보강 완료({fixed}개 섹션의 문단들에 모델이 이미 쓴 문장을 강조 처리함)")
 
 
+def ensure_unanswerable_reason(report):
+    """2026-08-29 추가 — 10번 규칙 정독 + 실제 프리미엄 리포트(최광호) 감사 중 발견:
+    redirected/unanswerable 질문 5개(Q2ㆍQ4ㆍQ7ㆍQ8ㆍQ9) 전부 unanswerable_reason이
+    null이었다. body 맨 앞에는 이유를 잘 썼는데(규칙이 요구하는 그대로), 별도
+    필드로는 한 번도 안 옮겨졌다 — 이 필드는 PDF에서 손님 눈에 띄는 인용구 박스로
+    따로 렌더링되는데(report_kit.py), null이면 그 박스 자체가 안 뜬다. 스키마에
+    "redirected/unanswerable일 때만 채움"이라고만 적혀 있고 강제할 방법이 없어서
+    매번 새는 구조 — ensure_emphasis()와 같은 원칙: 이미 모델이 body 맨 앞에 쓴
+    설명을 그대로 재사용해 코드가 직접 채운다(새 텍스트를 지어내지 않음, 1번 규칙)."""
+    def _d(v):
+        return v if isinstance(v, dict) else {}
+
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    fixed = 0
+    for qa in _l(report.get("question_answers")):
+        qa = _d(qa)
+        if qa.get("answerability") not in ("redirected", "unanswerable"):
+            continue
+        if qa.get("unanswerable_reason"):
+            continue
+        body = qa.get("body")
+        if not isinstance(body, str) or not body.strip():
+            continue
+        m = _SENTENCE_END_RE.match(body.strip())
+        if m:
+            qa["unanswerable_reason"] = m.group(0).strip()
+            fixed += 1
+
+    if fixed:
+        print(f"✓ unanswerable_reason 자동 보강 완료({fixed}개 — body 첫 문장을 그대로 재사용)")
+
+
+_COMPUTER_SPEAK_WORDS = ["계산", "데이터", "범위", "포함되어 있지"]
+
+
+def check_unanswerable_reason_tone(report):
+    """2026-08-29 추가 — ensure_unanswerable_reason()으로 필드를 채우다가 실제 발견:
+    body 첫 문장 자체가 이미 10번 규칙이 명시적으로 금지한 컴퓨터 말투("계산",
+    "포함되어 있지 않음" 등)를 쓰고 있었다(예: "삼재... 계산은 이번 진단에 포함되어
+    있지 않아"). 규칙은 정확한 문구("포함되어 있지 않음")만 예로 들었는데 실제로는
+    어미만 바꿔("포함되어 있지 않아") 빠져나간다 — 판단이 필요 없는 단어 매칭이라
+    여기서 기계적으로 대조한다(check_term_glosses와 같은 성격)."""
+    def _d(v):
+        return v if isinstance(v, dict) else {}
+
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    hits = []
+    for qa in _l(report.get("question_answers")):
+        qa = _d(qa)
+        reason = qa.get("unanswerable_reason")
+        if not isinstance(reason, str):
+            continue
+        for w in _COMPUTER_SPEAK_WORDS:
+            if w in reason:
+                hits.append((qa.get("question"), w))
+
+    if hits:
+        print("⚠ 경고: unanswerable_reason에 컴퓨터 말투 단어가 남아있음(10번 규칙) — 발송 전 확인할 것:")
+        for q, w in hits:
+            print(f"    - {q!r}: {w!r}")
+    else:
+        print("✓ unanswerable_reason 말투 검사 통과")
+
+
 def verify_groundedness(report, computed):
     """check_hallucination()의 정규식 대조가 구조적으로 못 잡는 영역을 메운다 —
     "computed.json에 없는 단어"가 아니라 "computed.json에 있는 값과 다른 내용을,
@@ -1808,11 +1876,13 @@ def main():
     report = ensure_term_glosses(report, gloss_map)
 
     ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
+    ensure_unanswerable_reason(report)  # redirected/unanswerable 인용구 박스가 비지 않도록 body 첫 문장 재사용
 
     known_terms = collect_known_terms(computed)
     valid_years = collect_valid_years(computed)
     check_hallucination(report, known_terms, valid_years)  # 원본 그대로 측정 — 얼마나 자주 규칙을 어기는지 계속 눈으로 볼 것
     check_required_tier_sections(report, computed)  # 티어별 필수 섹션(신규 5개 시스템 등)이 실제로 있는지 대조
+    check_unanswerable_reason_tone(report)  # redirected/unanswerable 이유 문장에 컴퓨터 말투가 남았는지 대조
     check_term_glosses(report)  # 최종 안전망 — {{}}를 안 쓰고 용어를 그냥 맨몸으로 쓴 경우만 여기서 잡힘
     check_emphasis_markers(report)  # ensure_emphasis() 이후에도 남는 예외가 있는지 계속 눈으로 볼 것(항상 통과해야 정상)
     verify_groundedness(report, computed)  # 정규식으로 못 잡는 의미 단위 오류(값 바꿔치기 등) 대조
