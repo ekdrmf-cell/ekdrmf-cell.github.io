@@ -2801,9 +2801,15 @@ def main():
     else:
         print("✓ 용어 뜻풀이 자동 삽입 완료")
 
+    # 2026-08-30 수정 — 실제 회귀 발견: ensure_emphasis()가 신규 시스템 섹션(아래
+    # ensure_required_new_engine_sections)보다 먼저 실행되고 있어서, LLM이 안 써서 코드가
+    # 대신 조립한 5개 섹션(토정비결ㆍ육효ㆍ성명학ㆍ풍수ㆍ택일)은 강조 처리 대상에서 아예
+    # 빠졌다 — 그 섹션들이 통째로 강조 없는 밋밋한 텍스트로 남아 check_emphasis_markers가
+    # "강조 부족" 경고를 내는 걸로 실제 확인함(프리미엄 샘플 재검증 중 발견). 신규 섹션을
+    # 먼저 채운 뒤에 강조를 매겨야 그 섹션들도 빠짐없이 강조 대상이 된다.
+    ensure_required_new_engine_sections(report, computed)  # 신규 5개 시스템 섹션이 빠지면 computed.json 실제 값으로 코드가 직접 채움
     ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
     ensure_unanswerable_reason(report)  # redirected/unanswerable 인용구 박스가 비지 않도록 body 첫 문장 재사용
-    ensure_required_new_engine_sections(report, computed)  # 신규 5개 시스템 섹션이 빠지면 computed.json 실제 값으로 코드가 직접 채움
     ensure_tarot_suit_tally(report, computed)  # 타로 카드 계열 개수를 LLM이 잘못 셌으면 computed.json 실제 값으로 문장의 수사를 코드가 직접 고침
 
     known_terms = collect_known_terms(computed)
