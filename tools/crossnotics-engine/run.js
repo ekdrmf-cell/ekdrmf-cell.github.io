@@ -18,6 +18,10 @@ const { computeCorrelation } = require("./correlate.js");
 const { computeGunghap } = require("./gunghap.js");
 const { computeSynastry } = require("./synastry.js");
 const { computeBehaviorProfile } = require("./behavior.js");
+const { computeSeongmyeonghak } = require("./seongmyeonghak.js");
+const { computePungsu } = require("./pungsu.js");
+const { computeYukhyo } = require("./yukhyo.js");
+const { computeTaekil } = require("./taekil.js");
 // 2026-08-23: 서비스허브의 site-checkout/lib/catalog.js에서 분리된 이 폴더의 로컬 가격표
 const { getCrossnoticsTierConfig } = require("./catalog.js");
 
@@ -75,6 +79,18 @@ function main() {
       unknownTime: !!intake.customer.unknown_time,
       gender: intake.customer.gender, // "M" | "F"
     });
+    // 2026-08-29 추가 — 성명학(발음오행) 계산 엔진. 생년월일과 무관하게 이름 글자만 있으면
+    // 되므로 여기서 바로 붙인다 — 이름이 한글 완성형 2음절 미만이면(드묾) null.
+    result.saju.seongmyeonghak = computeSeongmyeonghak(intake.customer.name);
+    // 2026-08-29 추가 — 풍수지리(오행 기반 공간 배치) 계산 엔진. 사주에서 이미 계산된
+    // 우세ㆍ부족 오행을 그대로 재사용(새 계산 없음).
+    result.saju.pungsu = computePungsu(result.saju.dominant_elements, result.saju.missing_elements);
+    // 2026-08-29 추가 — 육효/주역(그 자리에서 뽑는 괘) 계산 엔진. tarot.js와 같은 성격의
+    // "즉석 캐스팅" 도구라 매번 새로 뽑고, 생년월일 무관하게 saju 시스템이 포함되면 함께 준다.
+    result.saju.yukhyo = computeYukhyo();
+    // 2026-08-29 추가 — 택일(오행 합충 기반 30일 참고) 계산 엔진. 일지(일주 지지)만
+    // 있으면 되므로 pillars.day.ganzhi_ko 두 번째 글자를 그대로 넘긴다.
+    result.saju.taekil = computeTaekil(result.saju.pillars.day.ganzhi_ko.slice(-1));
   }
 
   // intake.customer.partner의 양력 변환 날짜 — 사주 궁합(gunghap.js)과 점성술 시너스트리

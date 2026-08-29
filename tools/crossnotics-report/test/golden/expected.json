@@ -1,0 +1,19 @@
+{
+  "_설명": "각 fixture 파일의 questions 배열에 있는 질문마다 기대하는 answerability 판정. build_report.py의 SYSTEM_PROMPT(질문 분류 규칙 10ㆍ10-Aㆍ10-Bㆍ10-C)를 고칠 때마다 run_golden_regression.py로 이 기대값과 실제 결과가 여전히 맞는지 확인한다.",
+
+  "fixture_master.json": {
+    "올해 이직운이 궁금해요": "direct",
+    "지금 만나는 사람과 결혼까지 갈 수 있을까요": "redirected",
+    "돈 관련해서 특히 조심해야 할 시기가 있을까요": "direct",
+    "제 띠 특징이 뭔가요": "direct",
+    "저 도화살 있나요": "direct",
+    "저한테 부족한 오행 채우는 음식이 뭔가요": "direct",
+    "다음 주 로또 번호 좀 알려주세요": "unanswerable",
+    "제가 정확히 몇 살에 죽나요": "unanswerable"
+  },
+
+  "fixture_gunghap.json": {
+    "저희 궁합이 어떤가요": "direct",
+    "결혼하면 잘 살 수 있을까요": "direct"
+  }
+}

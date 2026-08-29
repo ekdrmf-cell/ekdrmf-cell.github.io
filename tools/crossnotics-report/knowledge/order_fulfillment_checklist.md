@@ -43,9 +43,10 @@ cd ../crossnotics-report
 python build_report.py ../crossnotics-engine/computed.json computed.report.json
 ```
 
-- 모델: `claude-sonnet-4-5-20250929`, $3/100만 입력토큰 · $15/100만 출력토큰.
-- 실행 화면에 찍히는 실제 토큰 사용량으로 진짜 원가를 확인할 것(PREMIUM은 아직 실측
-  기록이 없으므로 이번이 처음).
+- 모델: `claude-sonnet-5`, $3/100만 입력토큰 · $15/100만 출력토큰.
+  (2026-08-29 — 첫 실제 PREMIUM 주문에서 이전 모델 claude-sonnet-4-5의 64K 출력 한도에
+  걸려 응답이 잘리는 사고가 있었음. claude-sonnet-5는 128K 한도라 이 문제가 해소됨.)
+- 실행 화면에 찍히는 실제 토큰 사용량으로 진짜 원가를 확인할 것.
 - ⚠ 경고(% 문자, 연도 불일치, 별자리 용어 불일치 등) 뜨는지 확인.
 - 질문별 direct/redirected/unanswerable 판정은 `logs/question_answerability_log.jsonl`에
   자동 기록됨 — 고객 질문 원문이 담기므로 **절대 커밋 금지**(이미 .gitignore 처리됨).

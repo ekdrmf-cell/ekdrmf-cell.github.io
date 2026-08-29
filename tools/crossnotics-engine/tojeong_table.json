@@ -1,0 +1,362 @@
+{
+  "갑자": {
+    "hanja": "甲子",
+    "taesesu": 20,
+    "wolgeonsu": 18,
+    "iljinsu": 18
+  },
+  "을축": {
+    "hanja": "乙丑",
+    "taesesu": 21,
+    "wolgeonsu": 16,
+    "iljinsu": 19
+  },
+  "병인": {
+    "hanja": "丙寅",
+    "taesesu": 17,
+    "wolgeonsu": 14,
+    "iljinsu": 15
+  },
+  "정묘": {
+    "hanja": "丁卯",
+    "taesesu": 16,
+    "wolgeonsu": 12,
+    "iljinsu": 14
+  },
+  "무진": {
+    "hanja": "戊辰",
+    "taesesu": 18,
+    "wolgeonsu": 10,
+    "iljinsu": 16
+  },
+  "기사": {
+    "hanja": "己巳",
+    "taesesu": 18,
+    "wolgeonsu": 13,
+    "iljinsu": 16
+  },
+  "경오": {
+    "hanja": "庚午",
+    "taesesu": 17,
+    "wolgeonsu": 17,
+    "iljinsu": 15
+  },
+  "신미": {
+    "hanja": "辛未",
+    "taesesu": 20,
+    "wolgeonsu": 15,
+    "iljinsu": 18
+  },
+  "임신": {
+    "hanja": "壬申",
+    "taesesu": 18,
+    "wolgeonsu": 13,
+    "iljinsu": 16
+  },
+  "계유": {
+    "hanja": "癸酉",
+    "taesesu": 17,
+    "wolgeonsu": 11,
+    "iljinsu": 15
+  },
+  "갑술": {
+    "hanja": "甲戌",
+    "taesesu": 22,
+    "wolgeonsu": 14,
+    "iljinsu": 20
+  },
+  "을해": {
+    "hanja": "乙亥",
+    "taesesu": 19,
+    "wolgeonsu": 12,
+    "iljinsu": 17
+  },
+  "병자": {
+    "hanja": "丙子",
+    "taesesu": 18,
+    "wolgeonsu": 16,
+    "iljinsu": 16
+  },
+  "정축": {
+    "hanja": "丁丑",
+    "taesesu": 19,
+    "wolgeonsu": 14,
+    "iljinsu": 17
+  },
+  "무인": {
+    "hanja": "戊寅",
+    "taesesu": 15,
+    "wolgeonsu": 12,
+    "iljinsu": 13
+  },
+  "기묘": {
+    "hanja": "己卯",
+    "taesesu": 19,
+    "wolgeonsu": 15,
+    "iljinsu": 17
+  },
+  "경진": {
+    "hanja": "庚辰",
+    "taesesu": 21,
+    "wolgeonsu": 13,
+    "iljinsu": 19
+  },
+  "신사": {
+    "hanja": "辛巳",
+    "taesesu": 16,
+    "wolgeonsu": 11,
+    "iljinsu": 14
+  },
+  "임오": {
+    "hanja": "壬午",
+    "taesesu": 15,
+    "wolgeonsu": 15,
+    "iljinsu": 13
+  },
+  "계미": {
+    "hanja": "癸未",
+    "taesesu": 18,
+    "wolgeonsu": 13,
+    "iljinsu": 16
+  },
+  "갑신": {
+    "hanja": "甲申",
+    "taesesu": 21,
+    "wolgeonsu": 16,
+    "iljinsu": 19
+  },
+  "을유": {
+    "hanja": "乙酉",
+    "taesesu": 20,
+    "wolgeonsu": 14,
+    "iljinsu": 18
+  },
+  "병술": {
+    "hanja": "丙戌",
+    "taesesu": 20,
+    "wolgeonsu": 12,
+    "iljinsu": 18
+  },
+  "정해": {
+    "hanja": "丁亥",
+    "taesesu": 17,
+    "wolgeonsu": 10,
+    "iljinsu": 15
+  },
+  "무자": {
+    "hanja": "戊子",
+    "taesesu": 16,
+    "wolgeonsu": 14,
+    "iljinsu": 14
+  },
+  "기축": {
+    "hanja": "己丑",
+    "taesesu": 22,
+    "wolgeonsu": 17,
+    "iljinsu": 20
+  },
+  "경인": {
+    "hanja": "庚寅",
+    "taesesu": 18,
+    "wolgeonsu": 15,
+    "iljinsu": 16
+  },
+  "신묘": {
+    "hanja": "辛卯",
+    "taesesu": 17,
+    "wolgeonsu": 13,
+    "iljinsu": 15
+  },
+  "임진": {
+    "hanja": "壬辰",
+    "taesesu": 19,
+    "wolgeonsu": 11,
+    "iljinsu": 17
+  },
+  "계사": {
+    "hanja": "癸巳",
+    "taesesu": 14,
+    "wolgeonsu": 9,
+    "iljinsu": 12
+  },
+  "갑오": {
+    "hanja": "甲午",
+    "taesesu": 18,
+    "wolgeonsu": 18,
+    "iljinsu": 16
+  },
+  "을미": {
+    "hanja": "乙未",
+    "taesesu": 21,
+    "wolgeonsu": 16,
+    "iljinsu": 19
+  },
+  "병신": {
+    "hanja": "丙申",
+    "taesesu": 19,
+    "wolgeonsu": 14,
+    "iljinsu": 17
+  },
+  "정유": {
+    "hanja": "丁酉",
+    "taesesu": 18,
+    "wolgeonsu": 12,
+    "iljinsu": 16
+  },
+  "무술": {
+    "hanja": "戊戌",
+    "taesesu": 18,
+    "wolgeonsu": 10,
+    "iljinsu": 16
+  },
+  "기해": {
+    "hanja": "己亥",
+    "taesesu": 20,
+    "wolgeonsu": 13,
+    "iljinsu": 18
+  },
+  "경자": {
+    "hanja": "庚子",
+    "taesesu": 19,
+    "wolgeonsu": 17,
+    "iljinsu": 17
+  },
+  "신축": {
+    "hanja": "辛丑",
+    "taesesu": 20,
+    "wolgeonsu": 15,
+    "iljinsu": 18
+  },
+  "임인": {
+    "hanja": "壬寅",
+    "taesesu": 16,
+    "wolgeonsu": 13,
+    "iljinsu": 14
+  },
+  "계묘": {
+    "hanja": "癸卯",
+    "taesesu": 15,
+    "wolgeonsu": 11,
+    "iljinsu": 13
+  },
+  "갑진": {
+    "hanja": "甲辰",
+    "taesesu": 22,
+    "wolgeonsu": 14,
+    "iljinsu": 20
+  },
+  "을사": {
+    "hanja": "乙巳",
+    "taesesu": 17,
+    "wolgeonsu": 12,
+    "iljinsu": 15
+  },
+  "병오": {
+    "hanja": "丙午",
+    "taesesu": 16,
+    "wolgeonsu": 16,
+    "iljinsu": 14
+  },
+  "정미": {
+    "hanja": "丁未",
+    "taesesu": 19,
+    "wolgeonsu": 14,
+    "iljinsu": 17
+  },
+  "무신": {
+    "hanja": "戊申",
+    "taesesu": 17,
+    "wolgeonsu": 12,
+    "iljinsu": 15
+  },
+  "기유": {
+    "hanja": "己酉",
+    "taesesu": 21,
+    "wolgeonsu": 15,
+    "iljinsu": 19
+  },
+  "경술": {
+    "hanja": "庚戌",
+    "taesesu": 21,
+    "wolgeonsu": 13,
+    "iljinsu": 19
+  },
+  "신해": {
+    "hanja": "辛亥",
+    "taesesu": 18,
+    "wolgeonsu": 11,
+    "iljinsu": 16
+  },
+  "임자": {
+    "hanja": "壬子",
+    "taesesu": 17,
+    "wolgeonsu": 15,
+    "iljinsu": 15
+  },
+  "계축": {
+    "hanja": "癸丑",
+    "taesesu": 18,
+    "wolgeonsu": 13,
+    "iljinsu": 16
+  },
+  "갑인": {
+    "hanja": "甲寅",
+    "taesesu": 19,
+    "wolgeonsu": 16,
+    "iljinsu": 17
+  },
+  "을묘": {
+    "hanja": "乙卯",
+    "taesesu": 18,
+    "wolgeonsu": 14,
+    "iljinsu": 16
+  },
+  "병진": {
+    "hanja": "丙辰",
+    "taesesu": 20,
+    "wolgeonsu": 12,
+    "iljinsu": 18
+  },
+  "정사": {
+    "hanja": "丁巳",
+    "taesesu": 15,
+    "wolgeonsu": 10,
+    "iljinsu": 13
+  },
+  "무오": {
+    "hanja": "戊午",
+    "taesesu": 14,
+    "wolgeonsu": 14,
+    "iljinsu": 12
+  },
+  "기미": {
+    "hanja": "己未",
+    "taesesu": 22,
+    "wolgeonsu": 17,
+    "iljinsu": 20
+  },
+  "경신": {
+    "hanja": "庚申",
+    "taesesu": 20,
+    "wolgeonsu": 15,
+    "iljinsu": 18
+  },
+  "신유": {
+    "hanja": "辛酉",
+    "taesesu": 19,
+    "wolgeonsu": 13,
+    "iljinsu": 17
+  },
+  "임술": {
+    "hanja": "壬戌",
+    "taesesu": 19,
+    "wolgeonsu": 11,
+    "iljinsu": 17
+  },
+  "계해": {
+    "hanja": "癸亥",
+    "taesesu": 16,
+    "wolgeonsu": 9,
+    "iljinsu": 14
+  }
+}

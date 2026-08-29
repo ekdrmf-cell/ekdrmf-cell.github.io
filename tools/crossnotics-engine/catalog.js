@@ -46,23 +46,27 @@ const CROSSNOTICS_TIERS = {
     pages_approx: 6,
   },
   "crossnotics-saju-astrology": {
-    name: "사주 + 별자리 교차진단 (질문 6개)",
+    name: "사주 + 별자리 + 토정비결 교차진단 (질문 6개)",
     label: "DUAL",
     price: 100000,
     tier: "dual",
     scope: "full",
-    systems: ["saju", "astrology"],
+    // 2026-08-29 추가 — 성명학ㆍ풍수지리ㆍ육효ㆍ주역ㆍ토정비결ㆍ택일은 run.js가 "saju"
+    // 시스템에 딸려 항상 함께 계산하므로(별도 게이팅 없음) 여기 systems 배열은 계산 여부를
+    // 바꾸지 않는다 — 이 필드는 어떤 참고 시스템을 이 티어에서 "전용 섹션으로" 자동
+    // 포함하는지를 build_report.py 10-F-1번 규칙과 맞춰 문서화하는 용도.
+    systems: ["saju", "astrology", "tojeong"],
     question_limit: 6,
     pages_note: "13페이지",
     pages_approx: 13,
   },
   "crossnotics-full": {
-    name: "사주 + 별자리 + 타로 통합진단 (질문 10개)",
+    name: "사주 + 별자리 + 타로 + 육효/주역 통합진단 (질문 10개)",
     label: "MASTER",
     price: 150000,
     tier: "master",
     scope: "full",
-    systems: ["saju", "astrology", "tarot"],
+    systems: ["saju", "astrology", "tarot", "tojeong", "yukhyo"],
     question_limit: 10,
     pages_note: "20페이지",
     pages_approx: 20,
@@ -73,7 +77,7 @@ const CROSSNOTICS_TIERS = {
     price: 200000,
     tier: "premium",
     scope: "premium",
-    systems: ["saju", "astrology", "tarot", "behavior"],
+    systems: ["saju", "astrology", "tarot", "behavior", "tojeong", "yukhyo", "seongmyeonghak", "pungsu", "taekil"],
     question_limit: 12,
     pages_note: "30페이지",
     pages_approx: 30,

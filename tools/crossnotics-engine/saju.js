@@ -10,6 +10,7 @@ const { Solar, Lunar } = require("lunar-javascript");
 const { buildCorrespondence } = require("./correspondence.js");
 const { computeShensha } = require("./shensha.js");
 const { computeYearlyFortune } = require("./yearly-fortune.js");
+const { computeTojeong } = require("./tojeong.js");
 
 const GAN_KO = { 甲: "갑", 乙: "을", 丙: "병", 丁: "정", 戊: "무", 己: "기", 庚: "경", 辛: "신", 壬: "임", 癸: "계" };
 const ZHI_KO = { 子: "자", 丑: "축", 寅: "인", 卯: "묘", 辰: "진", 巳: "사", 午: "오", 未: "미", 申: "신", 酉: "유", 戌: "술", 亥: "해" };
@@ -165,6 +166,11 @@ function computeSaju(input) {
   // 지적된 구멍("올해 이 띠에게 어떤 해인지" 계산이 유료 엔진엔 없었음)을 메움. se_un이
   // 없으면(성별 미입력) null.
   result.yearly_fortune = computeYearlyFortune(result);
+  // 2026-08-29 추가 — 토정비결(tojeong.js). 사주 오행 생극과는 별개의 전통 참고 기준을
+  // 하나 더 준다(성별 입력과 무관하게 계산 가능 — 대운/세운과 달리 이 계산은 생년월일만
+  // 있으면 되므로 gender 체크 없이 항상 시도함). lunar-javascript가 해당 음력월을 못 찾는
+  // 극히 드문 경우만 null.
+  result.tojeong = computeTojeong(resolved);
   return result;
 }
 

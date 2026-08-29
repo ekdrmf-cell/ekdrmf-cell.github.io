@@ -38,6 +38,7 @@ summary_box 등)를 지금까지 거의 안 쓰고 있었음 — 실제로 부�
   (pdf_kit.py 공용 설정은 그대로 — 다른 상품에 영향 없음).
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -70,6 +71,62 @@ ELEMENT_COLOR = {
     "불": colors.HexColor("#d9501f"), "땅": colors.HexColor("#8a6d3b"),
     "바람": colors.HexColor("#2f9e8c"), "물": colors.HexColor("#2f6fd9"),
 }
+
+
+# 2026-08-29 신설 — 타로 카드 이미지(라이더-웨이트 덱, 1909년 작품이라 퍼블릭 도메인,
+# 위키미디어 커먼즈에서 받아옴). manifest.json이 한글 카드명("13. 죽음" 등, tarot.js가
+# 뽑을 때 쓰는 이름과 정확히 같은 문자열) → 파일명을 매핑한다.
+TAROT_ASSET_DIR = Path(__file__).resolve().parent / "assets" / "tarot"
+_TAROT_MANIFEST_PATH = TAROT_ASSET_DIR / "manifest.json"
+_TAROT_MANIFEST = None
+
+
+def _tarot_manifest():
+    global _TAROT_MANIFEST
+    if _TAROT_MANIFEST is None:
+        if _TAROT_MANIFEST_PATH.exists():
+            _TAROT_MANIFEST = json.loads(_TAROT_MANIFEST_PATH.read_text(encoding="utf-8"))
+        else:
+            _TAROT_MANIFEST = {}
+    return _TAROT_MANIFEST
+
+
+def _tarot_image_path(card_name):
+    """card_name(예: "13. 죽음")에 맞는 로컬 이미지 파일 경로. 없으면 None(이미지
+    없이도 리포트가 죽지 않게 — check_hallucination과 같은 "부가 기능 실패가 본 결과물을
+    해치면 안 된다" 원칙)."""
+    filename = _tarot_manifest().get(card_name)
+    if not filename:
+        return None
+    path = TAROT_ASSET_DIR / filename
+    return str(path) if path.exists() else None
+
+
+_CARD_MARKER_RE = re.compile(r"\[\[CARD:([^\[\]]+)\]\]")
+
+
+def _render_body_with_cards(k, text, draws_by_position):
+    """body 텍스트 안에 [[CARD:포지션]] 표시가 있으면 그 자리에 실제 카드 이미지를
+    작게 끼워 넣는다(image_grid_page로 이미 크게 보여준 것과 같은 그림이라는 걸 바로
+    알아볼 수 있는 크기). 표시가 없으면 그냥 k.body(text)와 동일하게 동작한다.
+
+    2026-08-29 신설 — {{용어명}}(용어 뜻풀이 자동 삽입)과 문법이 겹치지 않게 이중
+    대괄호를 쓴다."""
+    pos = 0
+    for m in _CARD_MARKER_RE.finditer(text):
+        before = text[pos:m.start()]
+        if before.strip():
+            k.body(before)
+        position = m.group(1).strip()
+        draw = draws_by_position.get(position)
+        if draw:
+            image_path = _tarot_image_path(draw["card_name"])
+            if image_path:
+                k.inline_image(image_path, f"{draw['position']} — {draw['card_name']}({draw['orientation']})")
+        pos = m.end()
+    remainder = text[pos:]
+    if remainder.strip():
+        k.body(remainder)
 
 
 def _oheng_bars(k, saju):
@@ -109,7 +166,26 @@ def _render_section(k, ch, sec, computed, show_receipt):
     # 2026-08-24 추가 — body() 안의 "## 소제목"을 그대로 재사용해 챕터 맨 위에 미니 목차
     # 칩을 보여준다(사용자 요청: 글만 있지 않고 이해를 돕는 도구를 더 써달라).
     k.mini_toc(extract_subheadings(sec["body"]), color=sys_color)
-    k.body(sec["body"])
+
+    draws = (computed.get("tarot") or {}).get("draws") or [] if sec["system"] == "tarot" else []
+    if show_receipt and sec["system"] == "tarot" and draws:
+        # 2026-08-29 신설 — 타로 챕터 맨 처음, 카드 텍스트보다 먼저 실제 카드 이미지를
+        # 한 페이지 가득 공개한다(사용자 지시: "타로 챕터 시작할 때 가장 처음에 넣어,
+        # 한 페이지 전부 써서"). 이미지가 없는 카드는 조용히 빠짐(부가 기능 실패가 본
+        # 결과물을 막으면 안 된다는 기존 원칙과 동일).
+        reveal_items = []
+        for d in draws:
+            path = _tarot_image_path(d["card_name"])
+            if path:
+                reveal_items.append({"path": path, "caption": f"{d['position']} — {d['card_name']}({d['orientation']})"})
+        if reveal_items:
+            k.image_grid_page(reveal_items, page_title="뽑힌 카드")
+
+    if draws:
+        draws_by_position = {d["position"]: d for d in draws}
+        _render_body_with_cards(k, sec["body"], draws_by_position)
+    else:
+        k.body(sec["body"])
 
     if show_receipt and sec["system"] == "tarot" and computed.get("tarot"):
         cards = [f"{d['position']}: {d['card_name']}({d['orientation']})" for d in computed["tarot"]["draws"]]

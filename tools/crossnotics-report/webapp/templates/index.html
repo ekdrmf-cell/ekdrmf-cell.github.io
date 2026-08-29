@@ -103,7 +103,7 @@
 
   <div class="panel hidden" id="panel-progress">
     <h2><span class="spinner"></span>처리 중 — 계산 엔진 → 리포트 생성 → PDF 변환</h2>
-    <p class="sub" style="margin:0;">보통 30초~2분 정도 걸립니다. 창을 닫지 마세요.</p>
+    <p class="sub" style="margin:0;">티어(페이지ㆍ질문 개수)에 따라 걸리는 시간이 다릅니다. 창을 닫지 마세요.</p>
   </div>
 
   <div class="panel hidden" id="panel-result"></div>
@@ -174,17 +174,21 @@ function renderOrderList() {
   const rows = pendingOrders.map((o, i) => {
     const p = o.preview;
     const price = p && p.tier_price != null ? (p.tier_price === 0 ? "무료" : p.tier_price.toLocaleString() + "원") : "-";
+    const estCost = p && p.cost_estimate
+      ? `약 ${p.cost_estimate.krw_approx.toLocaleString()}원 (실측 ${p.cost_estimate.sample_count}건 평균)`
+      : (p ? "미실측" : "-");
     return `
       <tr data-idx="${i}">
         <td>${o.parse_error ? "" : `<input type="checkbox" class="order-check" data-idx="${i}" />`}</td>
         <td>${p ? escapeHtml(p.customer_name || "-") : "-"}</td>
         <td>${p ? escapeHtml(p.tier_name) : "-"}</td>
         <td>${price}</td>
+        <td>${estCost}</td>
         <td>${escapeHtml(o.date || "-")}</td>
         <td class="order-status">${o.parse_error ? `<span class="status-review">파싱 오류: ${escapeHtml(o.parse_error)}</span>` : "대기중"}</td>
       </tr>`;
   }).join("");
-  $("order-list-table").innerHTML = `<table><tr><th></th><th>이름</th><th>상품</th><th>금액</th><th>날짜</th><th>상태</th></tr>${rows}</table>`;
+  $("order-list-table").innerHTML = `<table><tr><th></th><th>이름</th><th>상품</th><th>금액</th><th>예상 API 비용</th><th>날짜</th><th>상태</th></tr>${rows}</table>`;
   $("order-list-wrap").classList.remove("hidden");
   $("order-list-table").querySelectorAll(".order-check").forEach((el) => {
     el.addEventListener("change", updateBatchButtonLabel);
@@ -217,7 +221,7 @@ $("btn-batch-generate").onclick = async () => {
   for (const i of idxs) {
     const order = pendingOrders[i];
     const statusEl = $("order-list-table").querySelector(`tr[data-idx="${i}"] .order-status`);
-    statusEl.innerHTML = `<span class="spinner"></span>생성 중... (30초~2분)`;
+    statusEl.innerHTML = `<span class="spinner"></span>생성 중...`;
     try {
       const res = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -278,9 +282,9 @@ function renderPreview(p) {
   $("preview-partner").innerHTML = p.has_partner
     ? `<p class="sub">궁합 상대방 정보 있음 (${p.partner_relationship}${p.has_synastry ? ", 점성술 시너스트리 포함" : ""})</p>`
     : "";
-  $("cost-note").textContent = "다음 단계(리포트 생성)에서 Anthropic API가 실제로 호출되어 비용이 발생합니다. " +
-    "SINGLE/MASTER는 실측 원가(각 33~50원/150~250원)가 있지만, 다른 티어는 추정치이거나 미실측입니다 — " +
-    "생성 후 이 화면에 실제 비용이 표시됩니다.";
+  $("cost-note").textContent = p.cost_estimate
+    ? `다음 단계(리포트 생성)에서 Anthropic API가 실제로 호출되어 비용이 발생합니다. 이 티어(${p.tier_name})의 과거 실측 평균은 약 ${p.cost_estimate.krw_approx.toLocaleString()}원(${p.cost_estimate.sample_count}건 기준)입니다 — 실제 값은 사주 내용ㆍ질문 개수에 따라 달라질 수 있습니다.`
+    : `다음 단계(리포트 생성)에서 Anthropic API가 실제로 호출되어 비용이 발생합니다. 이 티어(${p.tier_name})는 아직 실측 이력이 없어 예상 비용을 보여드릴 수 없습니다 — 생성 후 이 화면에 실제 비용이 표시됩니다.`;
 }
 
 function escapeHtml(s) {

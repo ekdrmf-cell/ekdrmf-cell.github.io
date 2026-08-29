@@ -6,8 +6,12 @@ order_fulfillment_checklist.md의 3~7단계(intake.json 만들기 ~ 발송 전 �
 사람이 판단할 부분이라 이 프로그램 밖에 남겨둔다(2026-08-23, 사용자 지시로 자동화
 범위 확정).
 
-가격 계산은 Sonnet 4.5($3/100만 입력토큰ㆍ$15/100만 출력토큰, claude-api 스킬로
-2026-08-23 확인) 기준이며, 환율은 화면에 "약"으로만 표기하는 참고용 추정치다.
+가격 계산은 Sonnet 5($3/100만 입력토큰ㆍ$15/100만 출력토큰 표준가 기준, claude-api 스킬로
+2026-08-29 확인) 기준이며, 환율은 화면에 "약"으로만 표기하는 참고용 추정치다.
+
+2026-08-29 — 실제 리포트 생성 모델을 claude-sonnet-4-5(64K 출력 한도)에서 claude-sonnet-5
+(128K 출력 한도)로 옮김(build_report.py MODEL 상수) — premium 티어가 64K에서 실제로 잘리는
+사고가 나서다. 이 가격 상수는 두 모델 다 표준가가 같아 그대로 유지.
 """
 import email
 import imaplib
@@ -239,6 +243,19 @@ def mark_order_fetched(message_key):
     _save_fetched_ids(fetched_ids)
 
 
+def estimate_cost_for_tier(tier_key):
+    """해당 티어의 과거 실측 비용(krw_approx) 평균 — 지어낸 추정치가 아니라 실제 생성
+    이력에서만 계산한다. 이력이 하나도 없는 티어는 None(미실측)을 그대로 반환한다."""
+    samples = [
+        o["cost"]["krw_approx"]
+        for o in list_past_orders()
+        if o.get("tier") == tier_key and o.get("cost")
+    ]
+    if not samples:
+        return None
+    return {"krw_approx": round(sum(samples) / len(samples)), "sample_count": len(samples)}
+
+
 def summarize_intake(intake, catalog, reply_email=None):
     """미리보기 화면에 보여줄 요약 — 아직 아무 스크립트도 실행하지 않는다(비용 0)."""
     customer = intake.get("customer") or {}
@@ -254,6 +271,7 @@ def summarize_intake(intake, catalog, reply_email=None):
         "tier": tier_key,
         "tier_name": tier_info["name"] if tier_info else f"알 수 없는 티어({tier_key})",
         "tier_price": tier_info["price"] if tier_info else None,
+        "cost_estimate": estimate_cost_for_tier(tier_key),
         "tier_pages": tier_info.get("pages_approx") if tier_info else None,
         "question_limit": tier_info.get("question_limit") if tier_info else None,
         "customer_name": customer.get("name"),

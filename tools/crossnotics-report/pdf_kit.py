@@ -27,7 +27,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle,
-    HRFlowable, Image, KeepTogether
+    HRFlowable, Image, KeepTogether, CondPageBreak
 )
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -763,6 +763,78 @@ class PDFKit:
     def toc_line(self, text, style="toc"):
         self.story.append(Paragraph(text, self.styles[style]))
 
+    # ---------- 이미지 그리드 페이지 / 인라인 이미지 (2026-08-29 신설, 공용) ----------
+    def image_grid_page(self, items, page_title=None):
+        """이미지 여러 개를 그리드로 크게 보여준다(예: 타로 카드 공개).
+        items: [{"path": str, "caption": str}, ...]. 특정 상품 전용 로직은 여기 넣지
+        않는다 — 호출 쪽(report_kit.py)이 items만 준비해서 넘긴다.
+
+        2026-08-29 두 번 수정된 이력 — 처음엔 시작ㆍ끝 둘 다 PageBreak()로 강제 넘겼더니
+        바로 앞 내용(챕터 제목 등)이 반 페이지만 쓰고 나머지가 비는 사고가 났고, 그
+        다음엔 "그리드보다 먼저 챕터 제목을 보여준다"는 이 문서 전체의 일관된 순서 자체를
+        깨는 땜질을 시도했다가(사용자가 바로 반려) 되돌렸다. **진짜 원칙에 맞는 해법은
+        무조건 새 페이지가 아니라, 지금 페이지에 이 그리드가 들어갈 공간이 없을 때만 새
+        페이지로 넘기는 것**(reportlab의 CondPageBreak) — 순서는 그대로 유지하면서 빈
+        공간만 없앤다."""
+        n = len(items)
+        cols = 2 if n <= 4 else (3 if n <= 9 else 5)
+        col_w = (170 * mm) / cols
+        rows_data, row_heights, row, row_max_h = [], [], [], 0
+        for i, item in enumerate(items):
+            with PILImage.open(item["path"]) as im:
+                w, h = im.size
+            ratio = h / w
+            img_w = col_w - 6 * mm
+            img_h = img_w * ratio
+            img = Image(item["path"], width=img_w, height=img_h)
+            cap = Paragraph(item["caption"], self.styles["caption"])
+            cell = Table([[img], [cap]], colWidths=[img_w])
+            cell.setStyle(TableStyle([
+                ("BOX", (0, 0), (0, 0), 0.8, BORDER),
+                ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            row.append(cell)
+            row_max_h = max(row_max_h, img_h + 22)  # 캡션(대략 2줄)ㆍ패딩 여유분
+            if len(row) == cols or i == n - 1:
+                while len(row) < cols:
+                    row.append("")
+                rows_data.append(row)
+                row_heights.append(row_max_h)
+                row, row_max_h = [], 0
+        grid = Table(rows_data, colWidths=[col_w] * cols)
+        grid.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        total_h = sum(row_heights) + (24 if page_title else 0)
+        self.story.append(CondPageBreak(total_h))
+        if page_title:
+            self.story.append(Paragraph(page_title, self.styles["h1"]))
+            self.story.append(Spacer(1, 14))
+        self.story.append(grid)
+        self.story.append(Spacer(1, 10))
+
+    def inline_image(self, path, caption, max_width_mm=42):
+        """본문 문단 사이에 작게 끼워 넣는 이미지 — screenshot()과 같은 모양이지만 크기가
+        작고 캡션이 짧다(카드 한 장 같은 보조 이미지용). image_grid_page()로 이미 크게
+        보여준 것과 "같은 그림"이라는 걸 바로 알아볼 수 있을 정도의 크기로 설계."""
+        with PILImage.open(path) as im:
+            w, h = im.size
+        ratio = h / w
+        img_w = max_width_mm * mm
+        img = Image(path, width=img_w, height=img_w * ratio)
+        cap = Paragraph(caption, self.styles["caption"])
+        box = Table([[img], [cap]], colWidths=[img_w])
+        box.setStyle(TableStyle([
+            ("BOX", (0, 0), (0, 0), 0.8, BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        self.story.append(Spacer(1, 4))
+        self.story.append(KeepTogether(box))
+        self.story.append(Spacer(1, 6))
+
     # ---------- 빌드 ----------
     def build(self, footer_tagline=None, watermark_text="천지인운명관 · 무단 전재·재배포 금지", logo_path=None):
         if footer_tagline:
@@ -897,7 +969,7 @@ class PDFKit:
             size = 100 * mm
             canvas.saveState()
             try:
-                canvas.setFillAlpha(0.045)
+                canvas.setFillAlpha(0.07)
             except AttributeError:
                 pass
             for x, y in (
