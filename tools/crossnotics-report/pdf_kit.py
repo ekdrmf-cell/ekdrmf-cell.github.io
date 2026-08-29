@@ -33,6 +33,16 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from PIL import Image as PILImage
 
+# 2026-08-29 추가 — 사용자 지시: "본문 중간중간에 등장하는 핵심 개념(도화살ㆍ역마살ㆍ
+# 화개살 등)은 볼드체나 포인트 컬러로 시각적으로 눈에 띄게." build_report.py가 이미
+# "이 용어들은 정확히 어떤 것들인지" 정의해둔 목록(GLOSSARY_TERMS/STRUCTURAL_TERM_
+# GLOSSARY)을 그대로 재사용 — 여기서 새로 목록을 만들면 두 파일이 따로 놀아서 나중에
+# 하나만 고치는 사고가 또 날 수 있다(오늘 밤 여러 번 겪은 클래스의 문제). build_report.py는
+# 이 파일을 import하지 않으므로(반대 방향 의존만 있음) 순환 참조 위험이 없다.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_report import GLOSSARY_TERMS as _GLOSSARY_TERMS, STRUCTURAL_TERM_GLOSSARY as _STRUCTURAL_TERM_GLOSSARY
+
 SHARED_DIR = Path(__file__).resolve().parent
 FONT_DIR = SHARED_DIR / "fonts"
 
@@ -57,6 +67,17 @@ _PAREN_TRAILING_SEP_RE = re.compile(r"[\s,ㆍ·]+\)")
 _PAREN_EMPTY_RE = re.compile(r"\(\s*[,ㆍ·]*\s*\)")
 _FONT_CMAP_CACHE = None
 
+# 2026-08-29 추가 — 핵심 용어(도화살ㆍ정관ㆍ지장간 등) 자체를 볼드+포인트 컬러로 항상
+# 강조한다. "**문장**"(LLM이 고른 1~3곳)과는 별개의, "이 단어는 전문용어다"라는 라벨
+# 표시라 개수 제한을 두지 않는다(문단마다 등장하는 모든 용어를 전부 강조) — 용어 뒤에
+# "("가 바로 오는 경우만 매칭해서(예: "도화살(뜻풀이)") 일반 문장 속 우연한 동음이의어
+# 오검출을 최소화한다. 긴 용어부터 매칭해야 "일간"이 "일간지"의 일부처럼 잘못 걸리는 걸
+# 방지(실제로는 겹치는 용어가 없지만 방어적으로 정렬).
+_TERM_HIGHLIGHT_TERMS = sorted(set(_GLOSSARY_TERMS) | set(_STRUCTURAL_TERM_GLOSSARY.keys()), key=len, reverse=True)
+_TERM_HIGHLIGHT_RE = re.compile(
+    "(" + "|".join(re.escape(t) for t in _TERM_HIGHLIGHT_TERMS) + r")(?=\()"
+) if _TERM_HIGHLIGHT_TERMS else None
+
 
 def _font_cmap():
     """PDF 본문 폰트(Pretendard-Regular)가 실제로 그릴 수 있는 유니코드 집합. 2026-08-24
@@ -80,15 +101,26 @@ def _strip_unsupported(text):
     return re.sub(r" {2,}", " ", cleaned)
 
 
-def _md(text, accent_hex="#5a3fd6", max_bold=2):
+def _md(text, accent_hex="#5a3fd6", max_bold=2, bold_font=None):
     """2026-08-24 추가 — 가독성 개선(사용자 피드백: "3페이지는 그냥 글자로만 가득 차있다,
     중요한 단어에 밑줄이나 색·굵기 변형이 있어야 한다"). LLM이 강조하고 싶은 부분을
     **이렇게** 표시하면(build_report.py SYSTEM_PROMPT에서 이 문법만 쓰도록 지시), 굵게 +
     강조색으로 렌더링한다. ReportLab의 Paragraph는 자체적으로 간단한 XML을 해석하므로,
     LLM이 실수로 <, >, & 같은 문자를 그대로 쓰면(수식·비교 표현 등에서 나올 수 있음) PDF
     빌드가 깨지거나 태그로 오인식될 수 있다 — 그래서 원문을 먼저 XML 이스케이프한 뒤에만
-    **마크를 <b><font color=...> 태그로 치환한다(이스케이프 후에도 별표 문자는 그대로
-    남으므로 순서가 안전함).
+    **마크를 태그로 치환한다(이스케이프 후에도 별표 문자는 그대로 남으므로 순서가 안전함).
+
+    2026-08-29 수정 — 실제 사고 발견: 지금까지 <b><font color=...>를 썼는데, 이 PDF의
+    커스텀 TTF 폰트들은 registerFontFamily()로 "이 폰트의 굵은 버전은 이거다"를 등록해둔
+    적이 없어서(폰트 하나하나를 registerFont로만 등록함) ReportLab이 <b> 태그를 만나도
+    바꿔 쓸 굵은 폰트를 못 찾아 그냥 무시하고 원래 폰트 그대로 렌더링했다 — 실제 PDF를
+    열어보면 강조색만 보이고 글자 굵기는 전혀 안 바뀌어 있었다(색조차 화면에서 잘 안
+    보인다는 사용자 지적까지 겹쳐 사실상 강조가 하나도 안 보이는 상태였음). registerFont
+    Family를 등록하는 대신 <font face="폰트이름" color=...>로 굵은 폰트를 직접 지정하는
+    쪽이 더 확실하다(패밀리 해석에 기대지 않고 항상 정확한 폰트를 씀). 본문(body)은
+    세리프(NotoSerifKR)인데 그 폰트는 굵은 버전 파일 자체가 없으므로, 강조 부분만
+    산세리프 SemiBold로 살짝 바꿔 쓴다 — 이미 확립된 디자인 원칙("본문은 세리프,
+    제목/포인트는 산세리프")과 같은 방향이라 이질감이 없다.
 
     2026-08-24(2차) — 실사용 리포트에서 한 문단에 강조가 5~8곳씩 붙어 오히려 아무것도
     안 튀는 문제를 실제로 확인함(사용자 지적: "이러면 눈에 안 들어온다"). 프롬프트에서
@@ -98,44 +130,64 @@ def _md(text, accent_hex="#5a3fd6", max_bold=2):
     safe = _strip_unsupported(text or "")
     escaped = _xml_escape(safe)
     count = 0
+    font_face = bold_font or SB
 
     def _sub(m):
         nonlocal count
         count += 1
         if count > max_bold:
             return m.group(1)
-        return f'<b><font color="{accent_hex}">{m.group(1)}</font></b>'
+        return f'<font face="{font_face}" color="{accent_hex}">{m.group(1)}</font>'
 
-    return _BOLD_MARK_RE.sub(_sub, escaped)
+    result = _BOLD_MARK_RE.sub(_sub, escaped)
+    if _TERM_HIGHLIGHT_RE is not None:
+        result = _TERM_HIGHLIGHT_RE.sub(
+            lambda m: f'<font face="{SB}" color="{ACCENT_DEEP_HEX}">{m.group(1)}</font>', result
+        )
+    return result
 
 
 _SENTENCE_END_RE = re.compile(r"(?<=[다요])\. ")
 
 
-def _split_paragraphs(text, max_chunk_chars=420):
+def _split_long_chunk(chunk, max_chunk_chars):
+    if len(chunk) <= max_chunk_chars:
+        return [chunk]
+    sentence_ends = [m.end() for m in _SENTENCE_END_RE.finditer(chunk)]
+    if not sentence_ends:
+        return [chunk]
+    mid = len(chunk) / 2
+    split_at = min(sentence_ends, key=lambda i: abs(i - mid))
+    left, right = chunk[:split_at].strip(), chunk[split_at:].strip()
+    if not left or not right:
+        return [chunk]  # 더 못 쪼개면(한쪽이 빈 문자열) 그대로 둠 — 무한루프 방지
+    # 2026-08-29 추가 — 재귀 호출: 한 번만 반으로 쪼개면 원문이 아주 길 때(600자+)
+    # 절반씩만 나눠도 여전히 max_chunk_chars를 넘을 수 있다 — 각 조각이 기준 이하가
+    # 될 때까지 계속 쪼갠다(사용자 요청: "3~4줄 단위로 적절히 끊어서 배치").
+    return _split_long_chunk(left, max_chunk_chars) + _split_long_chunk(right, max_chunk_chars)
+
+
+def _split_paragraphs(text, max_chunk_chars=160):
     """2026-08-24 추가 — 실사용 리포트에서 한 섹션 본문이 20줄 넘게 줄바꿈 하나 없이
     이어지는 "글자 벽"이 실제로 나온 걸 확인함(사용자 지적). LLM이 문단 사이에 빈 줄
     (\\n\\n)을 넣도록 프롬프트에서도 지시하지만(5-A번), 그것만 믿지 않고(같은 이유로
     한자 문제를 두 번 겪음) 렌더러가 항상 적당한 길이로 문단을 나누도록 보장한다:
     1) 원문에 이미 빈 줄이 있으면 그걸 우선 따르고,
     2) 그렇게 나눈 덩어리가 여전히 max_chunk_chars보다 길면, 그 덩어리의 중간 지점에서
-       가장 가까운 문장 끝("~다. "/"~요. ")을 찾아 추가로 쪼갠다.
+       가장 가까운 문장 끝("~다. "/"~요. ")을 찾아 추가로 쪼갠다(기준 이하가 될 때까지
+       재귀적으로).
     문장 경계를 못 찾으면(예: 문장부호가 특이한 경우) 억지로 자르지 않고 그대로 둔다 —
-    잘못된 지점에서 자르는 것보다는 긴 문단 하나가 낫다."""
+    잘못된 지점에서 자르는 것보다는 긴 문단 하나가 낫다.
+
+    2026-08-29 수정 — 사용자 지시: "한 문단이 너무 길어지지 않도록 3~4줄 단위로
+    적절히 끊어서 배치." 기존 420자는 본문 폭(약 164mm, 11.8pt 세리프 기준 한 줄에
+    약 38~40자) 대비 10줄 넘게 허용하는 값이라 사실상 "글자 벽"을 못 막고 있었음 —
+    3~4줄에 해당하는 약 160자로 낮추고, 위 _split_long_chunk가 재귀적으로 그 기준을
+    지키게 함."""
     raw_chunks = [c.strip() for c in re.split(r"\n\s*\n", text or "") if c.strip()]
     result = []
     for chunk in raw_chunks:
-        if len(chunk) <= max_chunk_chars:
-            result.append(chunk)
-            continue
-        sentence_ends = [m.end() for m in _SENTENCE_END_RE.finditer(chunk)]
-        if not sentence_ends:
-            result.append(chunk)
-            continue
-        mid = len(chunk) / 2
-        split_at = min(sentence_ends, key=lambda i: abs(i - mid))
-        result.append(chunk[:split_at].strip())
-        result.append(chunk[split_at:].strip())
+        result.extend(_split_long_chunk(chunk, max_chunk_chars))
     return result or [text or ""]
 
 
@@ -169,7 +221,8 @@ def register_fonts():
 
 # ---------- 색 ----------
 ACCENT = colors.HexColor("#5a3fd6")
-ACCENT_DEEP = colors.HexColor("#3d2a99")
+ACCENT_DEEP_HEX = "#3d2a99"  # 2026-08-29 추가 — _md()의 핵심 용어 강조에서 씀(문자열 형태 필요)
+ACCENT_DEEP = colors.HexColor(ACCENT_DEEP_HEX)
 ACCENT_SOFT = colors.HexColor("#d9cdf7")
 TEXT_DARK = colors.HexColor("#1f2333")
 TEXT_DIM = colors.HexColor("#4d5268")
@@ -906,11 +959,16 @@ class PDFKit:
             """logo_path가 주어졌을 때만 호출 — 사용자가 실제로 제공한 로고 이미지
             (짙은 남색+금색 원형 문장, crossnotics/apple-touch-icon.png와 동일 자산)를
             표지 하단에 원형 그대로 그린다. PNG 자체가 원형 바깥이 투명이라 별도
-            마스킹 없이 배경과 자연스럽게 어우러짐."""
+            마스킹 없이 배경과 자연스럽게 어우러짐.
+
+            2026-08-29 수정 — 사용자 지적: "표지 하단 로고가 너무 묵직하다, 크기를
+            줄이면 더 고급스러워지지 않을까." 62mm는 표지 하단을 거의 다 차지할 만큼
+            커서 무거운 인상을 줬음 — 44mm로 줄여 여백을 더 살리고, 줄어든 만큼
+            아래쪽 여백이 남으므로 y도 살짝 낮춰 표지 하단 균형을 맞춤."""
             w, h = A4
-            size = 62 * mm
+            size = 44 * mm
             x = (w - size) / 2
-            y = 42 * mm
+            y = 38 * mm
             canvas.saveState()
             canvas.drawImage(logo_path, x, y, width=size, height=size, mask="auto")
             canvas.restoreState()
@@ -950,9 +1008,12 @@ class PDFKit:
             2번 원칙: "순백색ㆍ순흑색 조합은 문서의 품격을 떨어뜨린다ㆍ저채도 미색 배경을
             써라." 순백색 배경 대신 아주 옅은 미색(따뜻한 아이보리)으로 전체 깔아, 눈의
             피로를 줄이고 고급 인쇄물 같은 질감을 준다(기존 보라/주황 브랜드 컬러는 그대로
-            유지 — 배경 톤만 조정, 브랜드 정체성은 바꾸지 않음)."""
+            유지 — 배경 톤만 조정, 브랜드 정체성은 바꾸지 않음).
+
+            2026-08-29 수정 — 사용자 지시: "배경색을 #fcfbf9 또는 연한 베이지 톤으로."
+            기존 #fdfbf5보다 살짝 더 따뜻한 베이지 톤으로 조정."""
             canvas.saveState()
-            canvas.setFillColor(colors.HexColor("#fdfbf5"))
+            canvas.setFillColor(colors.HexColor("#fcfbf9"))
             canvas.rect(0, 0, A4[0], A4[1], stroke=0, fill=1)
             canvas.restoreState()
 

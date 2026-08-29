@@ -133,12 +133,24 @@ def expand_term_placeholders(obj, gloss_map, unmapped):
     없는 용어명을 썼을 때만(목록 밖 이름ㆍ오타) 예외적으로 걸리며, 그 경우 중괄호만
     벗겨서 최소한 안 깨지게 하고 unmapped에 남겨 경고로 띄운다."""
     if isinstance(obj, str):
+        # 2026-08-29 추가 — 실제 사고 재현: 같은 문단 안에서 "정관"이 두 문장 뒤에
+        # 다시 언급되니까 뜻풀이 전체("나를 적당히 다스려주는 기운으로...")가 통째로
+        # 또 붙어서 똑같은 문장이 두 번 반복되는 것처럼 읽혔다. 사람은 한 번 정의한
+        # 용어를 같은 글 안에서 또 나오면 그냥 라벨만 쓴다 — 이 문자열(하나의 body/
+        # key_insight/takeaway 값) 안에서는 같은 용어를 처음 한 번만 풀어주고, 그
+        # 다음부터는 라벨만 남긴다(더 넓은 범위, 예: 다른 섹션에서 다시 나오는 경우는
+        # 손님이 다시 읽을 수도 있으니 그대로 유지 — 이 문자열 하나로만 범위를 좁힘).
+        seen_in_this_string = set()
+
         def _sub(m):
             term = m.group(1).strip()
             gloss = gloss_map.get(term)
             if gloss is None:
                 unmapped.append(term)
                 return term
+            if term in seen_in_this_string:
+                return term
+            seen_in_this_string.add(term)
             return f"{term}({gloss})"
         return _PLACEHOLDER_RE.sub(_sub, obj)
     if isinstance(obj, list):
@@ -1513,6 +1525,14 @@ def _ensure_term_glosses_once(obj, gloss_map):
             gloss = gloss_map.get(term)
             if not gloss:
                 continue
+            # 2026-08-29 추가 — 실제 사고 재현: 같은 문단 안에서 "정관"이 두 문장
+            # 뒤에 다시 나오니 뜻풀이 전체가 통째로 또 붙어서 같은 문장이 두 번
+            # 반복되는 것처럼 읽혔다. 처음엔 "이번 패스에서 첫 등장만" 식으로
+            # 막았는데, 바깥의 2패스 구조(순환참조 버그 수정 때 도입) 때문에 1패스가
+            # 막은 걸 2패스가 다시 뚫어버렸다 — "이 문자열 안 어딘가에 이미 이 용어의
+            # 뜻풀이가 있는가"를 패스 횟수와 무관하게 항상 확인해야 진짜로 막힌다.
+            if (term + "(") in original:
+                continue
             start = 0
             while True:
                 idx = original.find(term, start)
@@ -1521,6 +1541,7 @@ def _ensure_term_glosses_once(obj, gloss_map):
                 after = original[idx + len(term):idx + len(term) + 3].lstrip()
                 if not after.startswith("("):
                     insertions.append((idx, term, gloss))
+                    break  # 이 문자열 안에서는 첫 번째 맨몸 등장만 풀어주고 멈춘다
                 start = idx + len(term)
         insertions.sort(key=lambda t: t[0], reverse=True)  # 뒤에서부터 삽입해야 앞쪽 위치가 안 밀림
         for idx, term, gloss in insertions:
@@ -1662,8 +1683,25 @@ def check_emphasis_markers(report):
         print(f"✓ 강조 표시 개수 검사 통과({bold_count}번)")
 
 
-_SENTENCE_END_RE = re.compile(r"[^.!?\n]*[.!?]")
 _CARD_MARKER_ONLY_RE = re.compile(r"^\[\[CARD:[^\]]*\]\]$")
+
+
+def _find_first_sentence(text):
+    """2026-08-29 추가 — 실제 사고 발견: 예전엔 정규식으로 "첫 마침표까지"를 찾았는데,
+    십신ㆍ신살 뜻풀이 자체가 이미 완결된 문장(마침표 포함)이라 "편재(내가 다루는 재물
+    중에서도 흘러 다니는 쪽입니다. 사업 수완이...)"처럼 괄호 *안*에 마침표가 있으면
+    거기서 강조를 끊어버려 "**...쪽입니다.**" 뒤로 괄호가 안 닫힌 채 남는 사고가 실제
+    PDF에서 확인됨. 괄호 안에 있는 마침표는 무시하고, 괄호 바깥(깊이 0)의 첫 마침표까지만
+    문장으로 인정한다."""
+    depth = 0
+    for i, ch in enumerate(text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif ch in ".!?" and depth == 0:
+            return text[:i + 1]
+    return None
 
 
 def _is_content_paragraph(p):
@@ -1722,8 +1760,7 @@ def ensure_emphasis(report):
             if insight and insight in p:
                 target = insight
             else:
-                m = _SENTENCE_END_RE.match(p.strip())
-                target = m.group(0).strip() if m else None
+                target = _find_first_sentence(p.strip())
             if not target:
                 # 2026-08-29 추가 — 적대적 테스트에서 발견: 문장부호(.!?)가 아예 없는
                 # 문단은 여기서 target이 계속 None이라 강조가 하나도 안 붙었다(보장이
@@ -1769,8 +1806,8 @@ def ensure_unanswerable_reason(report):
         body = qa.get("body")
         if not isinstance(body, str) or not body.strip():
             continue
-        m = _SENTENCE_END_RE.match(body.strip())
-        reason = m.group(0).strip() if m else body.strip()[:120]  # 문장부호 없으면 앞부분이라도 재사용
+        found = _find_first_sentence(body.strip())
+        reason = found if found else body.strip()[:120]  # 문장부호 없으면 앞부분이라도 재사용
         if reason:
             qa["unanswerable_reason"] = reason
             fixed += 1
