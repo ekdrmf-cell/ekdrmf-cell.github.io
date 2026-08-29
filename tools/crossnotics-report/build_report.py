@@ -960,10 +960,15 @@ REPORT_SCHEMA = {
                 "type": ["object", "null"],
                 "description": "scope가 'premium'일 때만 채우는 10년/평생/인생 2막 전략 섹션. 그 외엔 null.",
                 "properties": {
-                    "decade_roadmap": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
-                    "lifetime_design": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
-                    "second_act": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
-                    "behavior_dna": {"type": ["object", "null"], "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
+                    # 2026-08-29 추가 — cross_analysis와 완전히 같은 패턴의 취약점을
+                    # report_kit.py에서 추가로 발견(decade_roadmap/lifetime_design/
+                    # second_act 셋 다 lts.get("decade_roadmap")로 존재만 확인하고
+                    # ["heading"]은 직접 접근 — heading이 없으면 KeyError). required로
+                    # 지정해 normalize_to_schema()가 빈 문자열로 백필하게 함.
+                    "decade_roadmap": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}, "required": ["heading", "body"]},
+                    "lifetime_design": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}, "required": ["heading", "body"]},
+                    "second_act": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}, "required": ["heading", "body"]},
+                    "behavior_dna": {"type": ["object", "null"], "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}, "required": ["heading", "body"]},
                 },
             },
             "closing": {"type": "string"},
@@ -1368,22 +1373,32 @@ def check_hallucination(report, known_terms, valid_years):
 
 def _ensure_term_glosses_once(obj, gloss_map):
     if isinstance(obj, str):
+        # 2026-08-29 수정 — 실제 사고 재현: 겁재/정재처럼 서로의 뜻풀이 안에 서로를
+        # 언급하는(가상의) 순환 관계를 넣고 적대적 테스트를 돌려보니, 용어를 하나씩
+        # 순서대로 처리하며 그때그때 문자열을 바꿔버려서 "방금 삽입한 다른 용어의
+        # 뜻풀이 안에 있는 텍스트"까지 같은 패스 안에서 또 훑어버렸다 — 그 결과 한 패스
+        # 만으로도 여러 겹 중첩이 생기고, 바깥의 고정점 루프(최대 5회)가 그걸 계속
+        # 키워서 읽을 수 없는 문장이 됐다. 고쳐서: 이 문자열의 "원본 스냅샷" 기준으로
+        # 모든 용어의 위치를 한꺼번에 먼저 찾고, 삽입은 마지막에 한 번에(뒤에서부터)
+        # 적용한다 — 한 패스 안에서는 삽입 순서가 서로에게 영향을 못 주게 만든 것.
+        original = obj
+        insertions = []  # (idx, term, gloss)
         for term in GLOSSARY_TERMS:
             gloss = gloss_map.get(term)
             if not gloss:
                 continue
-            positions = []
             start = 0
             while True:
-                idx = obj.find(term, start)
+                idx = original.find(term, start)
                 if idx == -1:
                     break
-                after = obj[idx + len(term):idx + len(term) + 3].lstrip()
+                after = original[idx + len(term):idx + len(term) + 3].lstrip()
                 if not after.startswith("("):
-                    positions.append(idx)
+                    insertions.append((idx, term, gloss))
                 start = idx + len(term)
-            for idx in reversed(positions):  # 뒤에서부터 삽입해야 앞쪽 위치가 안 밀림
-                obj = obj[:idx + len(term)] + f"({gloss})" + obj[idx + len(term):]
+        insertions.sort(key=lambda t: t[0], reverse=True)  # 뒤에서부터 삽입해야 앞쪽 위치가 안 밀림
+        for idx, term, gloss in insertions:
+            obj = obj[:idx + len(term)] + f"({gloss})" + obj[idx + len(term):]
         return obj
     if isinstance(obj, list):
         return [_ensure_term_glosses_once(v, gloss_map) for v in obj]
@@ -1414,14 +1429,21 @@ def ensure_term_glosses(obj, gloss_map):
     2026-08-29 수정 — 100회 시뮬레이션 실제 실행 중 발견: "홍염살"의 뜻풀이 원문
     자체가 "도화살처럼 이성에게..."로 시작한다(computed.json의 실제 데이터). 한 번만
     훑으면 "도화살"을 먼저 처리한 뒤 "홍염살"을 나중에 채워 넣는 과정에서 방금 새로
-    생긴 "도화살" 언급을 다시 못 본다 — 그래서 결과가 바뀌지 않을 때까지(고정점)
-    반복한다. 한 텀 안에 중첩 가능한 용어 수가 유한하므로(최대 GLOSSARY_TERMS 개수)
-    반드시 수렴하지만, 방어적으로 상한을 둔다."""
-    for _ in range(5):
-        new_obj = _ensure_term_glosses_once(obj, gloss_map)
-        if new_obj == obj:
-            break
-        obj = new_obj
+    생긴 "도화살" 언급을 다시 못 본다 — 그래서 두 번째 패스로 한 번 더 훑는다.
+
+    2026-08-29 재수정 — "결과가 바뀌지 않을 때까지(최대 5회) 반복"이라던 이전 버전은
+    적대적 테스트(겁재의 뜻풀이 안에 정재, 정재의 뜻풀이 안에 겁재를 서로 언급하는
+    가상의 순환 관계)에서 5단계까지 중첩되어 읽을 수 없는 문장을 만드는 실제 사고를
+    일으켰다 — "수렴이 보장된다"는 원래 판단이 틀렸다(서로를 참조하는 두 용어는
+    수학적으로 절대 수렴하지 않고 매 패스 계속 자란다). 위 _ensure_term_glosses_once를
+    "한 패스 안에서는 원본 스냅샷 기준으로 한꺼번에 삽입"하도록 고쳐 패스 내부 오염은
+    막았지만, 패스 자체는 여전히 여러 번 돌면 서로 계속 자랄 수 있다 — 그래서 "바뀔
+    때까지"가 아니라 **정확히 2번만** 돈다: 1패스=원본 용어, 2패스=1패스가 새로 만든
+    용어(홍염살→도화살 같은 실제 사례) 이렇게 "정의 안의 정의"까지만 의도적으로
+    지원하고, 그 이상(정의 안의 정의 안의 정의)은 지원하지 않는다 — 실제로 이 깊이가
+    필요한 사례가 없었고, 지원하면 순환 관계에서 다시 무한히 자라기 때문이다."""
+    obj = _ensure_term_glosses_once(obj, gloss_map)
+    obj = _ensure_term_glosses_once(obj, gloss_map)
     return obj
 
 
@@ -1576,6 +1598,13 @@ def ensure_emphasis(report):
             else:
                 m = _SENTENCE_END_RE.match(p.strip())
                 target = m.group(0).strip() if m else None
+            if not target:
+                # 2026-08-29 추가 — 적대적 테스트에서 발견: 문장부호(.!?)가 아예 없는
+                # 문단은 여기서 target이 계속 None이라 강조가 하나도 안 붙었다(보장이
+                # 깨지는 지점). 문장을 못 찾으면 문단 전체(너무 길면 앞부분만)를
+                # 강조 대상으로 대신 쓴다 — 여전히 "이미 모델이 쓴 텍스트 재사용"이라
+                # 1번 규칙(지어내지 않기) 위반이 아니다.
+                target = p.strip()[:120] or None
 
             if target and target in p:
                 paragraphs[i] = p.replace(target, f"**{target}**", 1)
@@ -1615,8 +1644,9 @@ def ensure_unanswerable_reason(report):
         if not isinstance(body, str) or not body.strip():
             continue
         m = _SENTENCE_END_RE.match(body.strip())
-        if m:
-            qa["unanswerable_reason"] = m.group(0).strip()
+        reason = m.group(0).strip() if m else body.strip()[:120]  # 문장부호 없으면 앞부분이라도 재사용
+        if reason:
+            qa["unanswerable_reason"] = reason
             fixed += 1
 
     if fixed:
