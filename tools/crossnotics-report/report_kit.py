@@ -48,12 +48,24 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from pdf_kit import PDFKit, extract_subheadings  # noqa: E402  — 2026-08-23: 서비스허브 공유 파일에서 분리된 이 폴더의 로컬 사본
 
-SYSTEM_LABEL = {"saju": "사주", "astrology": "서양 점성술", "tarot": "타로"}
+SYSTEM_LABEL = {
+    "saju": "사주", "astrology": "서양 점성술", "tarot": "타로",
+    # 2026-08-29 추가 — build_report.py의 system_sections enum에 신규 참고 시스템 5개를
+    # 추가하면서 같이 등록. 이게 없으면 report_kit.py가 영어 대문자(TOJEONG 등)로
+    # 표시해버려서 PDF 챕터 배지가 깨져 보인다.
+    "tojeong": "토정비결", "yukhyo": "육효ㆍ주역", "seongmyeonghak": "성명학",
+    "pungsu": "풍수지리", "taekil": "택일",
+}
 
 # 2026-08-23 추가 — PDF 퀄리티 개선. 웹사이트에서 사주=주황ㆍ점성술=보라ㆍ타로=초록으로
 # 구분해 쓰는 색을 PDF 챕터 배지에도 그대로 써서 체계별 구분을 웹과 통일한다
 # (chapter_header()의 accent/accent2 파라미터로 전달).
-SYSTEM_ACCENT = {"saju": "#e8562f", "astrology": "#6d4aff", "tarot": "#0a7d5e"}
+SYSTEM_ACCENT = {
+    "saju": "#e8562f", "astrology": "#6d4aff", "tarot": "#0a7d5e",
+    # 2026-08-29 추가 — SYSTEM_LABEL과 같은 이유로 신규 5개 시스템 배지 색 등록.
+    "tojeong": "#b8860b", "yukhyo": "#2b3a67", "seongmyeonghak": "#a8325e",
+    "pungsu": "#4a7c59", "taekil": "#3a6b73",
+}
 
 # 2026-08-24 수정 — "3원 겹침이 브랜드 정체성"이라는 건 사용자가 정한 적 없는 임의 가정이었음
 # (사용자가 직접 정정: "내가 그렇게 정한 적이 없어"). 실제로 사용자가 제공한 자산은 로고

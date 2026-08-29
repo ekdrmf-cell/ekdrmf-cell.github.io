@@ -851,7 +851,15 @@ REPORT_SCHEMA = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "system": {"type": "string", "enum": ["saju", "astrology", "tarot"]},
+                        # 2026-08-29 수정 — 실제 사고: 이 enum이 saju/astrology/tarot 세 개로만
+                        # 못박혀 있어서, 프롬프트로는 토정비결ㆍ육효/주역ㆍ성명학ㆍ풍수지리ㆍ
+                        # 택일 전용 섹션을 만들라고 지시해놓고 정작 구조화 출력 스키마에는 그
+                        # 섹션을 태그할 자리가 없었다(프리미엄 리포트에서 다섯 개 전부 통째로
+                        # 빠진 사고의 실제 원인). 신규 시스템 다섯 개를 여기 직접 추가.
+                        "system": {
+                            "type": "string",
+                            "enum": ["saju", "astrology", "tarot", "tojeong", "yukhyo", "seongmyeonghak", "pungsu", "taekil"],
+                        },
                         "heading": {"type": "string"},
                         "body": {"type": "string"},
                         "key_insight": {"type": "string", "description": "이 섹션의 핵심을 담은 한 문장(PDF 인용구용). scope가 mini면 생략 가능."},
