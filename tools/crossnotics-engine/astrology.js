@@ -34,6 +34,20 @@ const HOUSE_NUM_KO = {
   Seventh: 7, Eighth: 8, Ninth: 9, Tenth: 10, Eleventh: 11, Twelfth: 12,
 };
 
+// 2026-08-30 추가 — "하우스 지배행성"(house ruler) 개념: 지금까지는 computed.json에 이
+// 값이 아예 없어서 LLM이 검증 안 된 일반 점성술 지식으로 스스로 추론해 썼다(예: "화성이
+// 6하우스를 이끈다"). 이 하우스가 어떤 별자리인지는 whole-sign 하우스제(아래 houseSystem
+// 참고)에서 이미 계산되고 있었으니, 그 별자리의 전통 지배행성만 표준 매핑으로 붙이면 코드로
+// 검증 가능한 값이 된다(1번 규칙 — 지어내지 않기 — 을 이 개념에도 적용). 현대 점성술은
+// 일부 별자리에 외행성 공동지배(예: 물병자리=천왕성)를 추가로 인정하지만, "주인은 OO입니다"
+// 식 단일 답을 요구하는 리포트 문체에 맞춰 전통 단일 지배행성 하나만 채택한다(오행→4원소
+// 매핑과 같은 성격의 "이 프로젝트가 채택한 하나의 기준" — 정설로 제시하지 않음).
+const SIGN_RULER_KO = {
+  "양자리": "화성", "황소자리": "금성", "쌍둥이자리": "수성", "게자리": "달",
+  "사자자리": "태양", "처녀자리": "수성", "천칭자리": "금성", "전갈자리": "화성",
+  "사수자리": "목성", "염소자리": "토성", "물병자리": "토성", "물고기자리": "목성",
+};
+
 const ASPECT_KO = {
   conjunction: "합(컨정션)", opposition: "대립(오퍼지션)", trine: "삼각(트라인)",
   square: "사각(스퀘어)", sextile: "육각(섹스타일)",
@@ -94,6 +108,16 @@ function computeAstrology(input) {
     ? { sign: SIGN_KO[horoscope.Angles.ascendant.Sign.label].label }
     : null;
 
+  // 2026-08-30 추가 — whole-sign 하우스제라 하우스마다 이미 별자리 하나가 정확히
+  // 대응되므로(라이브러리가 이미 계산한 값, 새로 추론하는 게 아님), 그 별자리의
+  // 표준 지배행성만 붙인다. 생시를 모르면(hasTime=false) 하우스 자체가 없으므로 null.
+  const houseRulers = hasTime
+    ? horoscope.Houses.map((h) => {
+        const sign = SIGN_KO[h.Sign.label].label;
+        return { house: h.id, sign, ruler: SIGN_RULER_KO[sign] || null };
+      })
+    : null;
+
   const aspects = hasTime
     ? horoscope.Aspects.all
         .filter((a) => CORE_BODIES.includes(a.point1Key) && CORE_BODIES.includes(a.point2Key))
@@ -117,6 +141,7 @@ function computeAstrology(input) {
     planets,
     aspects,
     element_count: elementCount,
+    house_rulers: houseRulers,
   };
   // 2026-08-23 추가 — 점성술 대응표 지식베이스(astrology-correspondence.js). saju쪽
   // correspondence.js와 동일한 이유(별자리ㆍ행성ㆍ하우스ㆍ어스펙트 "의미" 사전이 없었음)로

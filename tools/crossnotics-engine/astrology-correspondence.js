@@ -88,7 +88,14 @@ function buildAstroCorrespondence(astrologyResult) {
     : null;
 
   const occupiedHouses = [...new Set((astrologyResult.planets || []).map((p) => p.house).filter(Boolean))].sort((a, b) => a - b);
-  const houseMeanings = occupiedHouses.map((h) => ({ house: h, meaning: HOUSE_MEANING[h] || null }));
+  // 2026-08-30 추가 — house_rulers(astrology.js에서 whole-sign 하우스제 기준으로 이미
+  // 계산됨)를 여기 붙여서, LLM이 "OO하우스의 주인은 OO입니다" 문장을 쓸 때 지어내지 않고
+  // 이 필드만 인용하게 한다.
+  const rulerByHouse = new Map((astrologyResult.house_rulers || []).map((r) => [r.house, r]));
+  const houseMeanings = occupiedHouses.map((h) => {
+    const r = rulerByHouse.get(h);
+    return { house: h, meaning: HOUSE_MEANING[h] || null, ruler: r ? r.ruler : null, ruler_sign: r ? r.sign : null };
+  });
 
   const aspectMeanings = (astrologyResult.aspects || []).map((a) => ({
     body1: a.body1,
