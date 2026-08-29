@@ -882,6 +882,11 @@ REPORT_SCHEMA = {
             "cross_analysis": {
                 "type": ["object", "null"],
                 "properties": {"heading": {"type": "string"}, "body": {"type": "string"}},
+                # 2026-08-29 추가 — heading이 없으면 report_kit.py가 안전장치 없이
+                # report["cross_analysis"]["heading"]을 직접 읽다가 KeyError로 죽는 실제
+                # 사고를 80회 시뮬레이션에서 재현 확인. required로 지정해 normalize_to_
+                # schema()가 응답에 아예 없을 때도 빈 문자열로 채워 넣게 한다.
+                "required": ["heading", "body"],
             },
             "opportunities": {
                 "type": ["array", "null"],
@@ -1171,12 +1176,104 @@ def normalize_to_schema(value, schema, path, corrections):
         for key, sub_schema in schema["properties"].items():
             if key in result:
                 result[key] = normalize_to_schema(result[key], sub_schema, f"{path}.{key}", corrections)
+        # 2026-08-29 추가 — 실제 사고: cross_analysis.heading이 응답에서 통째로 빠진 채
+        # 왔는데, 위 루프는 "이미 있는 키의 타입"만 검사해서 이 누락을 못 잡았다
+        # (report_kit.py가 안전장치 없이 그 키를 직접 읽다가 KeyError로 죽어, 이미 돈을
+        # 낸 리포트가 PDF 변환 단계에서 통째로 날아갈 뻔했다 — 80회 시뮬레이션에서 재현
+        # 확인). "이미 있는 데이터의 타입만 정규화"에서 "필수 필드가 아예 없어도 채운다"로
+        # 넓힌다 — required로 지정된 키가 응답에 없으면 안전한 기본값으로 채워 넣는다.
+        for key in schema.get("required", []):
+            if key not in result:
+                key_schema = schema["properties"].get(key, {})
+                key_types = key_schema.get("type")
+                if isinstance(key_types, str):
+                    key_types = [key_types]
+                default = next((_SCHEMA_SAFE_DEFAULT[t] for t in (key_types or []) if t in _SCHEMA_SAFE_DEFAULT), None)
+                corrections.append(f"{path}.{key}: 필수 필드가 응답에 아예 없음 → {default!r}로 채움")
+                result[key] = default
         return result
 
     if isinstance(value, list) and "items" in schema:
         return [normalize_to_schema(item, schema["items"], f"{path}[{i}]", corrections) for i, item in enumerate(value)]
 
     return value
+
+
+def check_required_tier_sections(report, computed):
+    """2026-08-29 추가 — 규칙(8번, 10-F-1번)을 정독하며 발견: 티어마다 "이 섹션은
+    무조건 들어가야 한다"는 지시가 프롬프트에 상세히 있는데, 그게 실제로 지켜졌는지
+    기계적으로 대조하는 코드가 지금까지 하나도 없었다. 오늘 밤 실제 프리미엄 리포트
+    (최광호)에서 신규 시스템 5개가 통째로 빠진 사고도, 이런 검증이 없어서 아무도
+    자동으로 못 잡고 손으로 파봐야만 드러났다 — check_term_glosses/check_emphasis_
+    markers와 같은 성격의, 판단이 필요 없는 순수 구조 대조.
+
+    경고만 남기고 발송은 막지 않는다(다른 check_* 함수들과 같은 원칙 — 아직 이
+    검증 자체의 오탐 여부를 충분히 검증하지 못했으므로 하드 블록은 이르다)."""
+    def _d(v):
+        return v if isinstance(v, dict) else {}
+
+    def _l(v):
+        return v if isinstance(v, list) else []
+
+    tier = computed.get("tier")
+    sections = _l(report.get("system_sections"))
+    systems_present = {_d(s).get("system") for s in sections}
+    problems = []
+
+    if tier == "mini":
+        if len(sections) != 1:
+            problems.append(f"mini는 system_sections가 1개여야 하는데 {len(sections)}개임")
+        if report.get("question_answers") is not None:
+            problems.append("mini는 question_answers가 null이어야 함(질문을 안 받는 티어)")
+        for f in ("cross_analysis", "long_term_strategy", "action_plan", "toc_preview"):
+            if report.get(f) is not None:
+                problems.append(f"mini는 {f}가 null이어야 함")
+
+    elif tier == "light":
+        if len(sections) < 2:
+            problems.append(f"light는 system_sections가 최소 2개여야 하는데 {len(sections)}개임")
+
+    else:
+        # single/dual/master/premium 공통(8번 규칙 scope "full"/"premium")
+        min_by_tier = {"single": 4, "dual": 8, "master": 11, "premium": 11}
+        minimum = min_by_tier.get(tier)
+        if minimum and len(sections) < minimum:
+            problems.append(f"{tier}는 system_sections가 최소 {minimum}개여야 하는데 {len(sections)}개임")
+
+        if tier in ("dual", "master", "premium") and "tojeong" not in systems_present:
+            problems.append(f"{tier}는 saju.tojeong 전용 섹션이 반드시 있어야 하는데 없음(10-F-1번)")
+        if tier in ("master", "premium") and "yukhyo" not in systems_present:
+            problems.append(f"{tier}는 saju.yukhyo 전용 섹션이 반드시 있어야 하는데 없음(10-F-1번)")
+        if tier == "premium":
+            for sys_name in ("seongmyeonghak", "pungsu", "taekil"):
+                if sys_name not in systems_present:
+                    problems.append(f"premium은 saju.{sys_name} 전용 섹션이 반드시 있어야 하는데 없음(10-F-1번)")
+
+        if tier == "dual" and report.get("cross_analysis") is None and computed.get("astrology"):
+            problems.append("dual은 cross_analysis가 있어야 함(사주ㆍ점성술 교차검증)")
+        if tier in ("master", "premium") and report.get("action_plan") is None:
+            problems.append(f"{tier}는 action_plan이 있어야 함(9-B번)")
+        if tier == "premium":
+            lts = _d(report.get("long_term_strategy"))
+            for f in ("decade_roadmap", "lifetime_design", "second_act"):
+                if not _d(lts.get(f)).get("body"):
+                    problems.append(f"premium은 long_term_strategy.{f}가 채워져야 함(9-A번)")
+
+    # 궁합 — SINGLE 이상 전 티어, computed.json에 gunghap이 있으면 자동 포함(2026-08-23 규칙).
+    # "system" enum에 gunghap 전용 값이 없어(saju로 태그됨) 휴리스틱으로 heading/body에
+    # "궁합"이 있는지로 대조 — 완벽하지 않으니 다른 check_* 함수처럼 신호로만 쓴다.
+    if tier not in ("mini", "light") and computed.get("saju") and computed.get("gunghap"):
+        has_gunghap_section = any("궁합" in (str(_d(s).get("heading") or "") + str(_d(s).get("body") or ""))
+                                   for s in sections)
+        if not has_gunghap_section:
+            problems.append(f"{tier}는 computed.gunghap이 있으면 궁합 전용 섹션이 있어야 함(2026-08-23 규칙)")
+
+    if problems:
+        print(f"⚠ 경고: 티어별 필수 섹션 규칙 위반 발견({tier}):")
+        for p in problems:
+            print(f"    - {p}")
+    else:
+        print(f"✓ 티어별 필수 섹션 검사 통과({tier})")
 
 
 def check_hallucination(report, known_terms, valid_years):
@@ -1715,6 +1812,7 @@ def main():
     known_terms = collect_known_terms(computed)
     valid_years = collect_valid_years(computed)
     check_hallucination(report, known_terms, valid_years)  # 원본 그대로 측정 — 얼마나 자주 규칙을 어기는지 계속 눈으로 볼 것
+    check_required_tier_sections(report, computed)  # 티어별 필수 섹션(신규 5개 시스템 등)이 실제로 있는지 대조
     check_term_glosses(report)  # 최종 안전망 — {{}}를 안 쓰고 용어를 그냥 맨몸으로 쓴 경우만 여기서 잡힘
     check_emphasis_markers(report)  # ensure_emphasis() 이후에도 남는 예외가 있는지 계속 눈으로 볼 것(항상 통과해야 정상)
     verify_groundedness(report, computed)  # 정규식으로 못 잡는 의미 단위 오류(값 바꿔치기 등) 대조
