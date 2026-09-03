@@ -41,7 +41,7 @@ def run_fixture(fixture_path, expected_map, total_usage):
     if schema_corrections:
         print(f"⚠ 스키마 보정 {len(schema_corrections)}건 발생 — 이 자체가 회귀 신호일 수 있음:")
         for c in schema_corrections:
-            print(f"    - {c}")
+            print(f"    - [{c['severity']}] {c['message']}")
 
     known_terms = build_report.collect_known_terms(computed)
     valid_years = build_report.collect_valid_years(computed)

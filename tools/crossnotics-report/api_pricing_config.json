@@ -1,0 +1,17 @@
+{
+  "_comment": "모델별 API 가격표 — 실제 청구 단가가 바뀌면 이 파일만 고칠 것, api_usage.py 코드에는 하드코딩하지 않는다. price가 null인 모델은 반드시 UNKNOWN으로 취급되고(api_usage.compute_cost_for_record), 절대 추정값으로 채우지 않는다.",
+  "usd_krw_approx": 1400,
+  "usd_krw_approx_note": "참고용 추정 환율일 뿐, 실제 결제 통화 아님(webapp/pipeline.py:42와 동일 문구 재사용)",
+  "models": {
+    "claude-sonnet-5": {
+      "input_price_per_million_usd": 3.00,
+      "output_price_per_million_usd": 15.00,
+      "source": "webapp/pipeline.py:40-41에 이미 하드코딩되어 있던 값(2026-09-01부터 적용되는 표준 단가) 그대로 이전 — build_report.py의 MODEL 상수 기본값과 동일 모델"
+    },
+    "claude-haiku-4-5-20251001": {
+      "input_price_per_million_usd": null,
+      "output_price_per_million_usd": null,
+      "source": "UNKNOWN — 이 프로젝트 어디에도 Haiku 4.5 단가가 문서화되어 있지 않음(build_report.py의 GROUNDEDNESS_MODEL 기본값). 사용자 확인 필요, 추정으로 채우지 않음."
+    }
+  }
+}

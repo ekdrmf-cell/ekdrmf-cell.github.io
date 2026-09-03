@@ -349,6 +349,10 @@ def run_full_pipeline(intake, order_id, reply_email=None):
             "usd": round(usd, 4), "krw_approx": round(usd * USD_KRW_APPROX),
         }
     warnings = [line for line in build_out.splitlines() if line.strip().startswith("⚠")]
+    # 2026-08-31 추가 — build_report.py가 최상위 구조 필드(system_sections 등) 손실은
+    # 일반 "⚠ 경고"와 다른 "🚨 CRITICAL:" 줄로 따로 찍는다(사소한 보정과 심각도가 다르므로
+    # 섞으면 사람이 못 알아챈다) — 여기서도 별도 리스트로 분리해 UI가 다르게 표시하게 한다.
+    critical_warnings = [line for line in build_out.splitlines() if line.strip().startswith("🚨 CRITICAL")]
 
     # 6단계 — PDF 생성
     _run(
@@ -384,6 +388,7 @@ def run_full_pipeline(intake, order_id, reply_email=None):
         "page_status": page_status,
         "cost": cost,
         "warnings": warnings,
+        "critical_warnings": critical_warnings,
         "questions_total": len(qas),
         "questions_non_direct": [
             {"question": qa.get("question"), "answerability": qa.get("answerability"),

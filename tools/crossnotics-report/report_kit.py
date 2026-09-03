@@ -544,9 +544,20 @@ def check_pdf_text_roundtrip(pdf_path, report, computed, customer_name):
 
 
 _TIER_EXPECTED_PAGES = {
-    "mini": (2, 12), "light": (4, 18), "single": (6, 22), "full": (10, 32),
+    "mini": (2, 12), "light": (4, 18), "single": (6, 22), "dual": (10, 32),
     "master": (18, 48), "premium": (22, 60),
 }
+# 2026-09-01 수정 — #16 실제 tier 검증 중 발견: 위 딕셔너리 키가 "full"로 돼 있었는데,
+# 이 함수에 실제로 전달되는 tier 값은 build_report.py의 computed["tier"](mini/light/
+# single/dual/master/premium 6개)이지 "full"이 아니다 — "full"은 SYSTEM_PROMPT 산문에
+# 쓰이는 비즈니스용 scope 표현(single/dual/master를 묶어 부르는 이름)일 뿐 실제 tier
+# 값으로는 한 번도 안 쓰인다. 그 결과 dual tier는 이 딕셔너리 어떤 키에도 안 걸려
+# get(tier, (1,200)) 기본값(사실상 무제한)으로 빠져 있었다 — 페이지 수 안전망이
+# 조용히 무력화된 상태. (10, 32)라는 값 자체는 원래도 있었으므로 새로 만들지 않고
+# 키 이름만 "full"→"dual"로 고쳤다 — r08_dual 규칙 원문의 "목표 분량 약 13페이지"
+# 기준으로, single(목표 6p, 범위 6~22)과 master(목표 20p, 범위 18~48) 사이에 자연스럽게
+# 들어맞는 값임을 확인함(실제 API 검증에서도 dual 결과가 22페이지로 이 범위 안에 있었음).
+
 
 
 def check_pdf_structural_integrity(pdf_path, tier):

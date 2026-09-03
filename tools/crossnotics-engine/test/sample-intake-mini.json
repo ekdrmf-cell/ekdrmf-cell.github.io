@@ -1,0 +1,14 @@
+{
+  "tier": "mini",
+  "systems_included": ["saju"],
+  "customer": {
+    "name": "테스트고객3",
+    "birth_year": 1995,
+    "birth_month": 11,
+    "birth_day": 3,
+    "birth_hour": null,
+    "unknown_time": true,
+    "gender": "M",
+    "questions": []
+  }
+}
