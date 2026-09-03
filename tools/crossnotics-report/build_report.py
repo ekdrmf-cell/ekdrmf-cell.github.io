@@ -25,6 +25,9 @@ import anthropic
 from dotenv import load_dotenv
 from fontTools.ttLib import TTFont
 
+import api_usage
+import computed_projection
+
 # Windows 콘솔 기본 인코딩(cp949)은 ✓ㆍ⚠ 같은 유니코드 기호를 못 담아 print()가 죽는다
 # (실제로 여기서 첫 실행 때 API 호출은 성공했는데 이 로그 출력 단계에서 죽어서 파일 저장 전에
 # 멈췄던 걸 확인함) — stdout을 UTF-8로 강제 전환해서 방지.
@@ -38,11 +41,31 @@ sys.path.insert(0, str(HERE.parent / "_shared"))  # products/_shared는 아님 �
 
 MODEL = os.environ.get("CROSSNOTICS_LLM_MODEL", "claude-sonnet-5")
 
-# 2026-08-28 추가 — verify_groundedness() 전용. 본문 생성이 아니라 "이미 쓰인 문장이
-# computed.json과 실제로 맞는지 대조"만 하는 좁은 작업이라 저렴한 모델로도 충분하다고
-# 판단해 하이쿠를 기본값으로 둠(비용 절감). 검증 품질이 떨어진다고 판단되면 이 환경변수만
-# 바꿔서 손쉽게 소네트로 올릴 수 있음.
-GROUNDEDNESS_MODEL = os.environ.get("CROSSNOTICS_VERIFY_MODEL", "claude-haiku-4-5-20251001")
+# 2026-08-28 추가, 2026-09-03 수정 — verify_groundedness()/verify_naturalness()/
+# verify_field_groundedness() 전용. 원래는 "이미 쓰인 문장이 computed.json과 실제로
+# 맞는지 대조"만 하는 좁은 작업이라 저렴한 haiku를 기본값으로 뒀었으나(비용 절감),
+# 사용자 지시로 프로젝트의 모든 Anthropic LLM 호출을 claude-sonnet-5 하나로 통일함 —
+# 역할별로 다른 모델을 쓰는 구조 자체(환경변수로 이 검증 계열만 따로 바꿀 수 있는
+# 구조)는 그대로 유지하고 기본값 문자열만 바꿈.
+GROUNDEDNESS_MODEL = os.environ.get("CROSSNOTICS_VERIFY_MODEL", "claude-sonnet-5")
+
+# 2026-08-30 추가 — OFFLINE_TEST_MODE. computed_projection/build_system_prompt 회귀
+# 테스트가 실수로라도 실제 유료 API를 호출하는 사고를 막기 위한 안전장치 — 이 환경변수가
+# 켜져 있으면 실제 네트워크 호출을 하는 4개 함수(call_llm/verify_groundedness/
+# verify_naturalness/_call_targeted_rewrite_llm) 전부가 client를 만들기도 전에 즉시
+# RuntimeError로 죽는다. 테스트 코드가 이 값을 세팅하고 실행하면, dependency 분석ㆍ
+# projection 검증ㆍtoken 측정ㆍschema 검증ㆍregression test는 전부 정상 동작하되 실제
+# API 호출 경로에만 진입하면 확실하게 차단된다.
+OFFLINE_TEST_MODE = bool(os.environ.get("CROSSNOTICS_OFFLINE_TEST_MODE"))
+
+
+def _block_if_offline_test_mode(fn_name):
+    if OFFLINE_TEST_MODE:
+        raise RuntimeError(
+            f"OFFLINE_TEST_MODE(CROSSNOTICS_OFFLINE_TEST_MODE 환경변수)가 켜져 있어 "
+            f"{fn_name}()의 실제 API 호출을 차단함 — 테스트 중 실수로 유료 호출이 "
+            "발생하는 걸 막기 위한 안전장치, 실제 운영 중이라면 이 환경변수를 지울 것."
+        )
 
 # 2026-08-29 추가 — check_term_glosses() 전용. "용어가 나오면 괄호로 뜻을 풀어라"는
 # 사람/모델의 판단 없이 기계적으로 대조 가능한 규칙인데, 실제로 화개살이 뜻풀이 없이
@@ -254,6 +277,12 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
 3. correlation 필드가 이미 계산한 dominant_axis/systems_agreeing/complementary_points를
    문장으로 번역하는 것만 하세요 — 당신이 스스로 다른 일치점을 찾아내려 하지 마세요.
    correlation.mode가 "single_system"이면 cross_analysis는 null로 두세요.
+   **2026-08-30 추가 — dominant_axis/systems_agreeing을 %나 숫자로 나열하는 것으로
+   끝내지 마세요.** 숫자는 근거로만 짧게 인용하고, 그 일치가 이 손님의 어떤 삶의
+   태도ㆍ패턴을 뒷받침하는 증거인지 해석하는 문장이 반드시 뒤따라야 합니다.
+   complementary_points(체계 간 차이)가 있으면 숨기지 말고 "이 지점에서는 일치하지만
+   이 지점에서는 다르게 나타난다"처럼 그 불일치 자체도 해석하세요 — 불일치를 감추지
+   않는 원칙은 5-B번과 동일합니다.
 4. 확정적 예언("반드시 ~할 것이다")이나 의료ㆍ법률ㆍ재무 전문가 자문처럼 읽히는 표현을
    쓰지 마세요 — "정보 제공" 톤을 유지하세요.
 4-A. **2026-08-24 추가 — 손님은 이 서비스를 만드는 과정을 전혀 모르는 사람입니다.**
@@ -489,6 +518,32 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
      독자가 "전문가 설명을 듣는 느낌"이 아니라 "내 삶을 이해하기 쉽게 설명받는 느낌"이
      들어야 합니다. 사주 구조 설명만 하고 끝내지 말고, 반드시 마지막에 이 흐름을 실제
      생활에서 어떻게 다루면 좋을지 현실적인 조언 한 가지로 마무리하세요.
+5-C. **2026-08-30 추가 — 계산값 반복 사용과 재설명은 다릅니다.** 같은 계산값이 여러
+   섹션에서 근거로 쓰일 수 있는 건 정상입니다(예: "수 기운이 없다"는 오행 균형ㆍ대운ㆍ
+   리스크ㆍ평생 설계ㆍ인생 2막ㆍ마무리 전부의 근거가 될 수 있습니다) — 문제는 등장할
+   때마다 그 사실 자체를 처음 설명하듯 다시 풀어 쓰는 것입니다. 이미 한 번 제대로
+   설명한 계산값이 다른 섹션에서 다시 필요하면, "앞서 본 대로"처럼 짧게만 참조하고
+   곧바로 그 섹션이 다루는 새로운 맥락(그 시기ㆍ그 관계ㆍ그 행동)에 적용하는 문장으로
+   넘어가세요 — 같은 근거로 새 결론을 끌어내는 것과, 같은 근거를 새로 설명하는 것은
+   다릅니다.
+   **closing(마무리)도 이 원칙의 예외가 아닙니다** — 앞서 나온 계산값(오행ㆍ십신ㆍ
+   어스펙트 등)을 다시 설명하거나 나열하지 마세요. 그 계산값들이 만들어낸 결론은 이미
+   앞에서 다 나왔습니다 — closing은 그 결론들이 결국 무엇을 말하는지 한 덩어리의 새
+   문장으로 압축하는 자리이지, 근거를 다시 되짚는 자리가 아닙니다.
+   **문장 끝맺음도 다양하게 쓰세요** — "~라는 뜻입니다"로 끝나는 문장이 연달아 나오지
+   않게, "~합니다", "~해 보세요", "~일 수 있습니다", 물음으로 끝내는 문장, 대사체
+   인용 등으로 끝맺음을 섞어 리듬을 만드세요(5-B번 "문단 시작을 다양화하라"는 지시와
+   같은 원칙을 문장 끝에도 적용하는 것입니다).
+   **한 문장 안에 `{{}}`로 감쌀 용어를 3개 이상 몰아넣지 마세요** — 한 문장에 십신ㆍ
+   신살ㆍ구조 용어가 여러 개 필요하면 문장을 나누거나, 이 손님에게 실제로 의미 있는
+   용어 1~2개만 그 문장에서 다루고 나머지는 다른 문장으로 넘기세요. 이 손님 얘기보다
+   용어 사전처럼 읽히면 안 됩니다.
+   **비유를 쓴 뒤에는 그 비유가 이 손님에게 구체적으로 어떻게 적용되는지까지 반드시
+   이어가세요** — 비유만 쓰고 곧바로 일반론 서술로 돌아가면 안 됩니다. "비유 →
+   (그래서 이 손님은) → 실제 의미"까지 한 흐름으로 연결하세요.
+   **흔히 안 쓰는 조합의 낯선 표현을 새로 만들어 쓰지 마세요**(예: "눙쳐서 풀어준다",
+   "근력이 되어준다"처럼 익숙지 않은 동사ㆍ명사를 억지로 조합한 표현). 정확한 뜻이
+   바로 안 와닿는 표현을 쓰느니, 조금 평범해도 뜻이 분명한 표현을 쓰는 쪽이 낫습니다.
 6. 업셀은 자연스럽게(예: "다른 체계와 교차하면 더 정확해집니다") 하되 강매 톤은 쓰지
    마세요 — 지금 이 리포트만으로도 완결된 답이어야 합니다.
 7. 한자(漢字)나 그 외 한글이 아닌 문자를 절대 쓰지 마세요 — 예를 들어 "신금(辛金)"처럼
@@ -589,8 +644,9 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
      구간까지만**(8번 규칙 본문ㆍ553번 줄 참고 — 과거 구간ㆍ"8구간 전부" 언급 금지) 각
      구간 최소 3~4문장으로 서술하세요.
      (b) **saju.tojeongㆍsaju.yukhyoㆍsaju.seongmyeonghakㆍsaju.pungsuㆍsaju.taekil
-     다섯 개 전부를 system_sections에 전용 섹션으로 추가하세요**(아래 "새 참고 시스템
-     5개" 문단에 각 필드별로 구체적인 작성법이 있습니다 — 거기 내용 그대로 따르되,
+     다섯 개 전부를 new_reference_systems의 각 key(tojeong/yukhyo/seongmyeonghak/pungsu/
+     taekil)에 채우세요**(아래 "새 참고 시스템 5개" 문단에 각 필드별로 구체적인 작성법이
+     있습니다 — 거기 내용 그대로 따르되,
      "premium이니까 이 다섯 개를 빠짐없이 넣는다"는 걸 여기서 다시 한번 명확히
      합니다). 다섯 개를 다 빼먹으면 사주+점성술+타로만 있는 master와 다를 게
      없어져서, 손님이 추가로 낸 5만원(master 대비 차액)에 해당하는 내용이 사라진
@@ -611,17 +667,31 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
      null이 아니지만 skipped_reason이 채워져 있으면(생시 미상) 그 이유를 짧게 안내하고
      시너스트리 내용은 생략하세요. 이 섹션 때문에 위 각 티어의 "목표 분량"이 살짝
      늘어나는 건 정상입니다(보너스 챕터이므로).
-   - **2026-08-29 수정 — 새 참고 시스템 5개(성명학ㆍ풍수지리ㆍ토정비결ㆍ육효/주역ㆍ택일)도
-     열리는 티어부터 질문 여부와 무관하게 전용 섹션으로 자동 포함됩니다(10-F-1번
-     참고).** DUAL 이상은 saju.tojeong(gwae의 세 조각을 엮어 올해 총운 섹션 하나), MASTER
-     이상은 그에 더해 saju.yukhyo(bon_gwae/ji_gwae를 엮어 즉석 괘 섹션 하나 — 타로처럼
-     "지금 이 순간 뽑아본" 톤 유지), PREMIUM은 그에 더해 saju.seongmyeonghak(letters/
-     pairs/flow_summary를 엮은 이름 섹션)ㆍsaju.pungsu(recommendations를 엮은 공간 배치
-     섹션)ㆍsaju.taekil(good_days/avoid_days를 엮은 택일 섹션)까지 다섯 개 전부 전용
-     섹션으로 추가하세요. 각 섹션 첫머리에 그 시스템의 methodology_note 취지를 한두
-     문장으로 자연스럽게 녹여, 손님이 이게 사주 오행 생극과는 다른 별개의 전통 참고
-     기준이라는 걸 알 수 있게 하세요. 이 섹션들 때문에 "목표 분량"이 늘어나는 것도
-     정상입니다.
+   - **2026-08-29 수정, 2026-09-01 출력 위치 변경 — 새 참고 시스템 5개(성명학ㆍ풍수지리ㆍ
+     토정비결ㆍ육효/주역ㆍ택일)도 열리는 티어부터 질문 여부와 무관하게 전용 섹션으로 자동
+     포함됩니다(10-F-1번 참고).** **이 5개는 system_sections 배열에 태그로 넣는 게 아니라,
+     new_reference_systems라는 별도 객체 필드의 해당 key에 직접 채우는 방식입니다 — 각
+     key의 값은 system_sections 항목과 같은 모양(heading/body/key_insight/takeaways를
+     담은 객체)이되, system 태그 필드는 필요 없습니다(key 이름 자체가 태그입니다).**
+     DUAL 이상은 new_reference_systems.tojeong(gwae의 세 조각을 엮어 올해 총운 섹션 하나), MASTER
+     이상은 그에 더해 new_reference_systems.yukhyo(bon_gwae/ji_gwae를 엮어 즉석 괘 섹션 하나
+     — 타로처럼 "지금 이 순간 뽑아본" 톤 유지), **PREMIUM은 그에 더해 다음 세 개도
+     채우세요 — 셋 다 똑같이 필수이며, 마지막 항목까지 빠뜨리면 안 됩니다:**
+     **new_reference_systems.seongmyeonghak** — letters/pairs/flow_summary를 엮은 이름 섹션.
+     **new_reference_systems.pungsu** — recommendations를 엮은 공간 배치 섹션.
+     **new_reference_systems.taekil** — good_days/avoid_days를 엮은 택일 섹션. 이렇게
+     new_reference_systems의 다섯 개 key(tojeongㆍyukhyoㆍseongmyeonghakㆍpungsuㆍ
+     taekil) 전부를 채우세요. 각 섹션 첫머리에 그 시스템의 methodology_note 취지를
+     한두 문장으로 자연스럽게 녹여, 손님이
+     이게 사주 오행 생극과는 다른 별개의 전통 참고 기준이라는 걸 알 수 있게 하세요. 이
+     섹션들 때문에 "목표 분량"이 늘어나는 것도 정상입니다.
+     **이 다섯 개 섹션도 부록처럼 따로 놀면 안 됩니다 — 실제로 연결되는 지점이
+     있다면, 도입부에서 정의한 핵심 인물상이나 앞서 사주ㆍ점성술에서 이미 나온
+     흐름과 한 문장 정도는 자연스럽게 이어주세요**(같은 방향이면 "앞서 본 ~한
+     결과와도 같은 방향입니다", 다른 방향이면 그 차이 자체를 짚어도 됩니다 — 5-B번
+     "모순처럼 보이는 양면성" 원칙과 동일). **단, 억지로 끼워 맞추지 마세요** — 이
+     다섯 체계는 사주 오행 생극과는 별개의 전통 기준이라, 정말 연결점이 안 보이면
+     무리하게 이어붙이지 말고 그 시스템 자체의 결과만 온전하게 다루세요.
    **공통 원칙: 위 "목표 분량"은 페이지 수를 채우기 위한 상한이 아니라, 그만큼 정보를
    담아야 손님이 낸 돈에 맞는 결과물이 된다는 최소 기준입니다.** 이미 계산되어 주어진
    데이터(사주: 연ㆍ월ㆍ일ㆍ시주 네 기둥 전부, 대운 전 구간, se_un 범위 안 연도만 / 점성술:
@@ -707,6 +777,13 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
    **reflection_questions(자문 질문, "master"/"premium"에서 채움)**: 손님이 스스로에게
    물어보고 판단할 수 있게 돕는 질문 2~3개. {"question": "질문 문장", "note": "이 질문이
    왜 이 사람에게 특히 중요한지 계산값에 근거해 한 문장"} 형식.
+   **2026-08-30 추가 — opportunities/risks/신규 참고시스템 섹션에서 이미 나온 조언
+   문장을 action_plan에서 그대로 복사하거나 살짝만 바꿔 다시 쓰지 마세요.** 같은
+   소재를 다시 다뤄도 되지만, 그때는 "무엇을 할지"가 아니라 "언제ㆍ어떤 상황에서ㆍ
+   어떻게 실행할지"까지 한 단계 더 구체화해야 새로 쓴 값어치가 있습니다 — 이미 나온
+   조언 문장을 그대로 반복하는 건 이 규칙 위반입니다. 새로운 계산값이나 근거를
+   지어내라는 뜻은 아닙니다(1번 규칙과 동일 원칙) — 이미 있는 근거를 실행 수준으로
+   더 구체화하라는 뜻입니다.
 9-C. **scope가 "full"/"premium"이면 opportunities(포착할 기회)와 risks(리스크ㆍ대비책)를
    채우세요**(mini/light는 둘 다 null). 지금까지의 system_sections에서 이미 다룬 계산값을
    "그래서 뭘 하면 좋은가/뭘 조심해야 하는가"로 재구성하는 섹션입니다 — 이미 나온 문장을
@@ -738,6 +815,10 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
    (2026-08-24 사용자 확인). 금지 대상은 어디까지나 "다른 손님/집단과 비교한, 근거
    없는 수치"입니다. "기회"와 "리스크"는 계산값이 가리키는 경향성을 설명하는 것이지,
    확정된 사건을 예언하는 게 아닙니다.
+   **2026-08-30 추가 — risks 항목들이 전부 "사실 제시→위험 설명→조언"으로 똑같은
+   순서를 반복하면 안 됩니다.** 5-B번의 장점→그림자→조언 원칙 자체는 유지하되,
+   항목마다 시작 지점(그림자부터 시작해도 됨, 장면 묘사부터 시작해도 됨)이나 문장
+   전개 순서를 다르게 써서 여러 개가 똑같은 틀로 찍어낸 것처럼 읽히지 않게 하세요.
 10. **고객이 questions 필드에 남긴 질문마다 question_answers 배열에 항목 하나씩 반드시
    작성하세요.** questions는 티어에 따라 0개일 수도, 최대 12개일 수도 있습니다. 질문
    개수만큼 정확히 그 개수만큼 항목을 만드세요 — 하나도 빠뜨리거나 합치지 마세요.
@@ -926,7 +1007,373 @@ system_sections가 각자 따로 노는 별개의 분석이 아니라 같은 인
    cross_analysis/action_plan/long_term_strategy/question_answers의 heading(또는 그
    섹션을 대표하는 제목)을 등장 순서 그대로 문자열 배열로 나열하세요(새로 지어내지 말고,
    실제로 이 응답에 채운 것만 옮기세요).
+12. **[스키마 확인 — 절대 빠뜨리면 안 됨] 8번 규칙에서 안내한 새 참고 시스템 섹션은
+   system_sections 배열에 태그로 넣는 게 아니라, new_reference_systems라는 별도 객체
+   필드의 해당 key에 직접 채워야 합니다: new_reference_systems.tojeong(토정비결)ㆍ
+   new_reference_systems.yukhyo(육효/주역)ㆍnew_reference_systems.seongmyeonghak(성명학)ㆍ
+   new_reference_systems.pungsu(풍수지리)ㆍnew_reference_systems.taekil(택일).** DUAL
+   이상 티어는 최소 tojeong 하나, MASTER 이상은 tojeong+yukhyo 둘, PREMIUM은 다섯 개
+   전부가 new_reference_systems 객체 안에 실제로 채워진 값(heading/body를 담은 객체)으로
+   존재해야 합니다 — 이 다섯 개는 8번 규칙이 이미 내용을 지시한 대상이니 여기서는
+   반복하지 않습니다, **다만 key 이름이 정확히 일치하는지(오탈자 금지, system_sections
+   배열에 태그로 넣는 예전 방식과 혼동하지 말 것)만 제출 직전에 한 번 더 확인하세요.**
+   **2026-08-31 추가 — 타로가 포함된 티어(MASTER/PREMIUM)에서 타로 섹션을
+   빠뜨리는 사고가 실제로 있었습니다.** system_sections 배열을 제출하기 전에,
+   타로가 포함된 티어라면 system 필드에 "tarot"으로 태그된 섹션이 최소 1개 이상
+   있는지 반드시 확인하세요 — 사주ㆍ점성술 섹션이 충분히 많다고 해서 타로 섹션을
+   생략해도 되는 게 아닙니다, 타로는 별도로 반드시 있어야 하는 독립 섹션입니다.
 """
+
+# ============================================================================
+# 2026-08-30 추가 — build_system_prompt(): SYSTEM_PROMPT 조건부 조립.
+#
+# 목적은 SYSTEM_PROMPT 원문을 요약ㆍ수정하는 게 아니라, 이미 있는 원문 문자열을 규칙
+# 경계에서 "슬라이스"만 해서, 티어ㆍcomputed.json 필드 존재 여부에 따라 필요 없는 규칙
+# 블록을 통째로 빼는 것이다 — 내용을 다시 타이핑하지 않고 원문 문자열 자체를 정규식
+# split으로만 나누므로, 아래 _split_system_prompt_into_rule_blocks()가 반환하는 조각을
+# 원래 순서대로 다시 이으면 SYSTEM_PROMPT와 100% 바이트 단위로 같아야 한다(직접 assert로
+# 강제 — 이 검증이 깨지면 build_report.py import 자체가 실패한다, 조립이 틀린 채로 조용히
+# API 호출까지 가는 사고를 막기 위해 일부러 이렇게 함).
+#
+# 규칙 5/5-A/5-B("가장 중요한 규칙")는 이 조립 로직에서 절대 손대지 않는다 — 아래
+# _RULE_META에서 항상 tier_condition=_cond_always로 고정.
+# ============================================================================
+
+_TIER_MINI, _TIER_LIGHT, _TIER_SINGLE, _TIER_DUAL, _TIER_MASTER, _TIER_PREMIUM = (
+    "mini", "light", "single", "dual", "master", "premium",
+)
+_TIERS_WITH_QUESTIONS = frozenset(
+    {_TIER_LIGHT, _TIER_SINGLE, _TIER_DUAL, _TIER_MASTER, _TIER_PREMIUM}
+)
+_TIERS_SINGLE_PLUS = frozenset({_TIER_SINGLE, _TIER_DUAL, _TIER_MASTER, _TIER_PREMIUM})
+_TIERS_DUAL_PLUS = frozenset({_TIER_DUAL, _TIER_MASTER, _TIER_PREMIUM})
+_TIERS_MASTER_PLUS = frozenset({_TIER_MASTER, _TIER_PREMIUM})
+
+
+def _has_field(computed, *path):
+    """computed.json에서 dot-path 필드가 존재하고 None이 아닌지 확인.
+
+    예: _has_field(computed, "saju", "tojeong") == (computed.get("saju") or {}).get("tojeong") is not None
+    """
+    node = computed
+    for key in path:
+        if not isinstance(node, dict) or node.get(key) is None:
+            return False
+        node = node[key]
+    return True
+
+
+def _split_system_prompt_into_rule_blocks(source_text):
+    """SYSTEM_PROMPT 원문을 규칙 번호 경계에서 정확히 슬라이스한다(재타이핑 없음).
+
+    1단계: "N.", "N-X.", "N-X-N." 같은 최상위 규칙 번호로 시작하는 줄 앞에서만 나눈다
+    (본문 안의 "(1)", "10번 규칙"처럼 줄 시작이 아닌 숫자 참조는 매치되지 않음).
+    2단계: 규칙 8 안의 "- **scope..." 불릿들을 다시 그 앞에서 나눈다.
+    3단계: 규칙 8의 마지막 불릿 뒤에 붙어있는 "**공통 원칙" 문단을 따로 뗀다.
+
+    반환 직전 두 번의 재조립 검증(rule8 자체, 전체 SYSTEM_PROMPT)이 모두 원문과 완전히
+    같아야 통과한다 — 하나라도 다르면 AssertionError로 즉시 실패한다(원문 훼손 방지).
+    """
+    top_pat = re.compile(r"\n(?=\d{1,2}(?:-[A-Z](?:-\d)?)?\.\s)")
+    top = top_pat.split(source_text)
+    if len(top) != 34:
+        raise AssertionError(
+            f"SYSTEM_PROMPT 최상위 규칙 분할 개수가 34가 아님(실제 {len(top)}) — "
+            "규칙 번호 서식이 바뀐 것으로 보임, build_system_prompt() 분해 로직을 다시 확인할 것"
+        )
+
+    sub_pat = re.compile(r"\n(?=\s{0,6}-\s\*\*)")
+    rule8_sub = sub_pat.split(top[13])
+    if len(rule8_sub) != 9:
+        raise AssertionError(f"규칙8 세부 항목 분할 개수가 9가 아님(실제 {len(rule8_sub)})")
+
+    tail_pat = re.compile(r"\n(?=\s*\*\*공통 원칙)")
+    rule8_tail = tail_pat.split(rule8_sub[8])
+    if len(rule8_tail) != 2:
+        raise AssertionError(f"규칙8 공통원칙 분할 실패(실제 조각 수 {len(rule8_tail)})")
+
+    blocks = {
+        "preamble": top[0],
+        "r00": top[1], "r01": top[2], "r02": top[3], "r03": top[4], "r04": top[5],
+        "r04a": top[6], "r05": top[7], "r05a": top[8], "r05b": top[9],
+        "r5c": top[10],
+        "r06": top[11], "r07": top[12],
+        "r08_intro": rule8_sub[0], "r08_mini": rule8_sub[1], "r08_light": rule8_sub[2],
+        "r08_single": rule8_sub[3], "r08_dual": rule8_sub[4], "r08_master": rule8_sub[5],
+        "r08_premium": rule8_sub[6], "r08_gunghap_auto": rule8_sub[7],
+        "r08_new5_auto": rule8_tail[0], "r08_common_tail": rule8_tail[1],
+        "r09_main": top[14], "r09a_lts": top[15], "r09a1_behavior": top[16],
+        "r09b_action_plan": top[17], "r09c_opp_risk": top[18],
+        "r10_main": top[19], "r10a": top[20], "r10b": top[21], "r10c": top[22],
+        "r10d": top[23], "r10e": top[24], "r10f": top[25], "r10f1": top[26],
+        "r10g": top[27], "r10h": top[28], "r10i": top[29], "r10j": top[30],
+        "r10k": top[31], "r11": top[32],
+        "r12_schema_link": top[33],
+    }
+
+    rule8_rebuilt = "\n".join([
+        blocks["r08_intro"], blocks["r08_mini"], blocks["r08_light"], blocks["r08_single"],
+        blocks["r08_dual"], blocks["r08_master"], blocks["r08_premium"],
+        blocks["r08_gunghap_auto"], blocks["r08_new5_auto"], blocks["r08_common_tail"],
+    ])
+    if rule8_rebuilt != top[13]:
+        raise AssertionError("규칙8 세부 분할을 원래 순서로 재조립했는데 원문과 다름")
+
+    order = [
+        "preamble", "r00", "r01", "r02", "r03", "r04", "r04a", "r05", "r05a", "r05b",
+        "r5c",
+        "r06", "r07",
+        "r08_intro", "r08_mini", "r08_light", "r08_single", "r08_dual", "r08_master",
+        "r08_premium", "r08_gunghap_auto", "r08_new5_auto", "r08_common_tail",
+        "r09_main", "r09a_lts", "r09a1_behavior", "r09b_action_plan", "r09c_opp_risk",
+        "r10_main", "r10a", "r10b", "r10c", "r10d", "r10e", "r10f", "r10f1",
+        "r10g", "r10h", "r10i", "r10j", "r10k", "r11", "r12_schema_link",
+    ]
+    full_rebuilt = "\n".join(blocks[k] for k in order)
+    if full_rebuilt != source_text:
+        raise AssertionError(
+            "SYSTEM_PROMPT 전체 재조립이 원문과 다름 — 규칙 분해 로직이 원문을 훼손했을 "
+            "위험이 있어 build_system_prompt() 배포를 중단함"
+        )
+
+    return blocks, order
+
+
+def _cond_always(tier, computed):
+    return True
+
+
+def _cond_tier(allowed_tiers):
+    def _cond(tier, computed):
+        return tier in allowed_tiers
+    return _cond
+
+
+def _cond_tier_and_field(allowed_tiers, field_check):
+    def _cond(tier, computed):
+        return tier in allowed_tiers and field_check(computed)
+    return _cond
+
+
+# rule_id -> {tier_condition, classification, action, notes}
+#   classification: GLOBAL(티어ㆍ필드 무관 항상 필요) / TIER_DEPENDENT(scope별 분량 지시라
+#     티어 자체가 조건, 데이터 유무와 무관) / DATA_DEPENDENT(특정 필드가 있어야만 의미 있고
+#     없을 때의 안내가 규칙10 메인의 일반 redirected 처리로 충분히 커버됨) /
+#     DATA_DEPENDENT_WITH_FALLBACK(필드가 없을 때 어떻게 답하라는 지시까지 이 규칙 안에
+#     있어서, 필드 부재를 이유로 제거하면 그 fallback 안내까지 같이 사라짐 — 절대 필드
+#     부재만으로 제거하면 안 되는 유형, 규칙10-B 궁합 사례가 바로 이것).
+#   action: KEEP(항상 포함) / CONDITIONAL(티어ㆍ필드 조건부 포함) / UNRESOLVED(아직 근거
+#     불충분이라 안전하게 KEEP 유지 — 이번 작업에서는 해당 없음, 전부 엔진 코드로 검증됨).
+_RULE_META = {
+    "preamble": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+                 "notes": "오프닝ㆍ최우선철학ㆍ용어통일ㆍ핵심 인물상 지시 — 모든 티어 공통"},
+    "r00": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙0, JSON 따옴표 형식 — 모든 티어 공통(형식 문제, 내용 무관)"},
+    "r01": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙1, 사실 날조 금지 — 모든 티어 공통"},
+    "r02": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙2, 근거 추적 가능성 — 모든 티어 공통"},
+    "r03": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙3, correlation 필드 사용법 — 모든 티어 공통(mini도 correlation 계산됨)"},
+    "r04": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙4, 확정적 예언 금지 — 모든 티어 공통"},
+    "r04a": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+             "notes": "규칙4-A, 내부 개발 용어 노출 금지 — 모든 티어 공통"},
+    "r05": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙5, 글의 질적 목표 — 절대 압축ㆍ수정 금지(이 작업의 최우선 제약)"},
+    "r05a": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+             "notes": "규칙5-A, 말투ㆍ형식 — 절대 압축ㆍ수정 금지(이 작업의 최우선 제약)"},
+    "r05b": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+             "notes": "규칙5-B, 상담 글 구조 — 절대 압축ㆍ수정 금지(이 작업의 최우선 제약)"},
+    "r5c": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "2026-08-30 신설 규칙5-C — 반복 방지 구체화ㆍclosing 재탕 금지ㆍ"
+                     "종결어미 다양화ㆍ용어 밀도ㆍ비유 적용ㆍ낯선 표현 자제. 규칙5/5-A/5-B "
+                     "원문은 절대 안 건드리고 별도 신규 규칙으로 보완(STEP7 품질 분석 근거)."},
+    "r06": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙6, 업셀 톤 — 모든 티어 공통"},
+    "r07": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙7, 한자 금지 — 모든 티어 공통"},
+    "r08_intro": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+                  "notes": "규칙8 도입부 — system_sections 분할 원칙, 모든 티어 공통"},
+    "r08_mini": {"tier_condition": _cond_tier({_TIER_MINI}), "classification": "TIER_DEPENDENT",
+                 "action": "CONDITIONAL", "notes": "mini 전용 분량ㆍ깊이 지시"},
+    "r08_light": {"tier_condition": _cond_tier({_TIER_LIGHT}), "classification": "TIER_DEPENDENT",
+                  "action": "CONDITIONAL", "notes": "light 전용 분량ㆍ깊이 지시"},
+    "r08_single": {"tier_condition": _cond_tier(_TIERS_SINGLE_PLUS), "classification": "TIER_DEPENDENT",
+                   "action": "CONDITIONAL",
+                   "notes": "single 전용 지시 — dual/master/premium 문구가 '사주 4개(위와 동일)'로 "
+                            "이 블록을 직접 참조하므로 single 이상 전 티어에서 함께 포함해야 함"},
+    "r08_dual": {"tier_condition": _cond_tier(_TIERS_DUAL_PLUS), "classification": "TIER_DEPENDENT",
+                 "action": "CONDITIONAL",
+                 "notes": "dual 전용 지시(점성술+하우스 주인+토정비결 섹션) — master 문구가 "
+                          "'dual의 사주4+점성술4에 더해'로 이 블록을 참조하므로 dual 이상에서 포함"},
+    "r08_master": {"tier_condition": _cond_tier(_TIERS_MASTER_PLUS), "classification": "TIER_DEPENDENT",
+                   "action": "CONDITIONAL",
+                   "notes": "master 전용 지시(타로+육효/주역 섹션) — premium 문구가 "
+                            "'master의 모든 구성에 더해'로 참조하므로 master 이상에서 포함"},
+    "r08_premium": {"tier_condition": _cond_tier({_TIER_PREMIUM}), "classification": "TIER_DEPENDENT",
+                    "action": "CONDITIONAL", "notes": "premium 전용 지시(장기전략+새 참고시스템 5개 전부)"},
+    "r08_gunghap_auto": {
+        "tier_condition": _cond_tier_and_field(
+            _TIERS_SINGLE_PLUS, lambda c: _has_field(c, "gunghap") or _has_field(c, "astrology_synastry")
+        ),
+        "classification": "DATA_DEPENDENT", "action": "CONDITIONAL",
+        "notes": "궁합/시너스트리 전용 섹션 자동 포함 지시 — gunghap.js/synastry.js 확인 결과 "
+                 "gunghap은 파트너 생년월일 입력 시에만, astrology_synastry는 astrology 포함 티어에서 "
+                 "파트너 위경도까지 있을 때만 계산됨(run.js:100-164). 필드가 아예 없으면 '전용 섹션을 "
+                 "추가하라'는 이 지시 자체가 무의미하므로(쓸 섹션이 없음) 제거해도 안전함 — "
+                 "규칙10-B(Q&A 답변용)와 달리 이 블록엔 '필드 없을 때' fallback 지시가 없음",
+    },
+    "r08_new5_auto": {
+        "tier_condition": _cond_tier(_TIERS_DUAL_PLUS), "classification": "TIER_DEPENDENT",
+        "action": "CONDITIONAL",
+        "notes": "새 참고시스템 5개(성명학ㆍ풍수지리ㆍ토정비결ㆍ육효ㆍ택일) 전용 섹션 자동 포함 지시 — "
+                 "saju.js/run.js 확인 결과 이 5개 필드는 saju가 포함되면 티어 무관하게 항상 계산되지만"
+                 "(saju.js:169-173, run.js:82-93), '전용 섹션으로 자동 포함'하는 건 순수 상품 설계상 "
+                 "dual 이상만 대상(catalog.js:54-57 주석이 이를 명시) — 데이터 존재가 아니라 상품 "
+                 "설계가 조건이므로 TIER_DEPENDENT로 분류(규칙10-F-1의 Q&A 답변 가능 여부와는 다른 축)",
+    },
+    "r08_common_tail": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+                        "notes": "규칙8 공통 원칙(목표 분량은 최소 기준) — 모든 티어 공통"},
+    "r09_main": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+                 "notes": "규칙9, key_insight/takeaways — mini/light 생략 가능 문구가 이 블록 "
+                          "안에 이미 있으므로 항상 포함(생략 여부는 모델이 스스로 판단)"},
+    "r09a_lts": {"tier_condition": _cond_tier({_TIER_PREMIUM}), "classification": "TIER_DEPENDENT",
+                 "action": "CONDITIONAL", "notes": "규칙9-A, long_term_strategy — premium 전용"},
+    "r09a1_behavior": {
+        "tier_condition": _cond_tier_and_field({_TIER_PREMIUM}, lambda c: _has_field(c, "behavior")),
+        "classification": "DATA_DEPENDENT", "action": "CONDITIONAL",
+        "notes": "규칙9-A-1, behavior_dna — behavior 필드는 premium에서 고객이 실제로 15문항에 "
+                 "답했을 때만 계산됨(run.js:171-173). 필드 없으면 이 지시 자체가 다룰 대상이 없어 "
+                 "제거해도 안전(별도 fallback 문구 없음)",
+    },
+    "r09b_action_plan": {"tier_condition": _cond_tier(_TIERS_DUAL_PLUS), "classification": "TIER_DEPENDENT",
+                         "action": "CONDITIONAL",
+                         "notes": "규칙9-B, action_plan — full(single 제외)/premium이므로 dual 이상"},
+    "r09c_opp_risk": {"tier_condition": _cond_tier(_TIERS_SINGLE_PLUS), "classification": "TIER_DEPENDENT",
+                      "action": "CONDITIONAL",
+                      "notes": "규칙9-C, opportunities/risks — full/premium이므로 single 이상"},
+    "r10_main": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "GLOBAL",
+                 "action": "CONDITIONAL",
+                 "notes": "규칙10 메인 프레임워크 — mini는 질문을 아예 안 받으므로(catalog.js "
+                          "question_limit=0) 제거 안전, light 이상은 질문 존재 자체가 조건이라 GLOBAL"},
+    "r10a": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "GLOBAL",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-A, saju.correspondence — saju.js가 모든 티어에서 무조건 계산함"
+                      "(saju.js:161) → 필드 조건 아님, 질문 존재 여부만 조건"},
+    "r10b": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "DATA_DEPENDENT_WITH_FALLBACK",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-B, 궁합 — gunghap 필드가 없을 때도 'redirected로 답하라'는 fallback "
+                      "지시가 이 블록 안에 있음(build_report.py 원문 820번 줄 부근) → gunghap 필드 "
+                      "유무로 제거하면 절대 안 됨(과거 실수 사례), 질문 존재 여부만 조건"},
+    "r10c": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "DATA_DEPENDENT_WITH_FALLBACK",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-C, 신살 — saju.shensha는 모든 티어에서 무조건 계산되고(saju.js:164) "
+                      "present=false 처리까지 이 블록 안에 있음 → 질문 존재 여부만 조건"},
+    "r10d": {"tier_condition": _cond_tier_and_field(_TIERS_DUAL_PLUS, lambda c: _has_field(c, "astrology")),
+             "classification": "DATA_DEPENDENT", "action": "CONDITIONAL",
+             "notes": "규칙10-D, astrology.correspondence — astrology 필드는 dual 이상에서만 계산됨"
+                      "(catalog.js systems 배열, run.js:130). 필드 없을 때 fallback 문구가 이 블록에 "
+                      "없으므로(규칙10 메인의 일반 redirected 처리로 충분) 제거 안전"},
+    "r10e": {"tier_condition": _cond_tier_and_field(_TIERS_DUAL_PLUS, lambda c: _has_field(c, "astrology")),
+             "classification": "DATA_DEPENDENT", "action": "CONDITIONAL",
+             "notes": "규칙10-E, 시너스트리 — astrology_synastry는 astrology 포함 티어(dual 이상)에서 "
+                      "파트너 위경도까지 있을 때만 계산됨(run.js:145-164). astrology 자체가 없는 "
+                      "light/single에서는 이 블록이 다룰 여지가 전혀 없어 제거 안전. astrology는 있는데 "
+                      "synastry만 없는 경우의 안내는 이 블록 자체 텍스트가 포함하므로 dual 이상에서는 "
+                      "항상 포함(필드 유무로 더 세분화하지 않음)"},
+    "r10f": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "DATA_DEPENDENT_WITH_FALLBACK",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-F, 세운(올해 띠 운세) — saju.yearly_fortune은 모든 티어에서 필드 자체는 "
+                      "항상 존재(값이 null일 수 있음, saju.js:168/yearly-fortune.js). null일 때 안내 "
+                      "문구가 이 블록 안에 있으므로 질문 존재 여부만 조건"},
+    "r10f1": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "GLOBAL",
+              "action": "CONDITIONAL",
+              "notes": "규칙10-F-1 — 원문이 명시(878번 줄): 새 참고시스템 5개는 'light 이상 전 "
+                       "유료 티어에서 전부 direct로 답변 가능, 시스템 자체를 막지 않음'. saju.js/"
+                       "run.js 확인 결과도 이 5개 필드는 saju 포함 시 티어 무관 항상 계산됨(주의 — "
+                       "규칙8의 '전용 섹션 자동 포함'은 dual/master/premium만 해당하는 별개의 조건이니 "
+                       "혼동 금지, 이 규칙은 Q&A 답변 가능 여부만 다룸)"},
+    "r10g": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "DATA_DEPENDENT_WITH_FALLBACK",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-G, 토정비결 — saju.tojeong은 saju.js가 성별ㆍ티어 무관하게 항상 계산"
+                      "(saju.js:169-173, 생년월일만 있으면 됨). null일 때 안내 문구가 이 블록 안에 "
+                      "있으므로 질문 존재 여부만 조건(10-F-1과 동일 근거)"},
+    "r10h": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "DATA_DEPENDENT_WITH_FALLBACK",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-H, 성명학 — saju.seongmyeonghak도 saju 포함 시 티어 무관 항상 계산"
+                      "(run.js:82-84). null일 때(이름 2음절 미만) 안내 문구가 이 블록 안에 있음"},
+    "r10i": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "GLOBAL",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-I, 풍수 — saju.pungsu도 saju 포함 시 티어 무관 항상 계산(run.js:85-87)"},
+    "r10j": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "GLOBAL",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-J, 육효/주역 — saju.yukhyo도 saju 포함 시 티어 무관 항상 계산(run.js:88-90)"},
+    "r10k": {"tier_condition": _cond_tier(_TIERS_WITH_QUESTIONS), "classification": "GLOBAL",
+             "action": "CONDITIONAL",
+             "notes": "규칙10-K, 택일 — saju.taekil도 saju 포함 시 티어 무관 항상 계산(run.js:91-93)"},
+    "r11": {"tier_condition": _cond_always, "classification": "GLOBAL", "action": "KEEP",
+            "notes": "규칙11, toc_preview — full/premium 조건 자체가 이 블록 문구 안에 있으므로 "
+                     "항상 포함(mini/light는 null로 두라는 지시까지 포함해야 함)"},
+    "r12_schema_link": {
+        "tier_condition": _cond_tier(_TIERS_DUAL_PLUS), "classification": "TIER_DEPENDENT",
+        "action": "CONDITIONAL",
+        "notes": "2026-08-30 추가 — 규칙8의 새 참고시스템 5개 내용 지시와 REPORT_SCHEMA의 "
+                 "system enum 태그값을 명시적으로 연결하는 스키마 확인 문구. r08_new5_auto와 "
+                 "정확히 같은 tier_condition(dual 이상) 재사용 — 그 5개가 아예 해당 없는 "
+                 "mini/light/single에서는 불필요. 근본 원인 가설: SYSTEM_PROMPT 어디에도 "
+                 "'system 필드'/enum 문자열을 명시적으로 언급한 곳이 없어(grep 0건) 모델이 "
+                 "내용 지시와 태그 요구사항을 스스로 연결해야 했음 — 이 블록이 그 연결을 "
+                 "명시적으로 제공. 프롬프트 맨 끝(규칙11 뒤)에 배치해 recency 효과를 노림."
+    },
+}
+
+REQUIRED_RULE_IDS = frozenset({"r05", "r05a", "r05b"})
+
+_PROMPT_BLOCKS, _PROMPT_RULE_ORDER = _split_system_prompt_into_rule_blocks(SYSTEM_PROMPT)
+
+assert set(_PROMPT_BLOCKS.keys()) == set(_RULE_META.keys()), (
+    "규칙 텍스트 블록과 메타데이터의 rule_id 집합이 다름 — "
+    f"블록에만 있음: {set(_PROMPT_BLOCKS) - set(_RULE_META)}, "
+    f"메타데이터에만 있음: {set(_RULE_META) - set(_PROMPT_BLOCKS)}"
+)
+
+
+def build_system_prompt(tier, computed):
+    """SYSTEM_PROMPT를 tier/computed.json 조건에 맞춰 조건부로 조립해 반환한다.
+
+    원문 내용은 한 글자도 요약ㆍ수정하지 않는다 — _PROMPT_BLOCKS의 각 조각은
+    SYSTEM_PROMPT 원문을 정규식으로 슬라이스한 것 그대로이고, 이 함수는 그 중 이번
+    tier/computed에 필요한 조각만 원래 순서대로 골라 이어붙일 뿐이다. 규칙 5/5-A/5-B는
+    REQUIRED_RULE_IDS에 있어 tier_condition이 항상 True이므로 어떤 티어든 반드시 포함된다.
+    """
+    return "\n".join(
+        _PROMPT_BLOCKS[rule_id]
+        for rule_id in _PROMPT_RULE_ORDER
+        if _RULE_META[rule_id]["tier_condition"](tier, computed)
+    )
+
+
+def get_prompt_rule_manifest(tier, computed):
+    """이번 tier/computed 조합에서 각 규칙 블록이 포함됐는지 감사용으로 반환.
+
+    반환값: [{"rule_id", "included", "classification", "action", "notes", "text_len"}, ...]
+    (원래 순서 그대로) — BEFORE/AFTER 리포트ㆍ회귀 테스트가 이 함수 하나만 근거로 삼는다.
+    """
+    manifest = []
+    for rule_id in _PROMPT_RULE_ORDER:
+        meta = _RULE_META[rule_id]
+        included = meta["tier_condition"](tier, computed)
+        manifest.append({
+            "rule_id": rule_id,
+            "included": included,
+            "classification": meta["classification"],
+            "action": meta["action"],
+            "notes": meta["notes"],
+            "text_len": len(_PROMPT_BLOCKS[rule_id]),
+        })
+    return manifest
+
 
 REPORT_SCHEMA = {
     "name": "submit_report",
@@ -964,6 +1411,35 @@ REPORT_SCHEMA = {
                         },
                     },
                     "required": ["system", "heading", "body"],
+                },
+            },
+            # 2026-09-01 추가 — #3(D-2) 신규5개 시스템 생성 안정성. system_sections는
+            # 자유 배열+enum이라 "특정 system 값이 배열에 존재해야 한다"는 강제가
+            # 스키마에 없었다(코드 확인). 신규5개만 이 별도 object 필드로 옮겨, 존재
+            # 여부를 배열 스캔이 아니라 dict key 조회로 직접 판단할 수 있게 한다.
+            # system_sections는 하위호환을 위해 그대로 둔다 — LLM이 예전 방식대로
+            # system_sections에 직접 태그를 넣어도 _merge_new_reference_systems_into_
+            # sections()가 두 경로를 모두 인식해 중복 없이 병합한다. tier별 필수 여부는
+            # 스키마 required가 아니라 기존 _TIER_REQUIRED_NEW_SYSTEMS(애플리케이션
+            # 코드)가 그대로 담당한다 — REPORT_SCHEMA는 tier 무관 전역 고정값으로
+            # call_llm()에 전달되므로 스키마 자체에서 tier 조건부 required를 표현할
+            # 방법이 없다(억지로 구현하지 않는다는 설계 원칙).
+            "new_reference_systems": {
+                "type": "object",
+                "description": "성명학ㆍ풍수지리ㆍ토정비결ㆍ육효/주역ㆍ택일 5개 시스템 전용. "
+                                "8번 규칙이 안내한 티어 조건만큼의 key를 채우세요.",
+                "properties": {
+                    key: {
+                        "type": "object",
+                        "properties": {
+                            "heading": {"type": "string"},
+                            "body": {"type": "string"},
+                            "key_insight": {"type": "string"},
+                            "takeaways": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["heading", "body"],
+                    }
+                    for key in ("tojeong", "yukhyo", "seongmyeonghak", "pungsu", "taekil")
                 },
             },
             "cross_analysis": {
@@ -1066,11 +1542,20 @@ REPORT_SCHEMA = {
 
 
 def call_llm(computed):
+    _block_if_offline_test_mode("call_llm")
     client = anthropic.Anthropic()  # ANTHROPIC_API_KEY 환경변수 자동 사용
+    # 2026-08-30 추가 — API 비용 절감 2단계. computed 원본은 절대 건드리지 않고,
+    # project_computed()가 만든 별도 view(computed_projection.py)만 LLM에 전달한다 —
+    # 이 파일의 다른 모든 코드(check_*/ensure_*/verify_* 등)는 여전히 원본 computed를
+    # 그대로 쓴다. 제거 대상은 SYSTEM_PROMPT 어떤 규칙도 참조하지 않는다고 검증된 필드뿐
+    # (computed_projection.REMOVED_FIELD_MANIFEST의 evidence 참고, 티어별 절감률은
+    # 0.9%~12.2% 수준 — 이 자체로 API 비용 문제를 해결한 게 아니라 SYSTEM_PROMPT 절감과
+    # 합산해서 평가해야 하는 구조적 기반 작업).
+    llm_input_computed = computed_projection.project_computed(computed)
     user_message = (
         "아래는 한 고객의 크로스노틱스 계산 결과(computed.json)입니다. 이 데이터만 근거로 "
         "리포트를 작성해 submit_report 도구로 제출하세요.\n\n"
-        f"```json\n{json.dumps(computed, ensure_ascii=False, indent=2)}\n```"
+        f"```json\n{json.dumps(llm_input_computed, ensure_ascii=False, indent=2)}\n```"
     )
     # 2026-08-21: 8번ㆍ9번 규칙(모든 데이터 빠짐없이 다루기 + 질문답변 섹션) 추가 후
     # 4096->8192->16000까지 올렸는데도 마스터 티어(3체계+질문 3개)에서 16000마저 실제로
@@ -1097,7 +1582,7 @@ def call_llm(computed):
         model=MODEL,
         max_tokens=max_tokens,
         thinking={"type": "disabled"},
-        system=SYSTEM_PROMPT,
+        system=build_system_prompt(computed.get("tier"), computed),
         tools=[REPORT_SCHEMA],
         tool_choice={"type": "tool", "name": "submit_report"},
         messages=[{"role": "user", "content": user_message}],
@@ -1115,6 +1600,12 @@ def call_llm(computed):
             missing = [f for f in REPORT_SCHEMA["input_schema"]["required"] if f not in report]
             if missing:
                 raise RuntimeError(f"LLM 응답에 필수 필드 누락: {missing} — 이대로 저장/발송하면 안 됨")
+            # 2026-08-30 추가 — API usage 계측 3단계. 기존 반환값(report, response.usage)은
+            # 전혀 안 바뀜, 순수 관측용 로그만 추가.
+            api_usage.log_usage_record(api_usage.build_usage_record(
+                call_purpose="generation", model=MODEL, usage=response.usage,
+                tier=computed.get("tier"), thinking_disabled=True,
+            ))
             return report, response.usage
     raise RuntimeError("LLM이 submit_report 도구를 호출하지 않음 — 응답 확인 필요")
 
@@ -1142,13 +1633,19 @@ def _set_by_path(obj, path, value):
     obj[path[-1]] = value
 
 
-def build_targeted_rewrite_prompt(report, computed, path, reason):
-    """path(예: ("question_answers", 5, "body"))가 가리키는 필드 하나만 다시 쓰게 하는
-    최소 프롬프트를 만든다. 전체 report/computed를 다 넘기지 않고, 이 필드를 판단하는 데
-    필요한 최소 맥락만 골라 넘긴다(토큰ㆍ비용 절약 + "이 필드만 고치라"는 범위를 명확히
-    좁히는 효과 둘 다)."""
-    original_value = _get_by_path(report, path)
-    context = {"path": list(path), "original_value": original_value, "problem_found": reason}
+def build_targeted_rewrite_prompt(report, computed, path, paragraph_index, paragraphs, reason):
+    """path(예: ("question_answers", 5, "body"))가 가리키는 필드 중 paragraph_index번째
+    문단 하나만 다시 쓰게 하는 최소 프롬프트를 만든다.
+
+    2026-09-01 수정 — paragraph-level 폐쇄 루프 근본 원인 제거(§5). 예전엔 field 전체를
+    "원문"으로 넘기고 field 전체를 다시 쓰게 했으나, 그러면 rewrite/검증 단위가 Detection이
+    실제로 지목한 단위(quoted_sentence)보다 훨씬 커져서 같은 field 안 무관한 다른 문단의
+    기존 문제가 정상 rewrite까지 끌고 들어가는 사고가 실제 pilot에서 발생했다(single tier
+    Issue A). 이제 target_paragraph만 "원문/수정 대상"으로 주고, 나머지 문단은
+    reference_paragraphs로 명시적으로 분리해 "참고용ㆍ수정 금지"로 표시한다."""
+    target_paragraph = paragraphs[paragraph_index]
+    reference_paragraphs = [p for i, p in enumerate(paragraphs) if i != paragraph_index]
+    context = {"path": list(path), "target_paragraph": target_paragraph, "problem_found": reason}
 
     if path[0] == "question_answers":
         qa = _get_by_path(report, path[:-1])
@@ -1164,10 +1661,15 @@ def build_targeted_rewrite_prompt(report, computed, path, reason):
         context["heading"] = sec.get("heading")
 
     user_message = (
-        "아래는 이미 완성된 리포트 중 문제가 발견된 필드 하나입니다. 전체를 다시 쓰지 말고 "
-        "이 필드 하나만 다시 써서 submit_field_rewrite 도구로 제출하세요. 리포트의 다른 "
-        "부분은 이미 정상이니 손대지 마세요.\n\n"
+        "아래는 이미 완성된 리포트의 한 필드 중 문제가 발견된 문단(paragraph) 하나입니다. "
+        "target_paragraph 하나만 다시 써서 submit_field_rewrite 도구로 제출하세요. "
+        "reference_paragraphs는 같은 필드에 있는 다른 문단들입니다 — 문체ㆍ맥락 참고용일 "
+        "뿐이며, 그 내용을 반환하거나 고치면 안 됩니다. 반환값은 target_paragraph를 "
+        "대체할 새 문단 텍스트 하나여야 하고, 그 안에 빈 줄(문단 구분)을 새로 만들면 "
+        "안 됩니다.\n\n"
         f"[문제로 지적된 내용]\n{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
+        f"[같은 필드의 다른 문단 — 참고용, 수정 금지]\n"
+        f"{json.dumps(reference_paragraphs, ensure_ascii=False, indent=2)}\n\n"
         f"[이 손님의 전체 계산값 — 사실 근거로만 쓰고 새 사실을 지어내지 마세요]\n"
         f"```json\n{json.dumps(computed, ensure_ascii=False)}\n```"
     )
@@ -1188,6 +1690,7 @@ _FIELD_REWRITE_SCHEMA = {
 def _call_targeted_rewrite_llm(user_message):
     """실제 API 호출. 2026-08-30 기준 아직 실행 승인을 받지 않아 코드로만 존재 —
     호출하려면 사용자에게 먼저 물어볼 것(ask_before_spending_api_money)."""
+    _block_if_offline_test_mode("_call_targeted_rewrite_llm")
     client = anthropic.Anthropic()
     with client.messages.stream(
         model=MODEL,
@@ -1206,17 +1709,803 @@ def _call_targeted_rewrite_llm(user_message):
     raise RuntimeError("LLM이 submit_field_rewrite 도구를 호출하지 않음")
 
 
-def apply_targeted_rewrite(report, computed, path, reason, rewrite_fn=None):
-    """path가 가리키는 필드 하나만 최소 범위로 재작성해 그 자리에 갈아 끼운다(TARGETED-
-    REWRITE — 전체 재생성이 아님). rewrite_fn을 넘기면 그 함수를 대신 쓴다(테스트용 —
-    실제 API를 안 부르고 가짜 응답으로 splice-back 로직만 검증할 때 사용, dry_run 개념).
-    안 넘기면 실제 _call_targeted_rewrite_llm을 쓴다(비용 발생 — 호출 전 사용자 승인 필요)."""
+def apply_targeted_rewrite(report, computed, path, paragraph_index, reason, rewrite_fn=None):
+    """path가 가리키는 필드 중 paragraph_index번째 문단 하나만 최소 범위로 재작성한다
+    (TARGETED-REWRITE — 전체 재생성도, field 전체 재작성도 아님). rewrite_fn을 넘기면
+    그 함수를 대신 쓴다(테스트용). 안 넘기면 실제 _call_targeted_rewrite_llm을 쓴다
+    (비용 발생 — 호출 전 사용자 승인 필요).
+
+    2026-09-01 수정 — paragraph-level 폐쇄 루프 근본 원인 제거(§6/§13). 이제 report를
+    직접 수정하지 않는다. 예전엔 재작성 직후 여기서 바로 _set_by_path로 field 전체를
+    갈아 끼우고, 이후 검증(scope/groundedness/format_integrity)이 실패하면 호출부가
+    원본으로 되돌리는 구조였다. 하지만 그 검증들은 전부 텍스트 자체만 받아 판단하고
+    report 상태에 의존하지 않으므로("판단"과 "반영"이 원래 독립적), "모든 검증을 통과했을
+    때만 반영"으로 단순화한다 — report가 미검증 값을 한순간이라도 담는 경우 자체가 없어져
+    "원본 field는 절대 직접 수정하지 않는다"는 원칙을 더 강하게 만족한다. 실제 반영(splice)은
+    호출부(rewrite_and_validate_issue)가 전부 통과를 확인한 뒤 담당한다."""
     call = rewrite_fn or _call_targeted_rewrite_llm
-    user_message = build_targeted_rewrite_prompt(report, computed, path, reason)
-    new_value, usage = call(user_message)
-    old_value = _get_by_path(report, path)
-    _set_by_path(report, path, new_value)
-    return {"path": path, "old_value": old_value, "new_value": new_value, "reason": reason, "usage": usage}
+    field_text = _get_by_path(report, path)
+    paragraphs = field_text.split("\n\n")
+    original_paragraph = paragraphs[paragraph_index]
+    user_message = build_targeted_rewrite_prompt(report, computed, path, paragraph_index, paragraphs, reason)
+    new_paragraph, usage = call(user_message)
+    # 2026-08-30 추가 — API usage 계측 3단계. rewrite_fn이 테스트용 mock이면(rewrite_fn
+    # 인자로 넘어온 경우) 실제 API 응답이 아니므로 기록하지 않는다 — 이 함수 자체가
+    # 아직 실제 운영에서 호출되지 않는 미승인 기능이라, 실제로 호출될 때만(rewrite_fn 없이
+    # _call_targeted_rewrite_llm이 실행된 경우만) 기록한다.
+    if rewrite_fn is None:
+        api_usage.log_usage_record(api_usage.build_usage_record(
+            call_purpose="targeted_rewrite", model=MODEL, usage=usage,
+            tier=computed.get("tier"), thinking_disabled=True,
+        ))
+    return {"path": path, "paragraph_index": paragraph_index, "paragraphs": paragraphs,
+            "old_paragraph": original_paragraph, "new_paragraph": new_paragraph, "reason": reason, "usage": usage}
+
+
+# ============================================================================
+# 2026-09-01 추가 — 품질 개선 폐쇄 루프(#7~#14 공통원인 A/B 대응).
+#
+# 목적: "LLM에게 잘 쓰라고 지시"가 아니라 "생성 → 결정론적 감지 → 정확한 위치만
+# 재작성 → 검증 → 통과한 것만 채택" 구조. #16(tier 경계 강제)과 같은 원칙 — 프롬프트는
+# 지시일 뿐이고, 중요한 조건은 코드가 최종 판단한다.
+#
+# 이 블록 전체는 아직 main()에 배선되지 않았다 — _call_targeted_rewrite_llm과 동일한
+# 원칙(구현ㆍmock 검증까지만, 실행은 사용자 승인 후 별도 작업). regel5/5-A/5-B/5-C,
+# 규칙10, enforce_purchased_core_systems_present, _merge_new_reference_systems_into_
+# sections, normalize_to_schema, computed_projection.py, REPORT_SCHEMA 구조, tier
+# 정책, 기존 하드블록 로직 — 전부 이 블록에서 손대지 않는다.
+# ============================================================================
+
+# ---- STEP 1: 카테고리 9(내부 필드명 노출) 결정론적 탐지 — API 불필요 ----
+
+
+# 2026-09-01 — \b(단어 경계)는 유니코드 기준으로 한글도 "단어 문자"로 취급하기 때문에,
+# "oheng_count에"처럼 한국어 조사가 공백 없이 영단어 뒤에 바로 붙으면(교착어 특성상
+# 실제로 매우 흔함) 끝쪽 \b가 성립하지 않아 탐지를 놓친다(mock 테스트로 직접 재현
+# 확인). 그래서 "단어 경계"가 아니라 "라틴 알파벳/숫자/밑줄에 안 붙어있는가"만 앞뒤로
+# 확인한다 — 한글이 바로 붙어도 잡히고, 더 긴 식별자의 일부만 잘못 잘라 잡는 것만 막는다.
+_SNAKE_CASE_TOKEN_RE = re.compile(r"(?<![a-zA-Z0-9_])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![a-zA-Z0-9_])")
+_DOTTED_PATH_TOKEN_RE = re.compile(r"(?<![a-zA-Z0-9_.])[a-z_]+\.[a-z_]+(?![a-zA-Z0-9_.])")
+
+
+def collect_internal_field_key_names(computed):
+    """computed.json을 재귀 순회해 실제 존재하는 모든 dict key 이름을 모은다 — 카테고리9
+    탐지의 유일한 판정 근거. oheng_count/correspondence.dominant_oheng_lifestyle 같은
+    4개 문자열을 하드코딩하지 않고, computed.json에 실제로 있는 key와 일치할 때만
+    "내부 필드명"으로 판정한다(사용자 지시) — computed.json 구조가 바뀌어도(새 계산값
+    추가) 코드 수정 없이 자동으로 따라간다."""
+    keys = set()
+
+    def walk(obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                keys.add(k)
+                walk(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                walk(item)
+
+    walk(computed)
+    return keys
+
+
+def detect_internal_field_name_leaks(text, internal_keys):
+    """text 안에서 computed.json의 실제 key와 정확히 일치하는 스네이크케이스 토큰이나
+    점 표기 경로(예: correspondence.dominant_oheng_lifestyle)를 찾는다. 영어 단어라고
+    무조건 잡지 않는다 — internal_keys 집합과 일치할 때만 판정(오탐 방지, 사용자 지시)."""
+    if not isinstance(text, str) or not text:
+        return []
+    found = []
+    for m in _SNAKE_CASE_TOKEN_RE.finditer(text):
+        tok = m.group(0)
+        if tok in internal_keys:
+            found.append(tok)
+    for m in _DOTTED_PATH_TOKEN_RE.finditer(text):
+        tok = m.group(0)
+        parts = tok.split(".")
+        if len(parts) >= 2 and all(p in internal_keys for p in parts):
+            found.append(tok)
+    return found
+
+
+def scan_report_for_internal_field_leaks(report, internal_keys):
+    """report 전체(모든 문자열 필드)를 sanitize_report()와 같은 방식으로 재귀 순회하며
+    카테고리9 위반을 찾는다. 이번 단계는 탐지까지만(사용자 지시) — 제거/재작성은
+    별도 단계에서 결정."""
+    findings = []
+
+    def walk(obj, path):
+        if isinstance(obj, str):
+            tokens = detect_internal_field_name_leaks(obj, internal_keys)
+            if tokens:
+                findings.append({"path": tuple(path), "tokens": tokens})
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                walk(item, path + [i])
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                walk(v, path + [k])
+
+    walk(report, [])
+    return findings
+
+
+# ---- STEP 2: verify_naturalness() 구조화 출력 ----
+#
+# 판정 기준(9개 카테고리 정의ㆍ문구)은 기존과 완전히 동일하게 유지한다 — 바뀌는 건
+# "응답 형식"뿐이다(자유 텍스트 → 구조화 tool-call). 콘솔에 찍히는 사람이 읽는 요약도
+# 기존과 같은 문장 형태로 재구성해 그대로 유지한다.
+
+_REWRITABLE_SECTION_KINDS = {
+    # 2026-09-01 — action_plan/long_term_strategy는 하위 구조가 한 단계 더 깊어(steps/
+    # scripts/reflection_questions, decade_roadmap/lifetime_design/second_act/
+    # behavior_dna) section_kind+index+system_or_key+field 4개로는 정확히 못 짚는다.
+    # 이번 10회 naturalness 데이터에도 이 두 필드가 직접 지목된 사례가 없어(카테고리
+    # 1/5/6/7 어디에도 action_plan/long_term_strategy라는 section 이름이 없었음),
+    # 근거 없이 범위를 넓히지 않고 이번 단계 대상에서 제외한다(범위 최소화).
+    "intro": {"needs_index": False, "needs_key": False, "allowed_fields": None},
+    "closing": {"needs_index": False, "needs_key": False, "allowed_fields": None},
+    "system_sections": {"needs_index": True, "needs_key": False,
+                         "allowed_fields": {"heading", "body", "key_insight"}},
+    "new_reference_systems": {"needs_index": False, "needs_key": True,
+                               "allowed_fields": {"heading", "body", "key_insight"}},
+    "cross_analysis": {"needs_index": False, "needs_key": False, "allowed_fields": {"heading", "body"}},
+    "opportunities": {"needs_index": True, "needs_key": False, "allowed_fields": {"title", "body"}},
+    "risks": {"needs_index": True, "needs_key": False, "allowed_fields": {"title", "body"}},
+    # question은 고객이 실제로 남긴 원문이라 재작성 대상에서 제외 — body/unanswerable_
+    # reason만 허용.
+    "question_answers": {"needs_index": True, "needs_key": False,
+                          "allowed_fields": {"body", "unanswerable_reason"}},
+}
+
+_NATURALNESS_ISSUES_SCHEMA = {
+    "name": "submit_naturalness_issues",
+    "description": "표현 자연스러움 검토에서 발견한 문제를 구조화된 목록으로 제출한다. 문제가 없으면 issues를 빈 배열로 제출한다.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "issues": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "section_kind": {"type": "string", "enum": sorted(_REWRITABLE_SECTION_KINDS.keys())},
+                        "index": {"type": ["integer", "null"],
+                                  "description": "system_sections/opportunities/risks/question_answers일 때만 배열 인덱스(0부터 시작), 그 외엔 null"},
+                        "system_or_key": {"type": ["string", "null"],
+                                           "description": "new_reference_systems일 때만 해당 key(tojeong 등), 그 외엔 null"},
+                        "field": {"type": ["string", "null"],
+                                  "description": "intro/closing이면 null, 그 외엔 그 섹션의 실제 필드명(body/heading/title/unanswerable_reason 중 하나)"},
+                        "category": {"type": "integer", "minimum": 1, "maximum": 9},
+                        "quoted_sentence": {"type": "string", "description": "문제가 있는 부분을 원문에서 변형 없이 그대로 인용"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["section_kind", "category", "quoted_sentence", "reason"],
+                },
+            },
+        },
+        "required": ["issues"],
+    },
+}
+
+
+def _naturalness_prompt(report):
+    # 기존 verify_naturalness()의 1~9번 카테고리 정의와 완전히 동일(판정 기준 완화 금지 —
+    # 사용자 지시). 마지막 지시문만 "자유 텍스트로 나열"에서 "도구로 제출"로 바뀜.
+    return (
+        "아래는 사주 리포트 본문입니다. 사실 관계가 아니라 '표현이 자연스럽고 명확한가'만 "
+        "검토하세요.\n\n"
+        "2026-08-29 확장 — 처음엔 아래 1ㆍ2번만 잡았는데, 그 뒤에도 같은 계열의 다른 "
+        "실수(연결어미 오용, 지시어 모호성 등)가 실제로 또 나와서 검사 범위를 넓힘. "
+        "다음을 찾으세요:\n"
+        "1. '겉으로는 ~하지만 속으로는/사실은 ~' 같은 표면-본심 대비 문장인데, 왜 그 둘이 "
+        "반대되거나 긴장 관계인지 문장 안에서 설명되지 않은 경우(독자가 '그게 무슨 "
+        "뜻이지?'라고 되물어야 하는 경우)\n"
+        "2. '튀는 소리', '이중적인 결'같이 무엇을 가리키는지 구체적으로 안 밝혀진 "
+        "추상적ㆍ문학적 표현\n"
+        "3. '~지만', '~면서도' 같은 대조ㆍ양보 연결어미가, 실제로는 안 부딪히거나 "
+        "거의 같은 뜻인 두 내용 사이에 쓰인 경우(예: '단단하지만 잘 안 굽혀지는' — "
+        "둘 다 같은 성질의 다른 표현이라 대조가 아니라 겹말인 경우)\n"
+        "4. '이', '그', '이 둘' 같은 지시어가 가리키는 대상이 하나로 명확하지 않은 경우 "
+        "(특히 여러 특징이 나열된 뒤에 지시어로 뭉뚱그린 경우, 지시어가 그 특징 전체를 "
+        "가리키는지 일부만 가리키는지 헷갈리는 경우)\n"
+        "5. 사주ㆍ점성술ㆍ타로 용어(십신ㆍ어스펙트 등)를 종류별로 묶어 목록처럼 나열만 "
+        "하고 시작하는 문단(예: '조화로운 삼각 다수 — A-B, C-D...'처럼 근거를 먼저 "
+        "쭉 늘어놓고 그 다음에야 결론이 나오는 구조)\n"
+        "6. 결론(사람 얘기)보다 전문 근거(용어 설명)가 먼저 나오는 문단 — 근거부터 "
+        "설명하고 결론은 마지막에 오는 순서로 쓰인 경우\n"
+        "7. 계산값이나 용어를 언급만 하고, 그게 이 손님의 실제 삶에서 구체적으로 "
+        "어떻게 나타나는지(현실 장면)까지 안 이어간 문장 — 공식만 던지고 이 손님에게 "
+        "대입을 안 한 경우\n"
+        "8. 장점만 나열하고 그림자(부작용ㆍ대가)나 조언 없이 끝난 문단\n"
+        "9. '계산 데이터', '계산값', '분석 체계', '구조적으로 보면', '종합하면', "
+        "'기운의 흐름', '알고리즘' 같은 AI 분석 보고서 냄새가 나는 단어\n\n"
+        "문제를 찾으면 submit_naturalness_issues 도구로 제출하세요. 각 항목의 "
+        "section_kind는 반드시 다음 중 하나여야 합니다: "
+        f"{', '.join(sorted(_REWRITABLE_SECTION_KINDS.keys()))}. "
+        "quoted_sentence는 아래 리포트 본문에 실제로 있는 문장을 그대로(줄이거나 "
+        "바꾸지 않고) 인용하세요 — 나중에 코드가 이 문장이 실제 원문에 있는지 대조해서 "
+        "없으면 그 항목을 버립니다. 문제가 없으면 issues를 빈 배열로 제출하세요.\n\n"
+        f"[리포트 본문]\n```json\n{json.dumps(report, ensure_ascii=False)}\n```"
+    )
+
+
+# 2026-09-01 추가 — 실제 API 파일럿에서 확인된 사고 대응: 구조화 tool-call이
+# max_tokens=1536에서 실제로 잘렸는데(stop_reason=="max_tokens", tool input이 빈 {}),
+# 그걸 "issues 없음"으로 잘못 해석해 조용히 PASS를 반환했었다. 4096으로 우선 올리되,
+# 이 값을 최종 확정으로 보지 않는다(사용자 지시 — 이번 단계는 게이트 자체를 고치는
+# 것이지 이 숫자를 실측으로 확정하는 단계가 아님).
+_NATURALNESS_MAX_TOKENS = 4096
+
+
+def verify_naturalness(report, tier=None, call_fn=None):
+    """2026-08-29 추가 — 사용자가 실제 발송된 리포트 문장("겉으로는 튀는 소리를 내면서도
+    속으로는 결국 손에 잡히는 결과물을 원하는 이중적인 결")을 보고 지적: 사실은 안 틀렸는데
+    표면/본심을 대비시키는 문장이 그 대비의 근거를 안 밝혀서 헷갈리게 읽히고, "튀는 소리"
+    같은 추상적 표현이 뭘 가리키는지 안 밝혀져 있었음. verify_groundedness()는 사실 관계만
+    보므로 이 문제는 못 잡는다 — 표현 방식 전담 검증이 필요해서 신설.
+
+    같은 원칙: 경고만 남기고 발송을 막지 않으며, 이 함수가 실패해도 파이프라인은 절대 안
+    죽는다(이미 돈을 낸 리포트를 이 부가 검증 때문에 날리면 안 됨).
+
+    2026-09-01 수정 — #7~#14 품질개선 폐쇄루프 1단계. 자유 텍스트 대신 구조화된
+    tool-call로 문제 목록을 받는다(판정 기준 9개 카테고리는 완전히 동일, 문구도 그대로
+    유지 — 응답 "형식"만 바꿈).
+
+    2026-09-01 추가 수정 — Detection Gate. 실제 API 파일럿에서 구조화 응답이
+    max_tokens에서 잘려 빈 결과를 "검증 통과"로 잘못 반환한 사고가 실제로 발생함
+    (stop_reason=="max_tokens", tool input=={}). 이후로는 다음 4단계 순서로만
+    판정한다 — 중간 단계가 하나라도 실패하면 "issues 없음"으로 얼버무리지 않고
+    INCOMPLETE/ERROR로 명확히 구분해 반환한다:
+      1) stop_reason 확인 — "max_tokens"면 무조건 INCOMPLETE(추측 보정 금지)
+      2) tool_use 블록 존재 확인 — 없으면 ERROR
+      3) tool input에 "issues" 키가 실제로 있는지(스키마 완전성) — 없으면 INCOMPLETE
+      4) issues가 배열이고 각 원소가 dict인지 — 아니면 ERROR
+    이 네 단계를 전부 통과했을 때만 issues==[] -> PASS, issues>0 -> ISSUES_FOUND로
+    판정한다. 반환값이 list에서 dict({"status","issues","detail"})로 바뀜 — 호출부
+    (main())는 반환값을 쓰지 않으므로 이 변경으로 깨지지 않음.
+
+    call_fn을 넘기면 그 함수를 실제 API 대신 쓴다(테스트용 — apply_targeted_rewrite의
+    rewrite_fn과 동일한 패턴, resp 객체를 반환해야 함 — stop_reason 속성 포함). 안
+    넘기면 실제 API를 호출한다(비용 발생)."""
+    if call_fn is None:
+        _block_if_offline_test_mode("verify_naturalness")
+    try:
+        prompt = _naturalness_prompt(report)
+        if call_fn is not None:
+            resp = call_fn(prompt)
+        else:
+            client = anthropic.Anthropic()
+            # 2026-09-03 — GROUNDEDNESS_MODEL이 claude-sonnet-5로 바뀌면서 함께 필요해진
+            # 호환성 조정. call_llm()/_call_targeted_rewrite_llm()과 같은 이유(1575행
+            # 주석 참고) — sonnet-5는 thinking을 명시 안 하면 기본으로 적응형 사고가
+            # 켜지고, 그러면 이미 빠듯한 max_tokens 예산 일부를 사고에 먼저 써서 구조화
+            # 출력이 잘릴 위험이 커진다(이 함수 자체가 막으려는 사고와 같은 종류). 프롬프트ㆍ
+            # 스키마ㆍ판정 로직은 전혀 안 바꾸고 이 파라미터만 추가.
+            resp = client.messages.create(
+                model=GROUNDEDNESS_MODEL, max_tokens=_NATURALNESS_MAX_TOKENS,
+                thinking={"type": "disabled"},
+                tools=[_NATURALNESS_ISSUES_SCHEMA],
+                tool_choice={"type": "tool", "name": "submit_naturalness_issues"},
+                messages=[{"role": "user", "content": prompt}],
+            )
+            api_usage.log_usage_record(api_usage.build_usage_record(
+                call_purpose="verify_naturalness", model=GROUNDEDNESS_MODEL, usage=resp.usage,
+                tier=tier, thinking_disabled=True,
+            ))
+
+        # 1) stop_reason 확인 — 잘린 응답은 절대 PASS/ISSUES_FOUND가 될 수 없음
+        stop_reason = getattr(resp, "stop_reason", None)
+        if stop_reason == "max_tokens":
+            usage = getattr(resp, "usage", None)
+            out_tok = getattr(usage, "output_tokens", None)
+            print(
+                f"⚠ 경고: 자연스러움 검증 응답이 max_tokens에서 잘림(output_tokens={out_tok}) "
+                "— 검증이 완료되지 못함, 이 결과를 통과로 간주하지 말 것"
+            )
+            return {"status": "INCOMPLETE", "issues": [],
+                    "detail": f"stop_reason=max_tokens, output_tokens={out_tok}"}
+
+        # 2) tool_use 블록 존재 확인
+        tool_block = None
+        for block in resp.content:
+            if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "submit_naturalness_issues":
+                tool_block = block
+                break
+        if tool_block is None:
+            print("⚠ 경고: 자연스러움 검증에서 도구 호출을 찾지 못함 — 검증 실패")
+            return {"status": "ERROR", "issues": [], "detail": "tool_use 블록 없음"}
+
+        # 3) tool input 완전성(스키마 확인) — issues 키 자체가 없으면 잘렸거나 깨진 것
+        tool_input = tool_block.input
+        if not isinstance(tool_input, dict) or "issues" not in tool_input:
+            print(
+                f"⚠ 경고: 자연스러움 검증 응답이 불완전함(issues 필드 없음: {tool_input!r}) "
+                "— 검증이 완료되지 못함, 이 결과를 통과로 간주하지 말 것"
+            )
+            return {"status": "INCOMPLETE", "issues": [], "detail": f"tool input 불완전: {tool_input!r}"}
+
+        # 4) issues가 배열이고 각 원소가 dict인지
+        issues = tool_input["issues"]
+        if not isinstance(issues, list) or not all(isinstance(it, dict) for it in issues):
+            print("⚠ 경고: 자연스러움 검증 응답의 issues 형식이 올바르지 않음 — 검증 실패")
+            return {"status": "ERROR", "issues": [], "detail": f"issues 형식 오류: {issues!r}"}
+
+        # 여기까지 왔으면 응답이 완전하다 — 이제만 issues==[]를 진짜 PASS로 인정
+        if not issues:
+            print("✓ 표현 자연스러움 검증 통과(응답 완전히 완료됨, 이슈 없음)")
+            return {"status": "PASS", "issues": [], "detail": "검증 완료, 이슈 없음"}
+
+        print(
+            f"⚠ 경고: 표현이 헷갈리거나 부자연스러운 문장 발견({len(issues)}건) — "
+            "발송 전 반드시 사람이 확인할 것:"
+        )
+        for it in issues:
+            loc = str(it.get("section_kind", "?"))
+            if it.get("index") is not None:
+                loc += f"[{it['index']}]"
+            if it.get("system_or_key"):
+                loc += f".{it['system_or_key']}"
+            if it.get("field"):
+                loc += f".{it['field']}"
+            print(f"    - ({loc}) {it.get('quoted_sentence', '')!r} — {it.get('category')}번 항목: {it.get('reason', '')}")
+        return {"status": "ISSUES_FOUND", "issues": issues, "detail": f"{len(issues)}건 발견"}
+    except Exception as e:  # noqa: BLE001 — 이 검증이 죽어도 본 파이프라인은 계속돼야 함
+        print(f"⚠ 참고: 자연스러움 검증 호출 실패({e}) — 이 검증만 건너뜀, 리포트 생성 자체엔 영향 없음")
+        return {"status": "ERROR", "issues": [], "detail": str(e)}
+
+
+# ---- path 검증 — LLM이 만든 자유 path를 그대로 신뢰하지 않는다 ----
+
+_WS_RE_REWRITE_MATCH = re.compile(r"\s+")
+
+
+def _norm_ws_rewrite_match(s):
+    """quoted_sentence 위치 대조 전용 normalization. 공백 정규화에 더해, 인라인
+    마크다운 강조 기호(**)만 제거한다 — 2026-09-01, 실제 API 파일럿에서 확인된
+    사고 대응: 원문은 "...구조**로 볼 수 있습니다"처럼 문장 중간에 ** 가 걸쳐 있는데,
+    LLM이 quoted_sentence를 인용할 때 이 기호만 자연스럽게 빼고 인용하는 경우가
+    실제로 있었다(내용은 완전히 같은데 ** 유무만 다름) — 공백만 정규화하던 기존
+    로직은 이걸 "위치 특정 실패"로 오판해 유효한 issue를 부당하게 폐기했다.
+
+    이 함수는 오직 report 문자열과 quoted_sentence를 "비교할 때만" 쓰는 임시
+    정규화이고, report 원문 자체나 apply_targeted_rewrite에 넘어가는 실제 값은
+    전혀 건드리지 않는다 — ** 제거 외의 다른 차이(단어 추가/삭제/치환, 동의어,
+    유사도 등)는 지금까지와 똑같이 전부 불일치로 취급한다(의도적으로 좁은 허용
+    범위, 사용자 지시)."""
+    s = str(s or "").replace("**", "")
+    return _WS_RE_REWRITE_MATCH.sub(" ", s).strip()
+
+
+def resolve_naturalness_issue_path(report, issue):
+    """issue(section_kind/index/system_or_key/field/quoted_sentence)를 실제 report의
+    path 튜플로 조립하고 검증한다. section_kind+index+system_or_key+field 4개 값만
+    받아 코드가 닫힌 whitelist(_REWRITABLE_SECTION_KINDS)로 path를 조립한다 — LLM이
+    ["system_sections", 999, "body"] 같은 자유 path 문자열을 직접 만들게 하지 않는다
+    (사용자 지시).
+
+    하나라도 실패하면 (None, 실패사유)를 반환한다 — 비슷한 path를 찾아 추측 보정하지
+    않는다(사용자 지시 그대로)."""
+    if not isinstance(issue, dict):
+        return None, "issue가 dict가 아님"
+
+    kind = issue.get("section_kind")
+    spec = _REWRITABLE_SECTION_KINDS.get(kind)
+    if spec is None:
+        return None, f"허용되지 않은 section_kind: {kind!r}"
+
+    path = [kind]
+    if spec["needs_index"]:
+        idx = issue.get("index")
+        if not isinstance(idx, int) or isinstance(idx, bool):
+            return None, f"index가 정수가 아님: {idx!r}"
+        path.append(idx)
+    if spec["needs_key"]:
+        key = issue.get("system_or_key")
+        if not isinstance(key, str) or not key:
+            return None, f"system_or_key가 없음: {key!r}"
+        path.append(key)
+    if spec["allowed_fields"] is not None:
+        field = issue.get("field")
+        if field not in spec["allowed_fields"]:
+            return None, f"허용되지 않은 field: {field!r}(section_kind={kind!r})"
+        path.append(field)
+    path = tuple(path)
+
+    try:
+        value = _get_by_path(report, path)
+    except (KeyError, IndexError, TypeError) as e:
+        return None, f"path 접근 실패({type(e).__name__}): {path}"
+
+    if not isinstance(value, str):
+        return None, f"대상 값이 문자열이 아님(실제: {type(value).__name__}), path={path}"
+
+    quoted = issue.get("quoted_sentence")
+    if not isinstance(quoted, str) or not quoted.strip():
+        return None, "quoted_sentence가 없음"
+    if _norm_ws_rewrite_match(quoted) not in _norm_ws_rewrite_match(value):
+        return None, "quoted_sentence가 실제 필드 원문에 없음(위치 특정 실패)"
+
+    return path, None
+
+
+def locate_target_paragraph(field_text, quoted_sentence):
+    """field_text를 "\n\n" 기준 문단으로 나누고, quoted_sentence가 정확히 몇 개의
+    문단에 들어있는지 확인한다 — resolve_naturalness_issue_path()가 확보한 "field 존재"
+    검증 다음 단계로, quoted_sentence가 실제로 가리키는 최소 수정 단위(문단)를 찾는다.
+
+    2026-09-01 추가 — paragraph-level 폐쇄 루프 근본 원인 제거(§4). 문단 분리ㆍ판정은
+    전부 기존 로직 재사용(_is_content_paragraph, _norm_ws_rewrite_match) — 새 정규화ㆍ
+    새 유사도 판정을 만들지 않는다.
+
+    반환: (index, paragraphs, matched_count, err).
+      - 정확히 1개 문단에 매칭 -> (그 index, 전체 paragraphs 리스트, 1, None)
+      - 0개 매칭 -> (None, paragraphs, 0, "NOT_FOUND: ...")
+      - 2개 이상 매칭 -> (None, paragraphs, N, "AMBIGUOUS: ...") — 추측 금지, 임의로
+        첫 번째를 고르지 않는다(사용자 지시 원칙 3/5).
+    matched_count는 실패 시에도 항상 반환한다 — 진단ㆍ테스트에서 "몇 개에 매칭됐는지"를
+    accepted 여부와 무관하게 확인할 수 있어야 하므로(사용자 지시 §15)."""
+    paragraphs = field_text.split("\n\n")
+    quoted_norm = _norm_ws_rewrite_match(quoted_sentence)
+    matches = [
+        i for i, p in enumerate(paragraphs)
+        if _is_content_paragraph(p) and quoted_norm in _norm_ws_rewrite_match(p)
+    ]
+    if len(matches) == 1:
+        return matches[0], paragraphs, 1, None
+    if len(matches) == 0:
+        return None, paragraphs, 0, "NOT_FOUND: quoted_sentence가 어느 문단에도 없음"
+    return None, paragraphs, len(matches), f"AMBIGUOUS: {len(matches)}개 문단에 매칭됨(임의 선택 금지)"
+
+
+# ---- STEP 3: targeted rewrite 폐쇄 루프 — 결과를 자동으로 신뢰하지 않는다 ----
+
+DEFAULT_MAX_REWRITES_PER_FIELD = 1  # 필드당 재시도 없음 — 실패하면 그걸로 끝, 무한 루프 방지
+
+# 2026-09-01 — 리포트당 상한. 근거: 10회 naturalness 재분석에서 카테고리 1/5/6/7(재작성
+# 대상)만 센 리포트당 평균은 4.2건(42/10), 관찰된 최댓값은 9건(single/master 실행분).
+# 상한을 최댓값(9)으로 두면 비용 통제 의미가 옅어지고, 평균(4.2) 그대로 두면 편차가 큰
+# 리포트에서 개선이 덜 미친다 — 평균에 여유분을 더한 6을 제안값으로 둔다. 확정된 값이
+# 아니라 실제 pilot 이후 재조정을 전제로 한 초기값(사용자 지시대로 임의 확정 안 함).
+DEFAULT_MAX_REWRITES_PER_REPORT = 6
+
+
+def _rewrite_within_reasonable_scope(original, rewritten):
+    """재작성 결과가 원문과 지나치게 다른 분량이면(지시 범위를 벗어난 과도한 재작성일
+    가능성) False를 반환한다.
+
+    2026-09-01 — 중요한 한계를 그대로 밝힘: _call_targeted_rewrite_llm이 아직 한 번도
+    실제로 실행된 적이 없어(미승인), 실제 재작성 결과 데이터로 임계값을 도출할 수
+    없었다. 아래 0.5~2.0배는 "원문의 절반 미만이거나 두 배를 넘으면 의심스럽다"는
+    보수적인 초기값일 뿐 실측 근거는 아니다 — 실제 API pilot 이후 재조정이 반드시
+    필요하다(사용자 지시: 기준을 확정하기 어려우면 구현 전에 보고할 것 — 코드에는
+    넣되 이 한계를 명시적으로 남긴다)."""
+    if not original or not rewritten:
+        return False
+    ratio = len(rewritten) / len(original)
+    return 0.5 <= ratio <= 2.0
+
+
+def _field_groundedness_prompt(computed, field_text):
+    """2026-09-01 수정 — ROOT CAUSE B 대응(STEP 2 실제 pilot: 계산값에 shi_shen_zhi=
+    ["편재","칠살(편관)"]가 실제로 있었는데도, groundedness가 scalar shi_shen_gan="정관"만
+    보고 "편재는 년주에 없다"고 오판해 정상 rewrite가 rollback됨 — computed 데이터 자체는
+    누락 없이 전달되고 있었음을 로그/fixture로 직접 확인했고, 원인은 이 프롬프트가
+    shi_shen_gan/shi_shen_zhi 두 필드의 의미ㆍ관계를 전혀 설명하지 않아 모델이 어느
+    필드를 봐야 하는지 판단할 근거가 없었던 것으로 특정됨(사전 조사, 코드 미변경 상태로
+    로그ㆍfixture 대조 완료).
+
+    computed 전체를 그대로 넘기는 기존 계약, "OK"/한 문장 출력 계약은 그대로 유지 —
+    추가하는 건 sipsin 필드 두 개의 관계를 읽는 법과, "list 중 하나만 언급"과 "유일값
+    단정/list 전체 왜곡"을 구분하라는 지시뿐이다. 과거 pilot(월주/비견 사례 — shi_shen_zhi
+    list 중 하나만 narrate한 걸 "list 전체를 대표"한다고 오판한 사례)도 이 구분으로
+    같이 다룬다. 기준을 느슨하게 만드는 게 목적이 아니므로, computed에 없는 값ㆍ다른
+    기둥의 값ㆍlist에 없는 값ㆍ유일값으로 왜곡한 경우는 여전히 FAIL 대상임을 명시한다."""
+    return (
+        "아래 문장 하나가 계산값과 어긋나는 구체적 사실을 담고 있는지만 확인하세요. "
+        "문체ㆍ표현은 평가 대상이 아닙니다.\n\n"
+        "[십신 필드 읽는 법 — 사주 기둥(년주/월주/일주/시주) 관련 주장에만 해당]\n"
+        "각 기둥의 shi_shen_gan은 그 기둥 천간의 십신 하나이고, shi_shen_zhi는 그 기둥 "
+        "지지ㆍ지장간에서 나오는 십신 목록으로 여러 개일 수 있습니다. \"OO주의 XX(십신)\" "
+        "같은 표현을 검증할 때는 shi_shen_gan만이 아니라 shi_shen_zhi도 함께 확인하세요. "
+        "shi_shen_zhi 목록 중 하나만 언급하는 것은 그 자체로 근거 없음이 아닙니다 — 다만 "
+        "문장이 그 하나를 \"그 기둥의 유일한 십신\"이라고 단정하거나, 목록의 나머지가 "
+        "없다고 말하거나, 목록 전체를 그 하나와 동일시하면 그 부분은 여전히 근거 없는 "
+        "주장입니다. 계산값에 없는 값, 다른 기둥의 값을 가져다 쓴 경우도 마찬가지로 "
+        "근거 없는 주장입니다.\n\n"
+        f"[계산값]\n```json\n{json.dumps(computed, ensure_ascii=False)}\n```\n\n"
+        f"[검토할 문장]\n{field_text}\n\n"
+        "계산값과 어긋나거나 근거 없는 구체적 주장이 없으면 \"OK\"라고만 답하세요. "
+        "있으면 무엇이 문제인지 한 문장으로 답하세요."
+    )
+
+
+def verify_field_groundedness(computed, field_text, call_fn=None):
+    """apply_targeted_rewrite() 결과 하나만 대상으로 하는 축소판 groundedness 검사.
+    verify_groundedness()처럼 report 전체를 다시 보내지 않고, 이 필드+computed.json만
+    보낸다(토큰ㆍ비용 절약 — 사용자 지시).
+
+    call_fn을 넘기면 그 함수를 실제 API 대신 쓴다(테스트용, prompt를 받아 결과 텍스트를
+    반환해야 함). 안 넘기면 실제 API를 호출한다(비용 발생)."""
+    if call_fn is None:
+        _block_if_offline_test_mode("verify_field_groundedness")
+    try:
+        prompt = _field_groundedness_prompt(computed, field_text)
+        if call_fn is not None:
+            result_text = call_fn(prompt)
+        else:
+            client = anthropic.Anthropic()
+            # 2026-09-03 — sonnet-5 호환성 조정(위 verify_naturalness와 동일 이유). 이
+            # 호출은 max_tokens=256으로 특히 여유가 없어, thinking이 조용히 켜지면 짧은
+            # "OK"/사유 문장 자체가 잘릴 위험이 더 크다.
+            resp = client.messages.create(
+                model=GROUNDEDNESS_MODEL, max_tokens=256,
+                thinking={"type": "disabled"},
+                messages=[{"role": "user", "content": prompt}],
+            )
+            api_usage.log_usage_record(api_usage.build_usage_record(
+                call_purpose="field_groundedness", model=GROUNDEDNESS_MODEL, usage=resp.usage,
+                tier=None, thinking_disabled=True,
+            ))
+            result_text = "".join(
+                b.text for b in resp.content if getattr(b, "type", None) == "text"
+            ).strip()
+        return result_text.upper().startswith("OK"), result_text
+    except Exception as e:  # noqa: BLE001 — 이 검증도 죽으면 안 됨(호출부가 안전 쪽으로 처리)
+        return False, f"검증 호출 실패: {e}"
+
+
+# 2026-09-01 추가 — 실제 targeted rewrite 파일럿(2회차)에서 재현된 사고 대응: groundedness/
+# scope를 전부 통과한 rewrite 결과 문자열 끝에 "</new_value>\n</invoke>\n"라는 도구
+# 호출 프로토콜 잔재가 그대로 섞여 있었다. 4개 태그만 하드코딩하지 않고, "이 파이프라인
+# 자신의 tool-call 스키마가 실제로 쓰는 예약어"(_FIELD_REWRITE_SCHEMA의 도구/파라미터
+# 이름)에 일반적인 agentic tool-use 프로토콜의 구조 태그명을 더한 것을 기준 집합으로
+# 삼는다 — category9(내부 필드명 노출)와 같은 설계 원칙("소스에서 파생, 하드코딩 최소화").
+_TOOL_PROTOCOL_TAG_NAMES = frozenset({
+    "invoke", "parameter", "parameters", "function_calls", "function_results",
+    "tool_call", "tool_use", "tool_result", "tool_calls",
+    "antml:invoke", "antml:parameter", "antml:function_calls", "antml:function_results",
+}) | {_FIELD_REWRITE_SCHEMA["name"]} | set(_FIELD_REWRITE_SCHEMA["input_schema"]["properties"].keys())
+
+# 열림/닫힘 태그 형태("<이름 ...>" 또는 "</이름>")만 잡는다 — 문장 속에 우연히 등장하는
+# "<"/">" 낱개 기호나 마크다운(**)은 애초에 이 정규식의 태그 모양 자체와 안 맞아 매치되지
+# 않는다(사용자 지시: 정상 콘텐츠를 과도하게 차단하지 않을 것).
+_XML_TAG_RE = re.compile(r"</?([a-zA-Z][a-zA-Z0-9_:.\-]*)\b[^>]*>")
+
+
+def check_format_integrity(text):
+    """rewrite 결과 문자열에 tool-call/XML 프로토콜 잔재가 섞여 있는지 결정론적으로
+    검사한다(LLM에게 판단시키지 않음, 사용자 지시). 태그 이름이 _TOOL_PROTOCOL_TAG_NAMES와
+    일치할 때만 오염으로 판정 — 일반 텍스트의 "<"/">" 기호나 마크다운 강조는 태그 모양
+    자체가 아니라서 애초에 매치되지 않는다.
+
+    반환: {"passed": bool, "reason": str, "matched_pattern": str|None}"""
+    if not isinstance(text, str) or not text:
+        return {"passed": True, "reason": "", "matched_pattern": None}
+    for m in _XML_TAG_RE.finditer(text):
+        tag_name = m.group(1).lower()
+        if tag_name in _TOOL_PROTOCOL_TAG_NAMES:
+            return {
+                "passed": False,
+                "reason": "tool-call protocol residue detected",
+                "matched_pattern": m.group(0),
+            }
+    return {"passed": True, "reason": "", "matched_pattern": None}
+
+
+def rewrite_and_validate_issue(report, computed, issue, rewrite_fn=None, groundedness_call_fn=None):
+    """감지된 naturalness issue 하나를 대상으로 path 검증 → paragraph 위치 확정 → 재작성
+    → 검증(타입ㆍparagraph 경계ㆍ변경범위ㆍparagraph-level groundednessㆍformat integrity)
+    → 채택/롤백까지 전부 수행한다. 검증을 전부 통과했을 때만 report에 반영한다(실패하면
+    report는 애초에 손도 대지 않은 상태로 남는다 — apply_targeted_rewrite 참고).
+
+    2026-09-01 수정 — paragraph-level 폐쇄 루프 근본 원인 제거. 예전엔 field 전체를
+    수정ㆍ검증 단위로 삼아서, 같은 field 안 무관한 다른 문단의 기존 문제가 정상 rewrite
+    까지 rollback시키는 사고가 실제 pilot(single tier Issue A)에서 발생했다. 이제
+    quoted_sentence가 실제로 속한 문단 하나만 확정해(locate_target_paragraph) 그 문단만
+    재작성ㆍ검증ㆍ반영한다 — 나머지 문단은 splice 구조상 코드가 건드릴 방법 자체가 없다
+    (LLM의 "손대지 말라"는 지시 준수 여부에 의존하지 않음).
+
+    반환: {"accepted": bool, "path": tuple|None, "stage": str, "reason": str,
+           "new_value": str|None(=새 paragraph), "paragraph_index": int|None,
+           "matched_paragraph_count": int, ...}. 실패해도 실제 API가 생성한 new_value
+    (paragraph 텍스트)를 반환값에 남긴다(진단ㆍ로그ㆍ테스트용) — report 자체에는 반영하지
+    않는다. 모든 실패 경로에서 new_value/paragraph_index/matched_paragraph_count 키가
+    항상 존재하도록 채워, 호출부가 매번 `.get` 없이 일관되게 다룰 수 있게 한다."""
+    path, err = resolve_naturalness_issue_path(report, issue)
+    if path is None:
+        return {"accepted": False, "path": None, "stage": "path_resolution", "reason": err,
+                "new_value": None, "paragraph_index": None, "matched_paragraph_count": 0}
+
+    field_text = _get_by_path(report, path)
+    paragraph_index, paragraphs, matched_count, loc_err = locate_target_paragraph(
+        field_text, issue.get("quoted_sentence", ""),
+    )
+    if paragraph_index is None:
+        return {"accepted": False, "path": path, "stage": "paragraph_location", "reason": loc_err,
+                "new_value": None, "paragraph_index": None, "matched_paragraph_count": matched_count}
+
+    original_paragraph = paragraphs[paragraph_index]
+
+    result = apply_targeted_rewrite(
+        report, computed, path, paragraph_index, issue.get("reason", ""), rewrite_fn=rewrite_fn,
+    )
+    new_paragraph = result["new_paragraph"]
+
+    def _fail(stage, reason, **extra):
+        return {"accepted": False, "path": path, "stage": stage, "reason": reason,
+                "new_value": new_paragraph, "paragraph_index": paragraph_index,
+                "matched_paragraph_count": matched_count, **extra}
+
+    # 검사 A — 문자열 여부
+    if not isinstance(new_paragraph, str) or not new_paragraph.strip():
+        return _fail("type_check",
+                      f"rewrite 결과가 문자열이 아니거나 비어있음(실제: {type(new_paragraph).__name__})")
+
+    # 검사 신규 — paragraph 경계 침범(§10). LLM이 반환한 문단 안에 새 빈 줄("\n\n")이
+    # 생기면 paragraph-level 계약(반환값은 정확히 문단 하나) 위반 — 추측으로 다시
+    # 분할해 여러 문단에 적용하지 않고 fail-closed 처리한다.
+    if "\n\n" in new_paragraph:
+        return _fail("paragraph_structure", "rewrite 결과에 빈 줄(문단 구분)이 새로 생겨 paragraph 경계를 침범함")
+
+    # 검사 E — 변경 범위(길이 비율). 이제 field 전체가 아니라 문단 대 문단으로 비교한다
+    # (§8 — 함수/임계값 자체는 무수정, 비교 대상만 축소).
+    if not _rewrite_within_reasonable_scope(original_paragraph, new_paragraph):
+        return _fail("scope_check",
+                      f"길이 비율이 허용 범위 밖(원본 문단 {len(original_paragraph)}자 -> 신규 {len(new_paragraph)}자)")
+
+    # 검사 C — paragraph-level groundedness(§7). 다른 문단은 애초에 이 프롬프트에
+    # 실리지 않으므로, 다른 문단의 기존 오류가 이 결과에 영향을 줄 수 없다.
+    ok, detail = verify_field_groundedness(computed, new_paragraph, call_fn=groundedness_call_fn)
+    if not ok:
+        return _fail("groundedness", detail)
+
+    # 검사 D — Format Integrity(§9), 이제 문단 대상. 함수 자체는 무수정.
+    integrity = check_format_integrity(new_paragraph)
+    if not integrity["passed"]:
+        return _fail("format_integrity", integrity["reason"], matched_pattern=integrity["matched_pattern"])
+
+    # 전부 통과 — 이제야 report에 실제로 반영한다(splice-back, §6). 다른 문단은 이
+    # join 대상 리스트 안에서 인덱스만 유지된 채 원본 그대로 남는다 — 코드 구조상
+    # target 문단 외에는 물리적으로 바뀔 방법이 없다.
+    paragraphs[paragraph_index] = new_paragraph
+    _set_by_path(report, path, "\n\n".join(paragraphs))
+
+    return {"accepted": True, "path": path, "old_value": original_paragraph, "new_value": new_paragraph,
+            "paragraph_index": paragraph_index, "matched_paragraph_count": matched_count}
+
+
+_ISSUE_ECHO_FIELDS = ("category", "quoted_sentence", "section_kind", "index", "system_or_key", "field")
+
+# 이 폐쇄 루프가 처리하지 못한 issue의 결과에도 항상 채워 넣는 공통 필드 —
+# rewrite_and_validate_issue()의 성공/실패 반환 shape과 동일한 키 집합을 유지해
+# 호출부가 "이 issue는 어떤 stage를 거쳤나"만 보고 성공/실패 결과 전체를 일관되게
+# 다룰 수 있게 한다(사용자 지시 — issue가 결과에서 사라지면 안 됨).
+_UNATTEMPTED_RESULT_BASE = {
+    "path": None, "new_value": None, "paragraph_index": None, "matched_paragraph_count": 0,
+}
+
+
+def _echo_issue_fields(issue):
+    return {k: issue.get(k) for k in _ISSUE_ECHO_FIELDS}
+
+
+# 2026-09-03 — 이전엔 target_categories 기본값이 (1,5,6,7)(근거ㆍ연결 부족 계열,
+# 실제 경고의 58.3%)로 좁혀져 있었다. 이건 "카테고리 2/3/4/8은 이 구조로 못 고친다"는
+# 기술적 제약이 아니라, 가장 큰 공통원인 묶음부터 먼저 닫힌 루프를 검증하기 위한
+# 범위 결정이었다(사용자 지시로 재확인) — rewrite/scope/groundedness/format_integrity
+# 전부 category 번호를 전혀 참조하지 않는 범용 로직이고, issue.reason이 그대로
+# rewrite 프롬프트의 "문제로 지적된 내용"에 실리므로 카테고리 2(추상적 표현)ㆍ
+# 3(대조어미 오용/겹말)ㆍ4(지시어 모호)ㆍ8(장점만 나열)도 구조적으로 동일하게
+# 처리 가능함을 코드 추적+mock 전체 경로 테스트(Test CAT2~CAT8)로 확인했다.
+# 카테고리 9(내부 필드명 노출)만 계속 제외한다 — scan_report_for_internal_field_leaks()
+# 라는 별도의, 더 정밀한(정확한 key 이름 대조) 결정론적 경로가 이미 있고, 이 범용
+# LLM rewrite 경로로 중복 처리하면 두 메커니즘이 서로 다른 판정을 내릴 여지만 생긴다
+# (기존 세션에서 이미 결정된 "카테고리9는 별도 경로" 설계를 그대로 유지).
+_ALL_REWRITABLE_NATURALNESS_CATEGORIES = (1, 2, 3, 4, 5, 6, 7, 8)
+
+
+def run_targeted_rewrite_pass(report, computed, issues, rewrite_fn=None, groundedness_call_fn=None,
+                               target_categories=_ALL_REWRITABLE_NATURALNESS_CATEGORIES,
+                               max_rewrites_per_report=DEFAULT_MAX_REWRITES_PER_REPORT):
+    """구조화된 naturalness issues 중 target_categories(기본 1~8 전부 — 카테고리 9만
+    제외)만 골라 상한 안에서 하나씩 rewrite_and_validate_issue()에 넘긴다. 필드당
+    재시도 없음(DEFAULT_MAX_REWRITES_PER_FIELD=1) — 실패하면 그 필드는 원문 그대로
+    두고 다음으로 넘어간다. 카테고리 9는 대상에서 제외(별도 결정론적 경로,
+    scan_report_for_internal_field_leaks 참고, _ALL_REWRITABLE_NATURALNESS_CATEGORIES
+    설명 참고) — 이 폐쇄 루프가 다루지 않는 카테고리는 "out_of_scope_category"로
+    명시 기록한다(2026-09-03 이전엔 1/5/6/7만 대상이라 2/3/4/8도 여기 해당했으나,
+    구조 조사+mock 전체 경로 검증 후 전부 대상에 포함시킴 — 이제 실제로 이 stage에
+    도달하는 건 category 9뿐).
+
+    2026-09-02 수정 — 품질 원칙 강화: 이전엔 category 불일치(continue)나
+    max_rewrites_per_report 초과(break) 시 그 issue가 반환값에서 그냥 사라졌다
+    (추적 불가능한 silent 누락 — "일부만 처리하고 나머지는 결과에서 사라지는 경로"가
+    실제로 존재했음). 또한 rewrite_and_validate_issue() 안에서 예외가 발생하면
+    이 함수 전체가 죽어서, 이미 처리된 결과까지 포함해 아무것도 반환되지 않고
+    이후 issue 전부가 함께 사라졌다(verify_naturalness/verify_field_groundedness는
+    자기 자신을 try/except로 감싸 파이프라인을 안 죽이는 원칙을 이미 따르고 있었는데
+    이 함수만 그 원칙이 빠져 있었음).
+
+    이제 반환값은 issues와 **정확히 같은 길이**이며, 원소 하나하나가 항상 다음 중
+    하나의 stage를 갖는다 — 어떤 경우에도 issue가 사라지지 않는다:
+      - accepted=True (성공)
+      - rewrite_and_validate_issue()의 기존 실패 stage들(type_check/paragraph_structure/
+        scope_check/groundedness/format_integrity/paragraph_location/path_resolution)
+      - "out_of_scope_category" — target_categories 밖(사람이 검토해야 함, 자동 해결
+        대상이 아님을 명시. category 9도 여기 포함 — 별도 결정론적 경로가 있다고 해서
+        이 함수의 issues 인자에 섞여 들어온 것까지 조용히 지우지 않는다)
+      - "skipped_cap" — max_rewrites_per_report 초과로 미시도
+      - "exception" — 처리 중 예외 발생(이 issue 하나만 실패로 기록, 나머지 issue
+        처리는 계속됨)
+    각 결과에는 원본 issue의 category/quoted_sentence/section_kind/index/
+    system_or_key/field를 그대로 echo한다 — path가 같은 issue가 둘 이상이어도
+    어느 결과가 어느 원본 issue에 대응하는지 항상 구분 가능하게 한다(이전엔 이
+    정보가 전혀 없었음). is_naturalness_pass_complete()가 이 반환값을 그대로 소비한다."""
+    results = []
+    attempted = 0
+    _accepted_field_targets = set()
+    for issue in issues:
+        base = _echo_issue_fields(issue)
+        if issue.get("category") not in target_categories:
+            results.append({
+                **base, **_UNATTEMPTED_RESULT_BASE, "accepted": False, "stage": "out_of_scope_category",
+                "reason": f"category {issue.get('category')!r}는 이 폐쇄 루프의 자동 대상이 아님(수동 검토 필요)",
+            })
+            continue
+        if attempted >= max_rewrites_per_report:
+            results.append({
+                **base, **_UNATTEMPTED_RESULT_BASE, "accepted": False, "stage": "skipped_cap",
+                "reason": f"리포트당 상한({max_rewrites_per_report}) 초과로 미시도",
+            })
+            continue
+        attempted += 1
+        try:
+            result = rewrite_and_validate_issue(
+                report, computed, issue, rewrite_fn=rewrite_fn, groundedness_call_fn=groundedness_call_fn,
+            )
+        except Exception as e:  # noqa: BLE001 — 이 issue 하나의 예외가 나머지 issue 처리를 막으면 안 됨
+            result = {**_UNATTEMPTED_RESULT_BASE, "accepted": False, "stage": "exception", "reason": str(e)}
+        # 2026-09-02 추가 — 같은 field를 가리키는 이전 issue가 이미 이번 pass 안에서
+        # ACCEPT됐는데 이번 issue가 path_resolution/paragraph_location에서 실패했다면,
+        # "quoted_sentence가 원래부터 없었다"와 "직전 rewrite가 그 자리를 바꿔서 지금은
+        # 없다"를 구분해 표시한다 — 둘 다 실패 처리(fail-closed)는 동일하지만, 진단
+        # 사유가 완전히 다르므로(Detection이 틀린 게 아니라 같은 배치 안 처리 순서
+        # 때문) 이 구분이 없으면 "Detection이 잘못됐다"로 오인할 위험이 있다.
+        target_key = (issue.get("section_kind"), issue.get("index"), issue.get("system_or_key"), issue.get("field"))
+        if result.get("accepted") is not True and result.get("stage") in ("path_resolution", "paragraph_location") \
+                and target_key in _accepted_field_targets:
+            result = {**result, "stale_due_to_earlier_rewrite_in_this_pass": True}
+        elif result.get("accepted") is True:
+            _accepted_field_targets.add(target_key)
+        results.append({**base, **result})
+    return results
+
+
+def is_naturalness_pass_complete(detection_result, rewrite_results):
+    """Detection→rewrite 사이클 전체가 "완료"로 판정될 수 있는지 확인한다.
+
+    2026-09-02 신설 — 품질 원칙: "대체로 잘 됐다"를 성공 기준으로 쓰지 않는다.
+
+    False를 반환하는 경우(전부 명시적):
+      - detection_result["status"]가 PASS/ISSUES_FOUND가 아님(INCOMPLETE/ERROR —
+        잘린 응답을 완료로 취급하는 사고를 이 레벨에서도 다시 막는다)
+      - rewrite_results 길이가 detection_result["issues"] 길이와 다름(누락 탐지 —
+        run_targeted_rewrite_pass()가 정상이라면 항상 같은 길이를 반환하므로,
+        다르면 그 자체가 상위 호출부의 버그 신호)
+      - rewrite_results 중 하나라도 accepted가 True가 아님 — "out_of_scope_category"
+        (사람이 아직 검토 안 함)ㆍ"skipped_cap"ㆍ실패ㆍ예외를 전부 미해결로 취급한다.
+        category가 이 폐쇄 루프의 자동 대상이 아니라는 사실은 "해결됨"의 이유가
+        되지 않는다.
+
+    True를 반환하는 경우: issues가 전부 빈 배열이거나(Detection PASS), 전부
+    accepted=True로 실제 처리됨."""
+    if detection_result.get("status") not in ("PASS", "ISSUES_FOUND"):
+        return False
+    issues = detection_result.get("issues") or []
+    if len(rewrite_results) != len(issues):
+        return False
+    return all(r.get("accepted") is True for r in rewrite_results)
 
 
 def collect_known_terms(computed):
@@ -1346,6 +2635,29 @@ _SCHEMA_TYPE_CHECK = {
 _SCHEMA_SAFE_DEFAULT = {"object": {}, "array": [], "string": "", "null": None}
 
 
+# 2026-08-31 추가 — STEP9 사고(system_sections가 문자열로 와서 []로 대체됐는데, 사소한
+# 보정과 똑같은 "⚠ 경고"로만 찍혀 심각도가 안 드러남) 대응. 이 필드들은 리포트의 실제
+# 해석 내용을 담는 최상위 구조라, 통째로 빈 기본값으로 대체되면 손님이 낸 돈만큼의
+# 내용이 그 자리에서 사라진다는 뜻 — 그래서 이 필드들에서 발생하는 정규화는 다른 사소한
+# 보정(예: 하위 필드 하나가 비어서 ""로 채워짐)과 구분해 CRITICAL로 표시한다.
+CRITICAL_TOP_LEVEL_FIELDS = frozenset({
+    "system_sections", "cross_analysis", "opportunities", "risks",
+    "action_plan", "question_answers", "long_term_strategy",
+    # 2026-09-01 추가 — #3(D-2). new_reference_systems도 system_sections와 같은 급의
+    # 최상위 구조 데이터(신규5개 시스템 내용)라 손실 시 같은 심각도로 다뤄야 한다.
+    "new_reference_systems",
+})
+
+
+def _correction_severity(path):
+    """path가 "report.<field>" 형태의 최상위 구조 필드를 가리키면 CRITICAL, 그 외
+    (하위 필드 하나, 배열 원소 안쪽 등)는 MINOR — 손실 범위가 다르므로 구분한다."""
+    parts = path.split(".")
+    if len(parts) == 2 and parts[0] == "report" and parts[1] in CRITICAL_TOP_LEVEL_FIELDS:
+        return "CRITICAL"
+    return "MINOR"
+
+
 def normalize_to_schema(value, schema, path, corrections):
     """2026-08-24 추가 — 실제로 두 번 연속 겪은 사고(action_plan이 dict 대신 문자열로,
     question_answers 항목이 dict 대신 문자열로 옴)를 계기로 만든 근본 수정. Anthropic
@@ -1355,9 +2667,15 @@ def normalize_to_schema(value, schema, path, corrections):
     필드에서 같은 사고가 난다 — 그래서 "LLM 응답을 받는 그 즉시, 딱 한 곳에서" 스키마와
     실제 타입을 대조해 안전한 기본값으로 되돌리는 이 함수를 만들었다. 이후로는
     check_hallucination이든 report_kit.py든 전부 이미 정규화된 안전한 데이터만 보게 된다.
-    무엇을 고쳤는지는 전부 corrections 리스트에 남겨 화면에 경고로 띄운다(내용이 조용히
-    사라지면 안 되므로) — 코드가 안 죽는 것과, 손님에게 나갈 리포트에 구멍이 난 걸 사람이
-    아는 것은 별개다."""
+    무엇을 고쳤는지는 전부 corrections 리스트에 {"path","severity","message"} 딕셔너리로
+    남겨 화면에 경고로 띄운다(내용이 조용히 사라지면 안 되므로) — 코드가 안 죽는 것과,
+    손님에게 나갈 리포트에 구멍이 난 걸 사람이 아는 것은 별개다.
+
+    2026-08-31 추가 — 이 함수는 여기서 절대 "문자열을 억지로 배열/객체로 추측 변환"하지
+    않는다(1번 규칙과 같은 이유 — 애매한 추측으로 잘못된 내용을 끼워넣지 않음). 유일한
+    복구 시도는 "정말로 같은 내용이 JSON 문자열로 이중 인코딩된 경우"뿐이고, 그마저
+    실패하면 안전한 빈 기본값으로 대체하며 CRITICAL로 표시한다 — 오류를 숨기는 게
+    아니라 원본 보존(main()의 raw 백업)과 명확한 손실 감지가 목적이다."""
     types = schema.get("type")
     if types is None:
         return value
@@ -1376,14 +2694,20 @@ def normalize_to_schema(value, schema, path, corrections):
             try:
                 reparsed = json.loads(value)
                 if any(_SCHEMA_TYPE_CHECK.get(t, lambda v: False)(reparsed) for t in types):
-                    corrections.append(f"{path}: 문자열로 이중 인코딩되어 있던 걸 재파싱으로 복구함")
+                    corrections.append({
+                        "path": path, "severity": "MINOR",
+                        "message": f"{path}: 문자열로 이중 인코딩되어 있던 걸 재파싱으로 복구함",
+                    })
                     value = reparsed
                     types = [t for t in types if _SCHEMA_TYPE_CHECK[t](value)]
             except (json.JSONDecodeError, TypeError):
                 pass
         if not any(_SCHEMA_TYPE_CHECK.get(t, lambda v: False)(value) for t in types):
             default = next((_SCHEMA_SAFE_DEFAULT[t] for t in types if t in _SCHEMA_SAFE_DEFAULT), None)
-            corrections.append(f"{path}: 예상 타입({'/'.join(types)})이 아님(실제: {type(value).__name__}) → {default!r}로 대체")
+            corrections.append({
+                "path": path, "severity": _correction_severity(path),
+                "message": f"{path}: 예상 타입({'/'.join(types)})이 아님(실제: {type(value).__name__}) → {default!r}로 대체",
+            })
             return default
 
     if isinstance(value, dict) and "properties" in schema:
@@ -1404,7 +2728,11 @@ def normalize_to_schema(value, schema, path, corrections):
                 if isinstance(key_types, str):
                     key_types = [key_types]
                 default = next((_SCHEMA_SAFE_DEFAULT[t] for t in (key_types or []) if t in _SCHEMA_SAFE_DEFAULT), None)
-                corrections.append(f"{path}.{key}: 필수 필드가 응답에 아예 없음 → {default!r}로 채움")
+                sub_path = f"{path}.{key}"
+                corrections.append({
+                    "path": sub_path, "severity": _correction_severity(sub_path),
+                    "message": f"{sub_path}: 필수 필드가 응답에 아예 없음 → {default!r}로 채움",
+                })
                 result[key] = default
         return result
 
@@ -1510,6 +2838,53 @@ _NEW_SYSTEM_BUILDERS = {
     "seongmyeonghak": _build_seongmyeonghak_section, "pungsu": _build_pungsu_section,
     "taekil": _build_taekil_section,
 }
+
+_NEW5_SYSTEM_KEYS = ("tojeong", "yukhyo", "seongmyeonghak", "pungsu", "taekil")
+
+
+def _has_new5_body_content(obj):
+    """system_sections 항목이든 new_reference_systems[key] 값이든, 실제 본문이 있는지
+    같은 기준(body 10자 이상)으로 판단 — ensure_required_new_engine_sections()의
+    기존 _has_content()와 동일한 임계값(2026-08-30 도입 이유도 동일: 태그만 있고
+    본문이 비어있는 걸 "있다"고 오판하지 않기 위함)."""
+    return isinstance(obj, dict) and isinstance(obj.get("body"), str) and len(obj.get("body").strip()) >= 10
+
+
+def _merge_new_reference_systems_into_sections(report):
+    """2026-09-01 추가 — #3(D-2). new_reference_systems(dict key 기반)에 LLM이 채운
+    내용을 system_sections(배열) 항목 모양으로 변환해 병합한다.
+
+    이 함수 이후로는 ensure_required_new_engine_sections()를 포함한 모든 하위 로직이
+    지금까지와 똑같이 system_sections 하나만 보면 된다(report_kit.py PDF 렌더러도
+    변경 없음) — new_reference_systems는 이 함수 안에서만 소비되는 입력 채널.
+
+    두 경로 동시 존재 시 중복 생성 방지: system_sections에 이미 같은 system 태그로
+    유효한 콘텐츠(_has_new5_body_content)가 있으면(LLM이 예전 방식대로 직접 썼거나,
+    이 함수가 이미 병합해둔 경우) new_reference_systems 쪽 값은 무시하고 건너뛴다."""
+    nrs = report.get("new_reference_systems")
+    if not isinstance(nrs, dict):
+        return
+    sections = report.get("system_sections")
+    if not isinstance(sections, list):
+        return
+
+    existing_tags = {
+        s.get("system") for s in sections
+        if isinstance(s, dict) and _has_new5_body_content(s)
+    }
+    for key in _NEW5_SYSTEM_KEYS:
+        if key in existing_tags:
+            continue  # system_sections 쪽에 이미 유효 콘텐츠 존재 — 중복 생성 금지
+        entry = nrs.get(key)
+        if not _has_new5_body_content(entry):
+            continue
+        sections.append({
+            "system": key,
+            "heading": entry.get("heading") or "",
+            "body": entry.get("body") or "",
+            "key_insight": entry.get("key_insight") or "",
+            "takeaways": entry.get("takeaways") or [],
+        })
 
 
 def ensure_required_new_engine_sections(report, computed):
@@ -2022,6 +3397,15 @@ def check_required_tier_sections(report, computed):
         if minimum and len(sections) < minimum:
             problems.append(f"{tier}는 system_sections가 최소 {minimum}개여야 하는데 {len(sections)}개임")
 
+        # 2026-08-31 추가 — STEP6 사고(#4): tarot 전용 섹션이 통째로 빠졌는데도 saju+
+        # astrology+신규5개 합만으로 개수 기준(min_by_tier)을 넘겨 이 함수가 "통과"를
+        # 찍은 걸 실제로 확인함 — 개수만 보고 "구매한 체계 각각의 존재"는 한 번도 검사한
+        # 적이 없었다는 게 근본 원인. saju/astrology/tarot도 tojeong 등 5개와 동일하게
+        # computed.json에 그 체계가 있으면 system_sections에도 반드시 있어야 한다.
+        for core_system in ("saju", "astrology", "tarot"):
+            if computed.get(core_system) and core_system not in systems_present:
+                problems.append(f"{tier}는 computed.{core_system}이 있는데 {core_system} 전용 섹션이 없음")
+
         if tier in ("dual", "master", "premium") and "tojeong" not in systems_present:
             problems.append(f"{tier}는 saju.tojeong 전용 섹션이 반드시 있어야 하는데 없음(10-F-1번)")
         if tier in ("master", "premium") and "yukhyo" not in systems_present:
@@ -2056,6 +3440,179 @@ def check_required_tier_sections(report, computed):
             print(f"    - {p}")
     else:
         print(f"✓ 티어별 필수 섹션 검사 통과({tier})")
+
+
+class ComputedContractError(RuntimeError):
+    """2026-09-03 추가 — STEP2(computed contract 안정화). report.json(LLM 출력) 쪽에는
+    normalize_to_schema()라는 정교한 타입 강제+손실 로깅 장치가 있는데, computed.json
+    (JS 엔진 출력) 쪽에는 top-level 3개 시스템 존재 여부(enforce_purchased_core_systems_
+    present) 외엔 검증이 전혀 없었다 — 나머지 전부 `.get(...) or {}` 체인으로만 소비돼,
+    엔진 필드가 깨지거나 이름이 바뀌어도 코드가 죽지 않고 조용히 빈 값으로 흘러가는
+    구조였다(2차/3차 감사에서 확인, 12운성 뜻풀이 오등록 실제 사고가 바로 이 비대칭
+    때문에 한 번 발생했었음).
+
+    이 예외는 "본문 생성ㆍ검증에 실제로 쓰이는 것으로 확인된" 핵심 필드
+    (saju.pillars/saju.shensha/saju.correspondence.shi_shen_meanings)가 실제로 깨져
+    있을 때만 발생한다 — astrology/tarot/tojeong 같은 tier별 optional system이
+    없는 것은 정상이며 이 예외 대상이 아니다(enforce_computed_core_contract 참고).
+    CoreSystemMissingError/ForbiddenTierSystemError와 동일한 하드블록 철학 — uncaught로
+    전파돼 main()의 report.json 저장 전에 파이프라인을 멈추고 raw 백업을 자연스럽게
+    보존한다. 단, 이 검증은 computed 로드 직후(call_llm 호출 전)에 실행해 애초에
+    깨진 계산값으로 유료 API를 호출하는 낭비 자체를 막는다(CoreSystemMissingError보다
+    이른 시점)."""
+
+
+def enforce_computed_core_contract(computed):
+    """computed.json의 핵심 계약 필드를 검증한다. 존재하지 않아야 할 optional system
+    (astrology/tarot/tojeong/yukhyo 등, tier마다 다름)은 절대 건드리지 않는다 — saju
+    자체는 이 프로젝트의 모든 tier에 공통으로 존재하는 핵심 시스템이므로(catalog.js
+    전 tier 기준 확인), saju 및 그 아래 세 핵심 필드만 검증 대상이다.
+
+    잘못된 값을 조용히 기본값으로 대체하지 않는다 — 깨져 있으면 그대로 예외를 던진다
+    (report.json의 normalize_to_schema와 다른 지점: 저건 "LLM이 가끔 스키마를 어길 수
+    있으니 안전하게 되돌린다"는 복구 장치이고, 이건 "우리가 만든 계산값 자체가 깨지면
+    그건 원본 데이터 오류이니 감추지 말고 즉시 알아야 한다"는 하드블록이라 목적이
+    다르다)."""
+    if not isinstance(computed, dict):
+        raise ComputedContractError("computed 자체가 dict가 아님 — 원본 JSON을 확인할 것")
+
+    saju = computed.get("saju")
+    if not isinstance(saju, dict):
+        raise ComputedContractError("computed.saju가 없거나 dict가 아님(이 프로젝트의 모든 tier가 saju를 포함해야 함)")
+
+    # --- pillars: saju.js computeSaju()의 pillars={year,month,day,hour} 계약.
+    # hour는 unknown_time이면 의도적으로 None(saju.js:98) — None 자체는 정상, 구조가
+    # 아예 다르거나 ganzhi_ko가 없는 경우만 계약 위반으로 본다.
+    pillars = saju.get("pillars")
+    if not isinstance(pillars, dict):
+        raise ComputedContractError("computed.saju.pillars가 없거나 dict가 아님")
+    for key in ("year", "month", "day"):
+        p = pillars.get(key)
+        if not isinstance(p, dict) or not p.get("ganzhi_ko"):
+            raise ComputedContractError(f"computed.saju.pillars.{key}이 없거나 ganzhi_ko가 없음")
+    hour = pillars.get("hour")
+    if hour is not None and (not isinstance(hour, dict) or not hour.get("ganzhi_ko")):
+        raise ComputedContractError("computed.saju.pillars.hour이 None(시간 미상)도 아니고 유효한 구조도 아님")
+
+    # --- shensha: shensha.js computeShensha()의 taohua/yeokma/hwagae/hongyeom 계약.
+    # "없음" 상태는 present:false로만 표현되고(key 자체가 빠지거나 null이 되는 경우는
+    # 없음) — SHENSHA_KEY_TO_LABEL(기존 상수 재사용, 새로 만들지 않음)의 4개 키 전부
+    # present(bool)+meaning(문자열)을 항상 가져야 한다.
+    shensha = saju.get("shensha")
+    if not isinstance(shensha, dict):
+        raise ComputedContractError("computed.saju.shensha가 없거나 dict가 아님")
+    for key in SHENSHA_KEY_TO_LABEL:
+        entry = shensha.get(key)
+        if not isinstance(entry, dict) or "present" not in entry or not entry.get("meaning"):
+            raise ComputedContractError(
+                f"computed.saju.shensha.{key} 구조가 깨짐(present/meaning이 있는 dict여야 함)"
+            )
+
+    # --- correspondence.shi_shen_meanings: correspondence.js buildCorrespondence()의
+    # 계약. 이 손님의 실제 네 기둥에 등장한 십신만 담기므로 list 자체는 비어있을 수
+    # 있다(빈 리스트는 정상) — 각 원소가 name을 가진 dict인지만 확인한다. meaning은
+    # null일 수 있음(JS: SHI_SHEN_MEANING[s] || null)을 build_term_gloss_map()이 이미
+    # 안전하게 처리하므로(항목 자체를 건너뜀) meaning까지 필수로 강제하지 않는다.
+    correspondence = saju.get("correspondence")
+    if not isinstance(correspondence, dict):
+        raise ComputedContractError("computed.saju.correspondence가 없거나 dict가 아님")
+    shi_shen_meanings = correspondence.get("shi_shen_meanings")
+    if not isinstance(shi_shen_meanings, list):
+        raise ComputedContractError("computed.saju.correspondence.shi_shen_meanings가 list가 아님")
+    for item in shi_shen_meanings:
+        if not isinstance(item, dict) or not item.get("name"):
+            raise ComputedContractError(
+                "computed.saju.correspondence.shi_shen_meanings의 항목 구조가 깨짐(name이 있는 dict여야 함)"
+            )
+
+
+class CoreSystemMissingError(RuntimeError):
+    """2026-08-31 추가 — #4(타로 누락) 재발 방지. 구매한 핵심 체계(saju/astrology/
+    tarot)가 system_sections에서 통째로 빠졌을 때 조용히 넘어가지 않고 파이프라인을
+    여기서 완전히 멈춘다.
+
+    신규5개 시스템처럼 코드가 computed.json 값을 f-string으로 대신 채우는 fallback을
+    tarot에 만들지 않는다 — 타로 해석은 카드ㆍ계산값ㆍ손님 상황을 엮는 진짜 해석이
+    필요해서, 미리 계산된 값을 그대로 나열하는 수준의 fallback을 만들면 "핵심 해석을
+    코드 템플릿으로 대체"하게 되어 이전에 사용자가 명시적으로 금지한 원칙을 어기게
+    된다. saju/astrology도 같은 이유로 fallback이 없다(지금까지 실제로 빠진 적이
+    없었을 뿐, 빠지면 이 예외도 saju/astrology에 똑같이 적용된다).
+
+    이 예외가 발생하면 report.json은 저장되지 않고(main()에서 이 호출 뒤에 저장
+    로직이 있음), 파이프라인 끝의 raw_backup_path.unlink()도 실행되지 않아 raw
+    원본이 자동으로 남는다 — 별도 보존 로직을 추가하지 않고 "예외가 전파되면 정리
+    코드가 안 돈다"는 자연스러운 성질만으로 raw를 지킨다."""
+
+
+def enforce_purchased_core_systems_present(report, computed):
+    sections = report.get("system_sections")
+    systems_present = (
+        {s.get("system") for s in sections if isinstance(s, dict)}
+        if isinstance(sections, list) else set()
+    )
+    missing = [
+        system for system in ("saju", "astrology", "tarot")
+        if computed.get(system) and system not in systems_present
+    ]
+    if missing:
+        raise CoreSystemMissingError(
+            f"구매한 핵심 체계가 system_sections에 전혀 없음: {missing} — "
+            "이 리포트는 저장ㆍ발송하면 안 됨. raw 백업(정규화 전 원본)을 확인해 재처리할 것."
+        )
+
+
+class ForbiddenTierSystemError(RuntimeError):
+    """2026-09-01 추가 — #16 dual 실제 API 검증에서 실제로 발생한 사고 대응. dual(10만원)
+    고객에게 master(15만원) 전용 new_reference_systems.yukhyo가 LLM 자체 판단으로
+    생성됨을 실제 API 응답에서 확인함 — 컴파일된 dual 프롬프트에 "MASTER 이상은 그에
+    더해 yukhyo"라는 tier gating 문구가 명시돼 있었음에도 LLM이 이를 무시했다. 즉
+    프롬프트 문구 문제가 아니라 결정론적 강제 장치의 부재가 근본 원인이었다(사용자 지시
+    그대로).
+
+    CoreSystemMissingError(필수 체계 누락, #4)와 반대 방향의 문제(금지 체계 과다 생성)
+    지만, "이 예외가 전파되면 main()의 report.json 저장ㆍraw_backup_path.unlink()가
+    자동으로 안 돈다"는 동일한 하드블록 메커니즘을 그대로 재사용한다(새 예외 처리 골격을
+    따로 만들지 않음). 원인이 서로 다르므로 이름만 구분한다(원인 추적성ㆍCoreSystem
+    MissingError와 혼동 방지) — 취급 방식(전파ㆍraw 보존ㆍ검증 API 호출 차단)은 완전히
+    동일하다."""
+
+
+def enforce_tier_system_boundaries(report, computed):
+    """신규5개 시스템(tojeong/yukhyo/seongmyeonghak/pungsu/taekil) 중 이 tier가 허용하지
+    않은 것이 실제 콘텐츠로 존재하면 하드 블록한다.
+
+    허용 집합은 _TIER_REQUIRED_NEW_SYSTEMS 하나만으로 정의한다(정책 이중 정의 금지 —
+    사용자 지시). 이 5개 체계는 "필수"와 "허용" 사이에 별도의 "선택적으로 있어도 되는"
+    중간 상태가 없으므로(각 tier는 정확히 이만큼만 받기로 설계된 유료 상품 구성),
+    forbidden = 전체 5개 - required로 그대로 도출해도 안전하다.
+
+    main()에서 _merge_new_reference_systems_into_sections() 바로 뒤, ensure_required_
+    new_engine_sections()(fallback) 앞에서 호출해야 한다 — 병합 전에는 new_reference_
+    systems 경로로 들어온 위반을 못 보고(legacy system_sections 경로만 보임), 병합
+    후여야 두 경로가 합쳐진 최종 system_sections를 정확히 판정할 수 있다.
+
+    "실제 콘텐츠로 존재"의 판정 기준(_has_new5_body_content, body 10자 이상)은 병합
+    함수의 판정 기준과 완전히 동일 — null/빈 객체({})는 병합 단계에서 이미 system_
+    sections에 반영되지 않으므로(merge 함수 참고), 이 함수 시점에는 애초에 "진짜
+    콘텐츠가 있는 항목"만 보게 된다. 별도의 null/empty 특수 처리를 추가하지 않는다."""
+    tier = computed.get("tier")
+    allowed = set(_TIER_REQUIRED_NEW_SYSTEMS.get(tier) or [])
+    forbidden = set(_NEW5_SYSTEM_KEYS) - allowed
+
+    sections = report.get("system_sections")
+    if not isinstance(sections, list):
+        return
+
+    violations = sorted({
+        s.get("system") for s in sections
+        if isinstance(s, dict) and s.get("system") in forbidden and _has_new5_body_content(s)
+    })
+    if violations:
+        raise ForbiddenTierSystemError(
+            f"'{tier}' tier에 허용되지 않은 신규 참고시스템이 실제 콘텐츠로 생성됨: "
+            f"{violations} — 이 리포트는 저장ㆍ발송하면 안 됨(고객이 구매하지 않은 상위 "
+            "티어 콘텐츠가 포함될 위험). raw 백업(정규화 전 원본)을 확인해 재처리할 것."
+        )
 
 
 def check_hallucination(report, known_terms, valid_years):
@@ -2604,6 +4161,9 @@ def verify_groundedness(report, computed):
     쌓이면 재검토), 이 함수 자체가 실패해도(API 에러ㆍ타임아웃 등) 본 파이프라인은
     절대 죽지 않는다 — 이미 돈을 낸 리포트 생성 결과를 이 부가 검증 때문에
     날리면 안 된다는 원칙은 check_hallucination() 도입 계기와 동일하다."""
+    # try 블록 밖에서 먼저 검사 — try 안에 두면 'except Exception'이 이 차단 자체를
+    # 삼켜서 "검증 호출 실패, 넘어감"으로만 찍히고 테스트가 실제로는 안전한지 알 수 없게 됨.
+    _block_if_offline_test_mode("verify_groundedness")
     try:
         client = anthropic.Anthropic()
         prompt = (
@@ -2620,11 +4180,23 @@ def verify_groundedness(report, computed):
             "있으면 각각을 다음 형식으로 나열하세요:\n"
             "- (어느 섹션인지) 주장 내용 — 계산값과 다른/없는 이유"
         )
+        # 2026-09-03 — sonnet-5 호환성 조정(verify_naturalness/verify_field_groundedness와
+        # 동일 이유). 이 프롬프트는 report+computed 전체를 담아 이미 긴데, thinking까지
+        # 조용히 켜지면 max_tokens=1536 중 상당 부분을 사고에 먼저 써서 대조 결과 텍스트가
+        # 잘릴 위험이 커진다.
         resp = client.messages.create(
             model=GROUNDEDNESS_MODEL,
             max_tokens=1536,
+            thinking={"type": "disabled"},
             messages=[{"role": "user", "content": prompt}],
         )
+        # 2026-08-30 추가 — API usage 계측 3단계. 기존 코드는 resp.content만 읽고 resp.usage를
+        # 한 번도 참조하지 않아 이 호출의 토큰 사용량이 어디에도 안 남았음(그동안 확인 불가
+        # 상태였던 원인) — 순수 관측용 로그만 추가, 검증 로직/반환값은 전혀 안 바뀜.
+        api_usage.log_usage_record(api_usage.build_usage_record(
+            call_purpose="verify_groundedness", model=GROUNDEDNESS_MODEL, usage=resp.usage,
+            tier=computed.get("tier"), thinking_disabled=True,
+        ))
         result = "".join(
             block.text for block in resp.content if getattr(block, "type", None) == "text"
         ).strip()
@@ -2637,67 +4209,6 @@ def verify_groundedness(report, computed):
             )
     except Exception as e:  # noqa: BLE001 — 이 검증이 죽어도 본 파이프라인은 계속돼야 함
         print(f"⚠ 참고: 의미 기반 근거 검증 호출 실패({e}) — 이 검증만 건너뜀, 리포트 생성 자체엔 영향 없음")
-
-
-def verify_naturalness(report):
-    """2026-08-29 추가 — 사용자가 실제 발송된 리포트 문장("겉으로는 튀는 소리를 내면서도
-    속으로는 결국 손에 잡히는 결과물을 원하는 이중적인 결")을 보고 지적: 사실은 안 틀렸는데
-    표면/본심을 대비시키는 문장이 그 대비의 근거를 안 밝혀서 헷갈리게 읽히고, "튀는 소리"
-    같은 추상적 표현이 뭘 가리키는지 안 밝혀져 있었음. verify_groundedness()는 사실 관계만
-    보므로 이 문제는 못 잡는다 — 표현 방식 전담 검증이 필요해서 신설.
-
-    같은 원칙: 경고만 남기고 발송을 막지 않으며, 이 함수가 실패해도 파이프라인은 절대 안
-    죽는다(이미 돈을 낸 리포트를 이 부가 검증 때문에 날리면 안 됨)."""
-    try:
-        client = anthropic.Anthropic()
-        prompt = (
-            "아래는 사주 리포트 본문입니다. 사실 관계가 아니라 '표현이 자연스럽고 명확한가'만 "
-            "검토하세요.\n\n"
-            "2026-08-29 확장 — 처음엔 아래 1ㆍ2번만 잡았는데, 그 뒤에도 같은 계열의 다른 "
-            "실수(연결어미 오용, 지시어 모호성 등)가 실제로 또 나와서 검사 범위를 넓힘. "
-            "다음을 찾으세요:\n"
-            "1. '겉으로는 ~하지만 속으로는/사실은 ~' 같은 표면-본심 대비 문장인데, 왜 그 둘이 "
-            "반대되거나 긴장 관계인지 문장 안에서 설명되지 않은 경우(독자가 '그게 무슨 "
-            "뜻이지?'라고 되물어야 하는 경우)\n"
-            "2. '튀는 소리', '이중적인 결'같이 무엇을 가리키는지 구체적으로 안 밝혀진 "
-            "추상적ㆍ문학적 표현\n"
-            "3. '~지만', '~면서도' 같은 대조ㆍ양보 연결어미가, 실제로는 안 부딪히거나 "
-            "거의 같은 뜻인 두 내용 사이에 쓰인 경우(예: '단단하지만 잘 안 굽혀지는' — "
-            "둘 다 같은 성질의 다른 표현이라 대조가 아니라 겹말인 경우)\n"
-            "4. '이', '그', '이 둘' 같은 지시어가 가리키는 대상이 하나로 명확하지 않은 경우 "
-            "(특히 여러 특징이 나열된 뒤에 지시어로 뭉뚱그린 경우, 지시어가 그 특징 전체를 "
-            "가리키는지 일부만 가리키는지 헷갈리는 경우)\n"
-            "5. 사주ㆍ점성술ㆍ타로 용어(십신ㆍ어스펙트 등)를 종류별로 묶어 목록처럼 나열만 "
-            "하고 시작하는 문단(예: '조화로운 삼각 다수 — A-B, C-D...'처럼 근거를 먼저 "
-            "쭉 늘어놓고 그 다음에야 결론이 나오는 구조)\n"
-            "6. 결론(사람 얘기)보다 전문 근거(용어 설명)가 먼저 나오는 문단 — 근거부터 "
-            "설명하고 결론은 마지막에 오는 순서로 쓰인 경우\n"
-            "7. 계산값이나 용어를 언급만 하고, 그게 이 손님의 실제 삶에서 구체적으로 "
-            "어떻게 나타나는지(현실 장면)까지 안 이어간 문장 — 공식만 던지고 이 손님에게 "
-            "대입을 안 한 경우\n"
-            "8. 장점만 나열하고 그림자(부작용ㆍ대가)나 조언 없이 끝난 문단\n"
-            "9. '계산 데이터', '계산값', '분석 체계', '구조적으로 보면', '종합하면', "
-            "'기운의 흐름', '알고리즘' 같은 AI 분석 보고서 냄새가 나는 단어\n\n"
-            "문제 없으면 \"OK\"라고만 답하세요. 있으면 다음 형식으로 나열하세요:\n"
-            "- (어느 섹션인지) 문제 문장 — 몇 번 항목에 해당하는지ㆍ왜 문제인지\n\n"
-            f"[리포트 본문]\n```json\n{json.dumps(report, ensure_ascii=False)}\n```"
-        )
-        resp = client.messages.create(
-            model=GROUNDEDNESS_MODEL, max_tokens=1536,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        result = "".join(
-            block.text for block in resp.content if getattr(block, "type", None) == "text"
-        ).strip()
-        if result.upper().startswith("OK"):
-            print("✓ 표현 자연스러움 검증 통과")
-        else:
-            print(
-                "⚠ 경고: 표현이 헷갈리거나 부자연스러운 문장 발견 — 발송 전 반드시 사람이 확인할 것:\n"
-                f"{result}"
-            )
-    except Exception as e:  # noqa: BLE001 — 이 검증이 죽어도 본 파이프라인은 계속돼야 함
-        print(f"⚠ 참고: 자연스러움 검증 호출 실패({e}) — 이 검증만 건너뜀, 리포트 생성 자체엔 영향 없음")
 
 
 QUESTION_LOG_PATH = HERE / "logs" / "question_answerability_log.jsonl"
@@ -2725,6 +4236,63 @@ def log_question_answerability(report, computed, log_path=QUESTION_LOG_PATH):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     counts = Counter(qa.get("answerability") for qa in qas)
     print(f"질문 판정 로그 기록 완료: {dict(counts)} (누적 로그 위치: {log_path})")
+
+
+NATURALNESS_PASS_LOG_PATH = HERE / "logs" / "naturalness_pass_log.jsonl"
+
+
+def log_naturalness_pass_result(naturalness_result, rewrite_pass_results, complete, computed,
+                                 log_path=NATURALNESS_PASS_LOG_PATH):
+    """2026-09-03 추가 — Naturalness Detection→targeted rewrite 폐쇄 루프를 main()에
+    처음 배선하면서 같이 추가한 감시 로그. log_question_answerability()와 동일한
+    append-only 패턴 — "미해결 issue가 있었다"는 사실을 절대 덮어쓰거나 지우지 않고
+    쌓기만 한다(나중에 print_log_summary처럼 실측 집계가 가능하도록).
+
+    중요: complete=False여도 여기서 예외를 던지거나 리포트 저장을 막지 않는다.
+    verify_naturalness()/verify_groundedness()가 이미 따르는 원칙("이미 돈을 낸
+    리포트를 부가 검증 때문에 날리면 안 됨")을 그대로 따른다 — 이 함수의 역할은
+    미해결 상태를 "조용히 사라지지 않게" 만드는 것뿐이고, 발송 여부를 결정하는
+    게이트가 아니다."""
+    resolved = sum(1 for r in rewrite_pass_results if r.get("accepted") is True)
+    unresolved = [r for r in rewrite_pass_results if r.get("accepted") is not True]
+
+    if naturalness_result.get("status") not in ("PASS", "ISSUES_FOUND"):
+        print(
+            f"⚠ 경고: naturalness Detection이 완료되지 못함(status={naturalness_result.get('status')}) "
+            "— 이번 실행에서는 표현 품질 폐쇄 루프가 완료로 판정될 수 없음(발송 자체는 계속 진행됨)"
+        )
+    elif not rewrite_pass_results:
+        print("✓ naturalness Detection: issue 없음 — 폐쇄 루프 완료(complete=True)")
+    else:
+        print(
+            f"naturalness 폐쇄 루프: 총 {len(rewrite_pass_results)}건 중 {resolved}건 resolved, "
+            f"{len(unresolved)}건 미해결(complete={complete})"
+        )
+        for r in unresolved:
+            print(
+                f"    - 미해결: {r.get('section_kind')}[{r.get('index')}].{r.get('field')} "
+                f"category={r.get('category')} stage={r.get('stage')} — {r.get('reason')}"
+            )
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({
+            "logged_at": datetime.now(timezone.utc).isoformat(),
+            "tier": computed.get("tier"),
+            "detection_status": naturalness_result.get("status"),
+            "issue_count": len(naturalness_result.get("issues") or []),
+            "resolved_count": resolved,
+            "unresolved_count": len(unresolved),
+            "complete": complete,
+            "unresolved": [
+                {
+                    "category": r.get("category"), "stage": r.get("stage"), "reason": r.get("reason"),
+                    "section_kind": r.get("section_kind"), "index": r.get("index"),
+                    "system_or_key": r.get("system_or_key"), "field": r.get("field"),
+                }
+                for r in unresolved
+            ],
+        }, ensure_ascii=False) + "\n")
 
 
 def print_log_summary(log_path=QUESTION_LOG_PATH):
@@ -2762,6 +4330,12 @@ def main():
 
     computed_path = Path(sys.argv[1])
     computed = json.loads(computed_path.read_text(encoding="utf-8"))
+    # 2026-09-03 추가 — STEP2(computed contract 안정화). enforce_purchased_core_systems_
+    # present보다 먼저(=call_llm 호출 전) 실행해, 애초에 깨진 계산값으로 유료 API를
+    # 호출하는 낭비 자체를 막는다. 이 예외는 잡지 않고 그대로 전파시켜 main()을
+    # 완전히 중단시킨다(report.json 저장 전, raw_backup_path 관련 로직 전) — 같은
+    # 하드블록 철학을 그대로 재사용.
+    enforce_computed_core_contract(computed)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ANTHROPIC_API_KEY 환경변수가 없음 — Anthropic Console에서 API 키 발급 필요")
@@ -2772,23 +4346,47 @@ def main():
     report, usage = call_llm(computed)
     print(f"완료. 토큰 사용량: 입력 {usage.input_tokens} / 출력 {usage.output_tokens}")
 
+    out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else computed_path.with_suffix(".report.json")
+    # 2026-08-31 수정 — STEP9 사고 대응: 이전 코드는 normalize_to_schema() 호출 *뒤에*
+    # "raw" 백업을 저장해서, LLM이 실제로 반환한 원본(예: system_sections가 문자열로
+    # 왔던 그 상태)이 파이프라인 어디에도 한순간도 기록되지 않았다 — normalize_to_schema
+    # 호출 *전*인 지금 이 시점의 report가 진짜 원본(call_llm()의 block.input 그대로)이다.
+    # 이후 단계가 죽어도, 또는 정규화가 내용을 비워도 이 파일로 원인을 확인할 수 있다.
+    raw_backup_path = out_path.with_suffix(".raw.json")
+    raw_backup_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
     # 2026-08-24 추가 — 응답을 받는 즉시 스키마와 실제 타입을 대조해 정규화(normalize_to_
     # schema 문서화 참고). 이후의 모든 코드(이 파일의 검증 함수들 + report_kit.py의 PDF
     # 렌더링)는 이 시점부터 항상 스키마와 맞는 안전한 데이터만 보게 된다.
     schema_corrections = []
     report = normalize_to_schema(report, REPORT_SCHEMA["input_schema"], "report", schema_corrections)
-    if schema_corrections:
-        print(f"⚠ 경고: LLM 응답이 스키마와 맞지 않아 {len(schema_corrections)}건 자동 보정함 — 해당 부분은 리포트에서 비어있을 수 있으니 발송 전 확인할 것:")
-        for c in schema_corrections:
-            print(f"    - {c}")
+    critical_corrections = [c for c in schema_corrections if c["severity"] == "CRITICAL"]
+    minor_corrections = [c for c in schema_corrections if c["severity"] != "CRITICAL"]
+    if critical_corrections:
+        print(f"🚨 CRITICAL: LLM 응답의 최상위 구조 필드 {len(critical_corrections)}건이 "
+              "타입 오류로 빈 값으로 대체됨 — 손님이 낸 돈만큼의 내용이 사라졌을 수 있음, "
+              "발송 전 반드시 원본(아래 보존 경로)을 확인할 것:")
+        for c in critical_corrections:
+            print(f"    - {c['message']}")
+    if minor_corrections:
+        print(f"⚠ 경고: LLM 응답이 스키마와 맞지 않아 {len(minor_corrections)}건 자동 보정함 — 해당 부분은 리포트에서 비어있을 수 있으니 발송 전 확인할 것:")
+        for c in minor_corrections:
+            print(f"    - {c['message']}")
 
-    out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else computed_path.with_suffix(".report.json")
-    # 2026-08-24 추가 — 실제로 이 아래(check_hallucination)에서 예상 못 한 응답 모양 때문에
-    # 죽으면서, 이미 돈을 내고 받은 LLM 응답이 저장도 안 된 채 통째로 날아간 사고가 있었음.
-    # 그래서 LLM 호출이 끝나는 즉시(뒤에 나올 검증ㆍ정제 단계가 뭘 하든 상관없이) 원본을
-    # 먼저 디스크에 저장해둔다 — 이후 단계가 죽어도 최소한 이 raw 파일로 복구할 수 있다.
-    raw_backup_path = out_path.with_suffix(".raw.json")
-    raw_backup_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 2026-08-31 추가 — 데이터 손실(schema_corrections 발생)이 있으면 원본을 삭제하지
+    # 않고, 어느 실행에서 발생했는지 추적 가능한 이름으로 영구 보존한다. 이 파일이
+    # 남아있다는 사실 자체가 "이 주문에서 원본 손실이 있었다"는 증거가 된다.
+    if schema_corrections:
+        incident_stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        incident_path = out_path.parent / f"{out_path.stem}.SCHEMA_INCIDENT_{incident_stamp}.raw.json"
+        incident_path.write_text(raw_backup_path.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"📁 원본 보존됨(스키마 보정 발생) — {incident_path}")
+
+    # 2026-08-31 추가 — #4(타로 누락) 재발 방지. normalize_to_schema() 직후, 아직 아무
+    # 유료 검증 호출(verify_groundedness/verify_naturalness)도 하기 전에 검사한다 —
+    # 여기서 실패하면 그 검증 호출 비용도 아낀다. 이 예외는 잡지 않고 그대로 전파시켜
+    # main()을 완전히 중단시킨다(report.json 저장 전, raw_backup_path.unlink() 전).
+    enforce_purchased_core_systems_present(report, computed)
 
     # 2026-08-29 추가 — 모델이 `{{용어명}}`으로 표시만 해둔 자리에, 코드가 항상 정확한
     # 뜻풀이를 채워 넣는다. 검증(뒤의 check_term_glosses)이 아니라 생성 단계 자체를
@@ -2807,7 +4405,9 @@ def main():
     # 빠졌다 — 그 섹션들이 통째로 강조 없는 밋밋한 텍스트로 남아 check_emphasis_markers가
     # "강조 부족" 경고를 내는 걸로 실제 확인함(프리미엄 샘플 재검증 중 발견). 신규 섹션을
     # 먼저 채운 뒤에 강조를 매겨야 그 섹션들도 빠짐없이 강조 대상이 된다.
-    ensure_required_new_engine_sections(report, computed)  # 신규 5개 시스템 섹션이 빠지면 computed.json 실제 값으로 코드가 직접 채움
+    _merge_new_reference_systems_into_sections(report)  # 2026-09-01 추가(#3 D-2) — new_reference_systems(dict key)에 LLM이 채운 내용을 system_sections로 병합, 이후 로직은 전부 system_sections만 봄
+    enforce_tier_system_boundaries(report, computed)  # 2026-09-01 추가(#16) — dual에 yukhyo가 실제로 생성된 사고 대응. 이 예외는 잡지 않고 그대로 전파시켜 main()을 중단시킨다(report.json 저장 전, raw_backup_path.unlink() 전) — enforce_purchased_core_systems_present와 동일한 하드블록 철학
+    ensure_required_new_engine_sections(report, computed)  # 신규 5개 시스템 섹션이 빠지면(위 병합 후에도 없으면) computed.json 실제 값으로 코드가 직접 채움
     ensure_emphasis(report)  # 생성 단계 자체를 고침 — 강조 누락이 애초에 최종 산출물에 남을 수 없게 함
     ensure_unanswerable_reason(report)  # redirected/unanswerable 인용구 박스가 비지 않도록 body 첫 문장 재사용
     ensure_tarot_suit_tally(report, computed)  # 타로 카드 계열 개수를 LLM이 잘못 셌으면 computed.json 실제 값으로 문장의 수사를 코드가 직접 고침
@@ -2827,7 +4427,16 @@ def main():
     check_term_glosses(report)  # 최종 안전망 — {{}}를 안 쓰고 용어를 그냥 맨몸으로 쓴 경우만 여기서 잡힘
     check_emphasis_markers(report)  # ensure_emphasis() 이후에도 남는 예외가 있는지 계속 눈으로 볼 것(항상 통과해야 정상)
     verify_groundedness(report, computed)  # 정규식으로 못 잡는 의미 단위 오류(값 바꿔치기 등) 대조
-    verify_naturalness(report)  # 사실은 맞는데 표현이 헷갈리거나 부자연스러운 문장 대조
+    naturalness_result = verify_naturalness(report, tier=computed.get("tier"))  # 사실은 맞는데 표현이 헷갈리거나 부자연스러운 문장 대조
+    # 2026-09-03 추가 — Detection이 찾은 issue를 실제로 처리하는 폐쇄 루프를 여기서
+    # 처음 실전에 배선한다(run_targeted_rewrite_pass()는 그동안 mock 검증 전용이었음).
+    # ACCEPT된 rewrite는 report를 직접(in-place) 갈아 끼우므로 이후 단계(sanitize_report
+    # 등)는 자동으로 갱신된 내용을 본다. complete가 False여도 리포트 저장ㆍ발송은
+    # 절대 막지 않는다 — verify_naturalness()/verify_groundedness()와 동일한 원칙
+    # ("이미 돈을 낸 리포트를 부가 검증 때문에 날리면 안 됨").
+    rewrite_pass_results = run_targeted_rewrite_pass(report, computed, naturalness_result["issues"])
+    naturalness_pass_complete = is_naturalness_pass_complete(naturalness_result, rewrite_pass_results)
+    log_naturalness_pass_result(naturalness_result, rewrite_pass_results, naturalness_pass_complete, computed)
 
     # 2026-08-24 추가 — 위 경고는 "얼마나 자주 어겼는지" 계속 지켜보기 위한 것일 뿐,
     # 실제로 저장ㆍ발송되는 리포트에는 폰트가 못 그리는 글자가 아예 없어야 한다(사용자
@@ -2840,9 +4449,12 @@ def main():
 
     out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"리포트 JSON 저장: {out_path}")
-    # 최종 저장이 여기까지 문제없이 왔다는 건 raw 백업이 더 이상 필요 없다는 뜻 — 폴더에
+    # 2026-08-31 수정 — schema_corrections가 발생했으면(데이터 손실 있었음) raw 백업을
+    # 삭제하지 않는다(사용자 지시 B — "원본 raw 백업을 삭제하지 말고 보존"). 손실이
+    # 없었을 때만(최종 저장까지 문제없이 왔고 정규화도 아무것도 안 고쳤을 때만) 폴더에
     # 쌍둥이 파일이 계속 쌓이지 않도록 정리한다.
-    raw_backup_path.unlink(missing_ok=True)
+    if not schema_corrections:
+        raw_backup_path.unlink(missing_ok=True)
     print("(PDF 생성은 report_kit.py 완성 후 build_pdf_from_report()로 이어서 처리)")
 
 

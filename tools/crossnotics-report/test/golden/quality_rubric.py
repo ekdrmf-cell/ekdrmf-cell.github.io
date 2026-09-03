@@ -216,9 +216,15 @@ def judge_semantic_quality(report, computed, model=None):
         f"[계산값]\n```json\n{json.dumps(computed, ensure_ascii=False)}\n```\n\n"
         f"[리포트 본문]\n```json\n{json.dumps(report, ensure_ascii=False)}\n```"
     )
+    # 2026-09-03 — GROUNDEDNESS_MODEL 기본값이 claude-sonnet-5로 바뀌면서 이 채점자도
+    # 자동으로 sonnet-5를 쓰게 됨(judge_model = model or br.GROUNDEDNESS_MODEL). sonnet-5는
+    # thinking을 명시 안 하면 기본으로 켜지므로, build_report.py의 다른 실제 API 호출들과
+    # 동일하게 명시적으로 꺼서 채점 스키마 출력이 잘리지 않게 한다 — 채점 기준ㆍ프롬프트는
+    # 그대로.
     resp = client.messages.create(
         model=judge_model,
         max_tokens=1024,
+        thinking={"type": "disabled"},
         tools=[_QUALITY_SCORE_SCHEMA],
         tool_choice={"type": "tool", "name": "submit_quality_scores"},
         messages=[{"role": "user", "content": prompt}],
