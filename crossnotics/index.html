@@ -80,7 +80,7 @@
     </div>
 
     <div class="cn-diff cn-reveal" id="cn-diff">
-      <div class="cn-diff-title">다른 사주 사이트는 상상도 못 하는 것들</div>
+      <div class="cn-diff-title">매번 새로 계산하는 진짜 사주</div>
       <p class="cn-diff-intro">대부분의 사주 사이트는 하루 만에 미리 써둔 문구를 태어난 날의 천간(일간) 하나로 골라
       보여줍니다 — 나와 같은 일간이면 수백만 명이 똑같은 문장을 받는 셈입니다. 천지인운명관은 다릅니다.
       신청서에 입력한 생년월일시(필요하면 출생지까지) 그대로, 매번 처음부터 다시 계산합니다.</p>
@@ -90,7 +90,9 @@
         <li><b>타로 10장 스프레드(켈틱크로스)</b> — 카드조차 알고리즘으로 뽑고 기록, 손으로 지어내지 않음</li>
         <li><b>행동DNA 15문항</b> — 손님이 직접 답한 실제 선택 데이터를 사주ㆍ별자리 신호와 교차검증해 10년 로드맵에 그대로 반영(프리미엄 전용)</li>
         <li><b>세 체계 교차검증</b> — 사주ㆍ별자리ㆍ타로가 같은 곳을 가리키는지, 감이 아니라 수치(일치도)로 확인</li>
+        <li><b>직접 남기는 질문</b> — 지금 가장 궁금한 걸 직접 적어주시면, 티어별로 최대 12개까지 실제 계산값을 근거로 정면으로 답변해 드립니다</li>
       </ul>
+      <p class="cn-q-warning">⚠️ 질문은 한 번 제출하면 다시 바꿀 수 없으니 신중하게 정해서 적어주세요. "어떻게 하면 신이 될 수 있나요?"처럼 사주ㆍ점성술ㆍ타로로 답할 수 없는 질문은 피해주시고, 지금 고민 중인 구체적인 상황을 적어주시면 훨씬 정확한 답을 받으실 수 있어요.</p>
       <div class="cn-diff-free">
         <div class="cn-diff-free-title">무료로 함께 드립니다 🎁</div>
         <p>상대방 생년월일만 입력하면, 두 사람의 사주 궁합(DUAL 이상은 별자리 궁합까지)을 추가 비용 한 푼
@@ -384,7 +386,7 @@
       code: "crossnotics-saju-light", tierKey: "light", label: "LIGHT", name: "사주 라이트 진단", price: 30000,
       systems: ["saju"], systemLabels: ["사주"], questionLimit: 1,
       daeYunRange: "현재 구간부터", hasOppRisk: false, hasActionPlan: false, hasLongTerm: false,
-      features: ["사주 네 기둥 전체 해석 — 타고난 기질ㆍ성향 세부 요소 포함", "지금 시기(10년 단위 흐름)의 운세 + 올해 운세ㆍ띠 관계", "성명학ㆍ풍수지리ㆍ육효ㆍ주역ㆍ토정비결ㆍ택일도 질문으로 물어보면 답변 가능", "질문 1개까지"],
+      features: ["사주 네 기둥 전체 해석 — 타고난 기질ㆍ성향 세부 요소 포함", "지금 시기(10년 단위 흐름)의 운세 + 올해 운세ㆍ띠 관계", "성명학ㆍ풍수지리ㆍ육효ㆍ주역ㆍ토정비결ㆍ택일도 질문으로 물어보면 답변 가능", "상대방 정보 입력 시 사주 궁합 챕터 자동 추가(무료)", "질문 1개까지"],
     },
     {
       code: "crossnotics-saju-only", tierKey: "single", label: "SINGLE", name: "사주 단독 진단", price: 50000,
@@ -564,7 +566,8 @@
       questionsEl.innerHTML = `<p class="cn-preview-sub" style="margin:0;">이 상품은 질문 없이 사주 네 기둥과 오행 흐름만 짧게 알려드립니다 — 궁금한 점을 직접 묻고 싶으시면 위에서 "사주 라이트 진단" 이상을 선택해주세요.</p>`;
       return;
     }
-    let html = `<label>궁금한 점 (선택, 최대 ${n}개)</label>`;
+    let html = `<p class="cn-q-warning">⚠️ 질문은 한 번 제출하면 다시 바꿀 수 없으니 신중하게 정해서 적어주세요. "어떻게 하면 신이 될 수 있나요?"처럼 사주ㆍ점성술ㆍ타로로 답할 수 없는 질문은 피해주시고, 지금 고민 중인 구체적인 상황을 적어주시면 훨씬 정확한 답을 받으실 수 있어요.</p>`;
+    html += `<label>궁금한 점 (선택, 최대 ${n}개)</label>`;
     for (let i = 0; i < n; i++) {
       const ph = CN_QUESTION_EXAMPLES[i % CN_QUESTION_EXAMPLES.length];
       html += `<div class="cn-question-item"><textarea class="cn-q" placeholder="예: ${ph}" rows="1"></textarea></div>`;

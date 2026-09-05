@@ -453,6 +453,16 @@ body::before {
 .cn-form .check input { margin-top: 3px; }
 .cn-question-item { margin-bottom: 8px; }
 .cn-question-item label { margin-bottom: 2px; }
+.cn-q-warning {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--warn);
+  background: rgba(224, 178, 92, 0.1);
+  border: 1px solid rgba(224, 178, 92, 0.28);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 0 10px;
+}
 
 /* 2026-08-24 추가 — 행동DNA 15문항(PREMIUM 전용). 공지문 톤의 안내문 +
    상황극 카드 목록. 라디오 보기는 폼의 다른 입력과 구분되게 카드 안에 두어
